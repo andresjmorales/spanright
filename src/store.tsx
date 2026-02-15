@@ -135,7 +135,7 @@ function reducer(state: State, action: Action): State {
           }
         : state
     case 'SET_CANVAS_SCALE':
-      return { ...state, canvasScale: Math.max(5, Math.min(20, action.scale)) }
+      return { ...state, canvasScale: Math.max(6, Math.min(20, action.scale)) }
     case 'PAN_CANVAS':
       return {
         ...state,
