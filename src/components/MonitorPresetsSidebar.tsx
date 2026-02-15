@@ -105,7 +105,7 @@ export default function MonitorPresetsSidebar() {
     return (
       <button
         onClick={() => setCollapsed(false)}
-        className="absolute top-2 left-2 z-30 flex items-center gap-1.5 bg-gray-800/90 hover:bg-gray-700 border border-gray-600/50 hover:border-gray-500 backdrop-blur-sm text-gray-300 hover:text-white text-xs font-medium px-2.5 py-1.5 rounded-md shadow-lg transition-all"
+        className="absolute top-8 left-8 z-30 flex items-center gap-1.5 bg-gray-800/90 hover:bg-gray-700 border border-gray-600/50 hover:border-gray-500 backdrop-blur-sm text-gray-300 hover:text-white text-xs font-medium px-2.5 py-1.5 rounded-md shadow-lg transition-all"
       >
         <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
           <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
@@ -117,7 +117,7 @@ export default function MonitorPresetsSidebar() {
 
   return (
     <div
-      className="absolute top-0 left-0 bottom-0 w-72 z-30 bg-gray-900 border-r border-gray-800 flex flex-col overflow-hidden shadow-xl"
+      className="absolute top-7 left-7 bottom-2 w-72 z-30 bg-gray-900 border border-gray-700 rounded-lg flex flex-col overflow-hidden shadow-xl"
     >
           {/* Header with title and collapse button */}
           <div className="p-3 border-b border-gray-800 flex items-center justify-between">
@@ -151,13 +151,13 @@ export default function MonitorPresetsSidebar() {
 
           <div className="flex-1 overflow-y-auto p-2 space-y-3">
             {laptops.length > 0 && (
-              <PresetGroup title="Laptops" presets={laptops} onAdd={addPreset} unit={state.unit} canvasScale={state.canvasScale} />
+              <PresetGroup title="Laptops" presets={laptops} onAdd={addPreset} unit={state.unit} canvasScale={state.canvasScale} nextColorIndex={state.monitors.length} />
             )}
             {standard.length > 0 && (
-              <PresetGroup title="Standard Monitors" presets={standard} onAdd={addPreset} unit={state.unit} canvasScale={state.canvasScale} />
+              <PresetGroup title="Standard Monitors" presets={standard} onAdd={addPreset} unit={state.unit} canvasScale={state.canvasScale} nextColorIndex={state.monitors.length} />
             )}
             {ultrawides.length > 0 && (
-              <PresetGroup title="Ultrawides" presets={ultrawides} onAdd={addPreset} unit={state.unit} canvasScale={state.canvasScale} />
+              <PresetGroup title="Ultrawides" presets={ultrawides} onAdd={addPreset} unit={state.unit} canvasScale={state.canvasScale} nextColorIndex={state.monitors.length} />
             )}
           </div>
 
@@ -289,7 +289,7 @@ function buildDragImage(preset: MonitorPreset, index: number, canvasScale: numbe
   const { width: physW, height: physH } = calculatePhysicalDimensions(preset.resolutionX, preset.resolutionY, ppi)
 
   // Match the canvas zoom scale, but cap to avoid browser drag image limits
-  const MAX_DRAG_DIM = 500
+  const MAX_DRAG_DIM = 280
   let w = Math.round(physW * canvasScale)
   let h = Math.round(physH * canvasScale)
   if (w > MAX_DRAG_DIM || h > MAX_DRAG_DIM) {
@@ -361,18 +361,20 @@ function PresetGroup({
   onAdd,
   unit,
   canvasScale,
+  nextColorIndex,
 }: {
   title: string
   presets: MonitorPreset[]
   onAdd: (p: MonitorPreset) => void
   unit: 'inches' | 'cm'
   canvasScale: number
+  nextColorIndex: number
 }) {
-  const handleDragStart = (e: React.DragEvent, preset: MonitorPreset, index: number) => {
+  const handleDragStart = (e: React.DragEvent, preset: MonitorPreset) => {
     e.dataTransfer.setData('application/monitor-preset', JSON.stringify(preset))
     e.dataTransfer.effectAllowed = 'copy'
 
-    const { canvas, offsetX, offsetY } = buildDragImage(preset, index, canvasScale)
+    const { canvas, offsetX, offsetY } = buildDragImage(preset, nextColorIndex, canvasScale)
     // The element must be in the DOM for setDragImage to work in all browsers
     document.body.appendChild(canvas)
     e.dataTransfer.setDragImage(canvas, offsetX, offsetY)
@@ -394,7 +396,7 @@ function PresetGroup({
               key={`${preset.name}-${i}`}
               draggable
               onClick={() => onAdd(preset)}
-              onDragStart={(e) => handleDragStart(e, preset, i)}
+              onDragStart={(e) => handleDragStart(e, preset)}
               className="w-full text-left bg-gray-800 hover:bg-gray-750 hover:bg-gray-700 border border-gray-700 hover:border-gray-600 rounded p-2 transition-colors group cursor-grab active:cursor-grabbing"
             >
               <div className="text-sm font-medium text-gray-200 group-hover:text-white">

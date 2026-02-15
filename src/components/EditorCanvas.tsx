@@ -20,6 +20,186 @@ function getMonitorColor(index: number): string {
   return MONITOR_COLORS[index % MONITOR_COLORS.length]
 }
 
+const RULER_SIZE = 24
+const DEFAULT_SCALE = 10
+
+// Physical workspace bounds (inches) — ~12ft x 8ft
+const PHYS_MIN_X = -12
+const PHYS_MAX_X = 132
+const PHYS_MIN_Y = -12
+const PHYS_MAX_Y = 84
+
+function getNiceInterval(pixelsPerUnit: number, minPixelGap = 60): { major: number; minor: number } {
+  if (pixelsPerUnit <= 0) return { major: 10, minor: 2 }
+  const rawInterval = minPixelGap / pixelsPerUnit
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rawInterval)))
+  const normalized = rawInterval / magnitude
+  let nice: number
+  if (normalized <= 1) nice = 1
+  else if (normalized <= 2) nice = 2
+  else if (normalized <= 5) nice = 5
+  else nice = 10
+  const major = nice * magnitude
+  const divisions = nice === 2 ? 4 : 5
+  return { major, minor: major / divisions }
+}
+
+function RulerOverlay({
+  width,
+  height,
+  canvasScale,
+  canvasOffsetX,
+  canvasOffsetY,
+  unit,
+}: {
+  width: number
+  height: number
+  canvasScale: number
+  canvasOffsetX: number
+  canvasOffsetY: number
+  unit: 'inches' | 'cm'
+}) {
+  const hRef = useRef<HTMLCanvasElement>(null)
+  const vRef = useRef<HTMLCanvasElement>(null)
+
+  useEffect(() => {
+    const unitFactor = unit === 'cm' ? 2.54 : 1
+    const pxPerUnit = canvasScale / unitFactor
+    const { major, minor } = getNiceInterval(pxPerUnit)
+
+    function formatLabel(v: number): string {
+      if (Math.abs(v) < 0.001) return '0'
+      if (Number.isInteger(v)) return v.toString()
+      const s = v.toFixed(1)
+      return s.endsWith('.0') ? v.toFixed(0) : s
+    }
+
+    function isMajorTick(u: number): boolean {
+      const rem = Math.abs(u % major)
+      return rem < minor * 0.01 || Math.abs(rem - major) < minor * 0.01
+    }
+
+    // --- Horizontal ruler ---
+    const hCanvas = hRef.current
+    if (hCanvas) {
+      const dpr = window.devicePixelRatio || 1
+      hCanvas.width = width * dpr
+      hCanvas.height = RULER_SIZE * dpr
+      const ctx = hCanvas.getContext('2d')!
+      ctx.scale(dpr, dpr)
+
+      ctx.fillStyle = '#0d1117'
+      ctx.fillRect(0, 0, width, RULER_SIZE)
+
+      ctx.strokeStyle = '#1e293b'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(0, RULER_SIZE - 0.5)
+      ctx.lineTo(width, RULER_SIZE - 0.5)
+      ctx.stroke()
+
+      const startUnit = Math.floor(((RULER_SIZE - canvasOffsetX) / canvasScale) * unitFactor / minor) * minor
+      const endUnit = Math.ceil(((width - canvasOffsetX) / canvasScale) * unitFactor / minor) * minor
+
+      for (let u = startUnit; u <= endUnit + minor * 0.5; u = +(u + minor).toFixed(10)) {
+        const screenX = (u / unitFactor) * canvasScale + canvasOffsetX
+        if (screenX < RULER_SIZE - 1 || screenX > width) continue
+
+        const isMaj = isMajorTick(u)
+        const tickLen = isMaj ? 12 : 5
+
+        ctx.strokeStyle = isMaj ? '#475569' : '#334155'
+        ctx.lineWidth = isMaj ? 1 : 0.5
+        ctx.beginPath()
+        ctx.moveTo(Math.round(screenX) + 0.5, RULER_SIZE)
+        ctx.lineTo(Math.round(screenX) + 0.5, RULER_SIZE - tickLen)
+        ctx.stroke()
+
+        if (isMaj) {
+          ctx.fillStyle = '#94a3b8'
+          ctx.font = '9px system-ui, -apple-system, sans-serif'
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'top'
+          ctx.fillText(formatLabel(u), screenX, 2)
+        }
+      }
+    }
+
+    // --- Vertical ruler ---
+    const vCanvas = vRef.current
+    if (vCanvas) {
+      const dpr = window.devicePixelRatio || 1
+      vCanvas.width = RULER_SIZE * dpr
+      vCanvas.height = height * dpr
+      const ctx = vCanvas.getContext('2d')!
+      ctx.scale(dpr, dpr)
+
+      ctx.fillStyle = '#0d1117'
+      ctx.fillRect(0, 0, RULER_SIZE, height)
+
+      ctx.strokeStyle = '#1e293b'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(RULER_SIZE - 0.5, 0)
+      ctx.lineTo(RULER_SIZE - 0.5, height)
+      ctx.stroke()
+
+      const startUnit = Math.floor(((RULER_SIZE - canvasOffsetY) / canvasScale) * unitFactor / minor) * minor
+      const endUnit = Math.ceil(((height - canvasOffsetY) / canvasScale) * unitFactor / minor) * minor
+
+      for (let u = startUnit; u <= endUnit + minor * 0.5; u = +(u + minor).toFixed(10)) {
+        const screenY = (u / unitFactor) * canvasScale + canvasOffsetY
+        if (screenY < RULER_SIZE - 1 || screenY > height) continue
+
+        const isMaj = isMajorTick(u)
+        const tickLen = isMaj ? 12 : 5
+
+        ctx.strokeStyle = isMaj ? '#475569' : '#334155'
+        ctx.lineWidth = isMaj ? 1 : 0.5
+        ctx.beginPath()
+        ctx.moveTo(RULER_SIZE, Math.round(screenY) + 0.5)
+        ctx.lineTo(RULER_SIZE - tickLen, Math.round(screenY) + 0.5)
+        ctx.stroke()
+
+        if (isMaj) {
+          ctx.fillStyle = '#94a3b8'
+          ctx.font = '9px system-ui, -apple-system, sans-serif'
+          ctx.save()
+          ctx.translate(8, screenY)
+          ctx.rotate(-Math.PI / 2)
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.fillText(formatLabel(u), 0, 0)
+          ctx.restore()
+        }
+      }
+    }
+  }, [width, height, canvasScale, canvasOffsetX, canvasOffsetY, unit])
+
+  return (
+    <>
+      <canvas
+        ref={hRef}
+        className="absolute top-0 left-0 pointer-events-none z-10"
+        style={{ width, height: RULER_SIZE }}
+      />
+      <canvas
+        ref={vRef}
+        className="absolute top-0 left-0 pointer-events-none z-10"
+        style={{ width: RULER_SIZE, height }}
+      />
+      <div
+        className="absolute top-0 left-0 z-20 flex items-center justify-center pointer-events-none border-b border-r border-[#1e293b]"
+        style={{ width: RULER_SIZE, height: RULER_SIZE, background: '#0d1117' }}
+      >
+        <span className="text-[8px] text-gray-500 font-medium select-none">
+          {unit === 'cm' ? 'cm' : 'in'}
+        </span>
+      </div>
+    </>
+  )
+}
+
 export default function EditorCanvas() {
   const { state, dispatch } = useStore()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -95,7 +275,7 @@ export default function EditorCanvas() {
     const availH = dimensions.height - padding * 2
     const scaleX = availW / bbox.width
     const scaleY = availH / bbox.height
-    const newScale = Math.max(5, Math.min(20, Math.min(scaleX, scaleY)))
+    const newScale = Math.max(7.5, Math.min(20, Math.min(scaleX, scaleY)))
     const newOffsetX = padding - bbox.minX * newScale + (availW - bbox.width * newScale) / 2
     const newOffsetY = padding - bbox.minY * newScale + (availH - bbox.height * newScale) / 2
     dispatch({ type: 'SET_CANVAS_SCALE', scale: newScale })
@@ -116,6 +296,34 @@ export default function EditorCanvas() {
   const scale = state.canvasScale
   const offsetX = state.canvasOffsetX
   const offsetY = state.canvasOffsetY
+
+  // Clamp panning to workspace bounds (with overflow so the boundary line is visible)
+  useEffect(() => {
+    const OVERFLOW = 80 // extra screen pixels past the boundary edge
+    const minOX = dimensions.width - PHYS_MAX_X * scale - OVERFLOW
+    const maxOX = -PHYS_MIN_X * scale + OVERFLOW
+    const minOY = dimensions.height - PHYS_MAX_Y * scale - OVERFLOW
+    const maxOY = -PHYS_MIN_Y * scale + OVERFLOW
+
+    let clampedX = offsetX
+    let clampedY = offsetY
+
+    if (minOX <= maxOX) {
+      clampedX = Math.max(minOX, Math.min(maxOX, offsetX))
+    } else {
+      clampedX = (minOX + maxOX) / 2
+    }
+
+    if (minOY <= maxOY) {
+      clampedY = Math.max(minOY, Math.min(maxOY, offsetY))
+    } else {
+      clampedY = (minOY + maxOY) / 2
+    }
+
+    if (Math.abs(clampedX - offsetX) > 0.5 || Math.abs(clampedY - offsetY) > 0.5) {
+      dispatch({ type: 'SET_CANVAS_OFFSET', x: clampedX, y: clampedY })
+    }
+  }, [offsetX, offsetY, scale, dimensions.width, dimensions.height, dispatch])
 
   // Convert physical inches to canvas pixels
   const toCanvasX = useCallback((physInches: number) => physInches * scale + offsetX, [scale, offsetX])
@@ -141,7 +349,7 @@ export default function EditorCanvas() {
       // Ctrl+Scroll = Zoom (toward pointer)
       const oldScale = state.canvasScale
       const zoomFactor = e.evt.deltaY > 0 ? 0.9 : 1.1
-      const newScale = Math.max(5, Math.min(20, oldScale * zoomFactor))
+      const newScale = Math.max(7.5, Math.min(20, oldScale * zoomFactor))
       const physX = (pointer.x - state.canvasOffsetX) / oldScale
       const physY = (pointer.y - state.canvasOffsetY) / oldScale
       const newOffsetX = pointer.x - physX * newScale
@@ -237,34 +445,24 @@ export default function EditorCanvas() {
     reader.onload = (ev) => {
       const img = new Image()
       img.onload = () => {
-        const bbox = getMonitorsBoundingBox(state.monitors)
         const imgAspect = img.naturalWidth / img.naturalHeight
-        let physWidth: number, physHeight: number
+        const physWidth = 72 // 6 feet
+        const physHeight = physWidth / imgAspect
 
-        if (bbox.width > 0 && bbox.height > 0) {
-          const bboxAspect = bbox.width / bbox.height
-          if (imgAspect > bboxAspect) {
-            physHeight = bbox.height * 1.1
-            physWidth = physHeight * imgAspect
-          } else {
-            physWidth = bbox.width * 1.1
-            physHeight = physWidth / imgAspect
-          }
-        } else {
-          physWidth = 30
-          physHeight = physWidth / imgAspect
-        }
-
-        const centerX = bbox.width > 0 ? bbox.minX + (bbox.width - physWidth) / 2 : 0
-        const centerY = bbox.height > 0 ? bbox.minY + (bbox.height - physHeight) / 2 : 0
+        // Center on current viewport
+        const container = containerRef.current
+        const viewW = container?.clientWidth ?? 800
+        const viewH = container?.clientHeight ?? 500
+        const centerPhysX = (viewW / 2 - state.canvasOffsetX) / state.canvasScale
+        const centerPhysY = (viewH / 2 - state.canvasOffsetY) / state.canvasScale
 
         const sourceImage: SourceImage = {
           element: img,
           fileName: file.name,
           naturalWidth: img.naturalWidth,
           naturalHeight: img.naturalHeight,
-          physicalX: centerX,
-          physicalY: centerY,
+          physicalX: centerPhysX - physWidth / 2,
+          physicalY: centerPhysY - physHeight / 2,
           physicalWidth: physWidth,
           physicalHeight: physHeight,
         }
@@ -273,7 +471,7 @@ export default function EditorCanvas() {
       img.src = ev.target?.result as string
     }
     reader.readAsDataURL(file)
-  }, [state.monitors, state.canvasOffsetX, state.canvasOffsetY, state.canvasScale, state.snapToGrid, state.gridSize, dispatch])
+  }, [state.canvasOffsetX, state.canvasOffsetY, state.canvasScale, state.snapToGrid, state.gridSize, dispatch])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -287,7 +485,6 @@ export default function EditorCanvas() {
   // Generate grid lines
   const gridLines: React.ReactNode[] = []
   const gridSpacing = state.gridSize * scale
-  const unitMultiplier = state.unit === 'cm' ? 2.54 : 1
 
   if (gridSpacing > 4) {
     const startX = Math.floor(-offsetX / gridSpacing) * gridSpacing
@@ -324,29 +521,6 @@ export default function EditorCanvas() {
     }
   }
 
-  // Grid labels
-  const gridLabels: React.ReactNode[] = []
-  if (gridSpacing > 20) {
-    const majorStep = 5 * state.gridSize
-    const startXLabel = Math.floor(-offsetX / (majorStep * scale)) * majorStep
-    for (let physX = startXLabel; physX * scale + offsetX < dimensions.width; physX += majorStep) {
-      const cx = physX * scale + offsetX
-      if (cx < 30 || cx > dimensions.width) continue
-      const displayVal = state.unit === 'cm' ? (physX * unitMultiplier).toFixed(0) : physX.toFixed(0)
-      gridLabels.push(
-        <Text key={`lx-${physX}`} x={cx + 2} y={2} text={displayVal} fontSize={9} fill="#475569" listening={false} />
-      )
-    }
-    const startYLabel = Math.floor(-offsetY / (majorStep * scale)) * majorStep
-    for (let physY = startYLabel; physY * scale + offsetY < dimensions.height; physY += majorStep) {
-      const cy = physY * scale + offsetY
-      if (cy < 15 || cy > dimensions.height) continue
-      const displayVal = state.unit === 'cm' ? (physY * unitMultiplier).toFixed(0) : physY.toFixed(0)
-      gridLabels.push(
-        <Text key={`ly-${physY}`} x={2} y={cy + 2} text={displayVal} fontSize={9} fill="#475569" listening={false} />
-      )
-    }
-  }
 
   // Handle monitor drag
   const handleMonitorDragEnd = useCallback((monitor: Monitor, e: Konva.KonvaEventObject<DragEvent>) => {
@@ -532,6 +706,28 @@ export default function EditorCanvas() {
     </>
   )
 
+  // Workspace boundary — darken everything outside the bounds
+  const bx = toCanvasX(PHYS_MIN_X)
+  const by = toCanvasY(PHYS_MIN_Y)
+  const bw = (PHYS_MAX_X - PHYS_MIN_X) * scale
+  const bh = (PHYS_MAX_Y - PHYS_MIN_Y) * scale
+  const FAR = 20000
+  const outsideFill = '#1e293b'
+  const workspaceBorder = (
+    <>
+      {/* Top */}
+      <Rect x={-FAR} y={-FAR} width={FAR * 2} height={FAR + by} fill={outsideFill} listening={false} />
+      {/* Bottom */}
+      <Rect x={-FAR} y={by + bh} width={FAR * 2} height={FAR} fill={outsideFill} listening={false} />
+      {/* Left */}
+      <Rect x={-FAR} y={by} width={FAR + bx} height={bh} fill={outsideFill} listening={false} />
+      {/* Right */}
+      <Rect x={bx + bw} y={by} width={FAR} height={bh} fill={outsideFill} listening={false} />
+      {/* Border line */}
+      <Rect x={bx} y={by} width={bw} height={bh} stroke="#475569" strokeWidth={3} listening={false} />
+    </>
+  )
+
   return (
     <div
       ref={containerRef}
@@ -556,8 +752,8 @@ export default function EditorCanvas() {
         <Layer>
           <Rect width={dimensions.width} height={dimensions.height} fill="#0a0a1a" listening={false} />
           {gridLines}
+          {workspaceBorder}
           {originLines}
-          {gridLabels}
         </Layer>
         <Layer>
           {imageNode}
@@ -579,6 +775,16 @@ export default function EditorCanvas() {
           {monitorNodes}
         </Layer>
       </Stage>
+
+      {/* Rulers */}
+      <RulerOverlay
+        width={dimensions.width}
+        height={dimensions.height}
+        canvasScale={scale}
+        canvasOffsetX={offsetX}
+        canvasOffsetY={offsetY}
+        unit={state.unit}
+      />
 
       {/* Canvas menu (top-right) */}
       <CanvasMenu
@@ -602,15 +808,23 @@ export default function EditorCanvas() {
       <div className="absolute bottom-3 right-3 flex flex-col items-end gap-1.5 select-none">
         <div className="bg-gray-900/80 backdrop-blur px-3 py-1.5 rounded text-xs text-gray-400 flex items-center gap-2">
           <button
-            onClick={() => dispatch({ type: 'SET_CANVAS_SCALE', scale: state.canvasScale * 0.8 })}
+            onClick={() => {
+              const pct = (state.canvasScale / DEFAULT_SCALE) * 100
+              const newPct = Math.max(75, Math.floor((pct - 0.5) / 25) * 25)
+              dispatch({ type: 'SET_CANVAS_SCALE', scale: (newPct / 100) * DEFAULT_SCALE })
+            }}
             className="hover:text-white transition-colors px-1"
             title="Zoom out"
           >
             −
           </button>
-          <span>{Math.round(state.canvasScale)}px/in</span>
+          <span>{Math.round((state.canvasScale / DEFAULT_SCALE) * 100)}%</span>
           <button
-            onClick={() => dispatch({ type: 'SET_CANVAS_SCALE', scale: state.canvasScale * 1.25 })}
+            onClick={() => {
+              const pct = (state.canvasScale / DEFAULT_SCALE) * 100
+              const newPct = Math.min(200, Math.ceil((pct + 0.5) / 25) * 25)
+              dispatch({ type: 'SET_CANVAS_SCALE', scale: (newPct / 100) * DEFAULT_SCALE })
+            }}
             className="hover:text-white transition-colors px-1"
             title="Zoom in"
           >
