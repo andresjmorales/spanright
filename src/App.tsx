@@ -16,11 +16,11 @@ export default function App() {
               <path d="M8 21h8M12 17v4" />
             </svg>
             <h1 className="text-sm font-bold text-gray-100 tracking-tight">
-              Wallpaper Resizer
+              Spanwright
             </h1>
           </div>
           <span className="text-xs text-gray-500">
-            Multi-Monitor Alignment Tool
+            Multi-Monitor Wallpaper Alignment Tool
           </span>
         </header>
 

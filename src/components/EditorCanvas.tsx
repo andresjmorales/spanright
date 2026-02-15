@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback, useState } from 'react'
+import React, { useRef, useEffect, useCallback, useState, useMemo, type Dispatch } from 'react'
 import { Stage, Layer, Rect, Text, Group, Image as KonvaImage, Line, Transformer } from 'react-konva'
 import type Konva from 'konva'
 import { useStore } from '../store'
@@ -78,7 +78,7 @@ export default function EditorCanvas() {
     const availH = dimensions.height - padding * 2
     const scaleX = availW / bbox.width
     const scaleY = availH / bbox.height
-    const newScale = Math.max(2, Math.min(40, Math.min(scaleX, scaleY)))
+    const newScale = Math.max(2, Math.min(20, Math.min(scaleX, scaleY)))
     const newOffsetX = padding - bbox.minX * newScale + (availW - bbox.width * newScale) / 2
     const newOffsetY = padding - bbox.minY * newScale + (availH - bbox.height * newScale) / 2
     dispatch({ type: 'SET_CANVAS_SCALE', scale: newScale })
@@ -112,7 +112,7 @@ export default function EditorCanvas() {
     return Math.round(value / state.gridSize) * state.gridSize
   }, [state.snapToGrid, state.gridSize])
 
-  // Handle wheel zoom
+  // Handle wheel: default = pan, Ctrl = zoom
   const handleWheel = useCallback((e: Konva.KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault()
     const stage = stageRef.current
@@ -120,21 +120,26 @@ export default function EditorCanvas() {
     const pointer = stage.getPointerPosition()
     if (!pointer) return
 
-    if (e.evt.shiftKey) {
-      dispatch({ type: 'PAN_CANVAS', dx: -e.evt.deltaX, dy: -e.evt.deltaY })
-      return
+    if (e.evt.ctrlKey || e.evt.metaKey) {
+      // Ctrl+Scroll = Zoom (toward pointer)
+      const oldScale = state.canvasScale
+      const zoomFactor = e.evt.deltaY > 0 ? 0.9 : 1.1
+      const newScale = Math.max(2, Math.min(20, oldScale * zoomFactor))
+      const physX = (pointer.x - state.canvasOffsetX) / oldScale
+      const physY = (pointer.y - state.canvasOffsetY) / oldScale
+      const newOffsetX = pointer.x - physX * newScale
+      const newOffsetY = pointer.y - physY * newScale
+
+      dispatch({ type: 'SET_CANVAS_SCALE', scale: newScale })
+      dispatch({ type: 'SET_CANVAS_OFFSET', x: newOffsetX, y: newOffsetY })
+    } else {
+      // Normal scroll = Pan (vertical by default, horizontal with Shift)
+      if (e.evt.shiftKey) {
+        dispatch({ type: 'PAN_CANVAS', dx: -e.evt.deltaY, dy: 0 })
+      } else {
+        dispatch({ type: 'PAN_CANVAS', dx: -e.evt.deltaX, dy: -e.evt.deltaY })
+      }
     }
-
-    const oldScale = state.canvasScale
-    const zoomFactor = e.evt.deltaY > 0 ? 0.9 : 1.1
-    const newScale = Math.max(2, Math.min(40, oldScale * zoomFactor))
-    const physX = (pointer.x - state.canvasOffsetX) / oldScale
-    const physY = (pointer.y - state.canvasOffsetY) / oldScale
-    const newOffsetX = pointer.x - physX * newScale
-    const newOffsetY = pointer.y - physY * newScale
-
-    dispatch({ type: 'SET_CANVAS_SCALE', scale: newScale })
-    dispatch({ type: 'SET_CANVAS_OFFSET', x: newOffsetX, y: newOffsetY })
   }, [state.canvasScale, state.canvasOffsetX, state.canvasOffsetY, dispatch])
 
   // Middle-mouse or right-click for panning
@@ -171,10 +176,36 @@ export default function EditorCanvas() {
     e.preventDefault()
   }, [])
 
-  // Image drop on canvas
+  // Drop on canvas — handles both image files and monitor presets
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     setIsDragOverCanvas(false)
+
+    // Check if this is a monitor preset drop
+    const presetData = e.dataTransfer.getData('application/monitor-preset')
+    if (presetData) {
+      try {
+        const preset = JSON.parse(presetData) as import('../types').MonitorPreset
+        // Calculate physical position from drop coordinates
+        const container = containerRef.current
+        if (container) {
+          const rect = container.getBoundingClientRect()
+          const canvasX = e.clientX - rect.left
+          const canvasY = e.clientY - rect.top
+          const physX = (canvasX - state.canvasOffsetX) / state.canvasScale
+          const physY = (canvasY - state.canvasOffsetY) / state.canvasScale
+          // Snap position if enabled
+          const snappedX = state.snapToGrid ? Math.round(physX / state.gridSize) * state.gridSize : physX
+          const snappedY = state.snapToGrid ? Math.round(physY / state.gridSize) * state.gridSize : physY
+          dispatch({ type: 'ADD_MONITOR', preset, x: snappedX, y: snappedY })
+        }
+      } catch {
+        // Ignore invalid preset data
+      }
+      return
+    }
+
+    // Otherwise handle image file drop
     const file = e.dataTransfer.files[0]
     if (!file || !file.type.startsWith('image/')) return
 
@@ -217,7 +248,7 @@ export default function EditorCanvas() {
       img.src = ev.target?.result as string
     }
     reader.readAsDataURL(file)
-  }, [state.monitors, dispatch])
+  }, [state.monitors, state.canvasOffsetX, state.canvasOffsetY, state.canvasScale, state.snapToGrid, state.gridSize, dispatch])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -523,38 +554,61 @@ export default function EditorCanvas() {
         </Layer>
       </Stage>
 
-      {/* Zoom controls */}
-      <div className="absolute bottom-3 right-3 bg-gray-900/80 backdrop-blur px-3 py-1.5 rounded text-xs text-gray-400 flex items-center gap-2 select-none">
-        <button
-          onClick={() => dispatch({ type: 'SET_CANVAS_SCALE', scale: state.canvasScale * 0.8 })}
-          className="hover:text-white transition-colors px-1"
-          title="Zoom out"
-        >
-          −
-        </button>
-        <span>{Math.round(state.canvasScale)}px/in</span>
-        <button
-          onClick={() => dispatch({ type: 'SET_CANVAS_SCALE', scale: state.canvasScale * 1.25 })}
-          className="hover:text-white transition-colors px-1"
-          title="Zoom in"
-        >
-          +
-        </button>
-        <div className="w-px h-3 bg-gray-700 mx-0.5" />
-        <button
-          onClick={fitView}
-          className="hover:text-white transition-colors px-1"
-          title="Fit view (F)"
-        >
-          Fit
-        </button>
+      {/* Canvas menu (top-right) */}
+      <CanvasMenu
+        hasMonitors={state.monitors.length > 0}
+        hasImage={!!state.sourceImage}
+        dispatch={dispatch}
+      />
+
+      {/* Custom scrollbars */}
+      <CanvasScrollbars
+        dimensions={dimensions}
+        monitors={state.monitors}
+        sourceImage={state.sourceImage}
+        canvasScale={state.canvasScale}
+        canvasOffsetX={state.canvasOffsetX}
+        canvasOffsetY={state.canvasOffsetY}
+        dispatch={dispatch}
+      />
+
+      {/* Zoom controls + hint */}
+      <div className="absolute bottom-3 right-3 flex flex-col items-end gap-1.5 select-none">
+        <div className="bg-gray-900/80 backdrop-blur px-3 py-1.5 rounded text-xs text-gray-400 flex items-center gap-2">
+          <button
+            onClick={() => dispatch({ type: 'SET_CANVAS_SCALE', scale: state.canvasScale * 0.8 })}
+            className="hover:text-white transition-colors px-1"
+            title="Zoom out"
+          >
+            −
+          </button>
+          <span>{Math.round(state.canvasScale)}px/in</span>
+          <button
+            onClick={() => dispatch({ type: 'SET_CANVAS_SCALE', scale: state.canvasScale * 1.25 })}
+            className="hover:text-white transition-colors px-1"
+            title="Zoom in"
+          >
+            +
+          </button>
+          <div className="w-px h-3 bg-gray-700 mx-0.5" />
+          <button
+            onClick={fitView}
+            className="hover:text-white transition-colors px-1"
+            title="Fit view (F)"
+          >
+            Fit
+          </button>
+        </div>
+        <div className="bg-gray-900/60 backdrop-blur px-2 py-1 rounded text-[10px] text-gray-500">
+          Scroll to pan · Ctrl+Scroll to zoom · Right-click drag to pan
+        </div>
       </div>
 
       {/* Drop overlay */}
       {isDragOverCanvas && (
         <div className="absolute inset-0 flex items-center justify-center bg-blue-500/10 pointer-events-none">
           <div className="bg-gray-900/90 backdrop-blur rounded-lg px-6 py-4 text-center">
-            <div className="text-blue-400 text-sm font-medium">Drop image here</div>
+            <div className="text-blue-400 text-sm font-medium">Drop here</div>
           </div>
         </div>
       )}
@@ -564,13 +618,273 @@ export default function EditorCanvas() {
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-center text-gray-600">
             <div className="text-lg font-medium mb-1">Editor Canvas</div>
-            <div className="text-sm">Add monitors from the sidebar to get started</div>
+            <div className="text-sm">Add monitors from the sidebar, or drag presets here</div>
             <div className="text-xs mt-2 text-gray-700">
-              Scroll to zoom · Right-click drag to pan · Drop images here
+              Scroll to pan · Ctrl+Scroll to zoom · Right-click drag to pan · Drop images here
             </div>
           </div>
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * Dropdown menu in the top-right corner of the canvas.
+ */
+function CanvasMenu({
+  hasMonitors,
+  hasImage,
+  dispatch,
+}: {
+  hasMonitors: boolean
+  hasImage: boolean
+  dispatch: Dispatch<any>
+}) {
+  const [open, setOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [open])
+
+  // Close on Escape
+  useEffect(() => {
+    if (!open) return
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [open])
+
+  return (
+    <div ref={menuRef} className="absolute top-3 right-3 select-none z-10">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="bg-gray-900/80 backdrop-blur hover:bg-gray-800/90 text-gray-400 hover:text-gray-200 px-2 py-1.5 rounded transition-colors"
+        title="Canvas options"
+      >
+        <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
+          <circle cx="8" cy="3" r="1.5" />
+          <circle cx="8" cy="8" r="1.5" />
+          <circle cx="8" cy="13" r="1.5" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-1 w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-xl overflow-hidden">
+          <button
+            disabled={!hasMonitors}
+            onClick={() => {
+              dispatch({ type: 'CLEAR_ALL_MONITORS' })
+              setOpen(false)
+            }}
+            className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-300 disabled:cursor-default transition-colors"
+          >
+            Clear all monitors
+          </button>
+          <button
+            disabled={!hasImage}
+            onClick={() => {
+              dispatch({ type: 'CLEAR_SOURCE_IMAGE' })
+              setOpen(false)
+            }}
+            className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-300 disabled:cursor-default transition-colors"
+          >
+            Remove image
+          </button>
+          <div className="border-t border-gray-700" />
+          <button
+            disabled={!hasMonitors && !hasImage}
+            onClick={() => {
+              dispatch({ type: 'CLEAR_ALL_MONITORS' })
+              dispatch({ type: 'CLEAR_SOURCE_IMAGE' })
+              setOpen(false)
+            }}
+            className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-gray-800 hover:text-red-300 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-red-400 disabled:cursor-default transition-colors"
+          >
+            Reset canvas
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Custom scrollbar overlays that show viewport position relative to content.
+ */
+function CanvasScrollbars({
+  dimensions,
+  monitors,
+  sourceImage,
+  canvasScale,
+  canvasOffsetX,
+  canvasOffsetY,
+  dispatch,
+}: {
+  dimensions: { width: number; height: number }
+  monitors: Monitor[]
+  sourceImage: SourceImage | null
+  canvasScale: number
+  canvasOffsetX: number
+  canvasOffsetY: number
+  dispatch: React.Dispatch<any>
+}) {
+  const SCROLLBAR_SIZE = 8
+  const MIN_THUMB = 30
+  const MARGIN = 2
+
+  // Calculate content bounds in physical space
+  const contentBounds = useMemo(() => {
+    let minX = 0, minY = 0, maxX = 50, maxY = 30
+    for (const m of monitors) {
+      minX = Math.min(minX, m.physicalX)
+      minY = Math.min(minY, m.physicalY)
+      maxX = Math.max(maxX, m.physicalX + m.physicalWidth)
+      maxY = Math.max(maxY, m.physicalY + m.physicalHeight)
+    }
+    if (sourceImage) {
+      minX = Math.min(minX, sourceImage.physicalX)
+      minY = Math.min(minY, sourceImage.physicalY)
+      maxX = Math.max(maxX, sourceImage.physicalX + sourceImage.physicalWidth)
+      maxY = Math.max(maxY, sourceImage.physicalY + sourceImage.physicalHeight)
+    }
+    // Add padding in physical space
+    const padX = (maxX - minX) * 0.3
+    const padY = (maxY - minY) * 0.3
+    return {
+      minX: minX - padX,
+      minY: minY - padY,
+      maxX: maxX + padX,
+      maxY: maxY + padY,
+    }
+  }, [monitors, sourceImage])
+
+  // Convert content bounds to canvas pixels
+  const contentMinCX = contentBounds.minX * canvasScale + canvasOffsetX
+  const contentMaxCX = contentBounds.maxX * canvasScale + canvasOffsetX
+  const contentMinCY = contentBounds.minY * canvasScale + canvasOffsetY
+  const contentMaxCY = contentBounds.maxY * canvasScale + canvasOffsetY
+
+  const totalW = contentMaxCX - contentMinCX
+  const totalH = contentMaxCY - contentMinCY
+
+  // Horizontal scrollbar
+  const hTrackWidth = dimensions.width - SCROLLBAR_SIZE - MARGIN * 2
+  const hThumbRatio = Math.min(1, dimensions.width / totalW)
+  const hThumbWidth = Math.max(MIN_THUMB, hTrackWidth * hThumbRatio)
+  const hScrollRange = hTrackWidth - hThumbWidth
+  const hContentScroll = totalW > dimensions.width ? (0 - contentMinCX) / (totalW - dimensions.width) : 0
+  const hThumbLeft = Math.max(0, Math.min(hScrollRange, hScrollRange * hContentScroll))
+
+  // Vertical scrollbar
+  const vTrackHeight = dimensions.height - SCROLLBAR_SIZE - MARGIN * 2
+  const vThumbRatio = Math.min(1, dimensions.height / totalH)
+  const vThumbHeight = Math.max(MIN_THUMB, vTrackHeight * vThumbRatio)
+  const vScrollRange = vTrackHeight - vThumbHeight
+  const vContentScroll = totalH > dimensions.height ? (0 - contentMinCY) / (totalH - dimensions.height) : 0
+  const vThumbTop = Math.max(0, Math.min(vScrollRange, vScrollRange * vContentScroll))
+
+  const showH = hThumbRatio < 0.99
+  const showV = vThumbRatio < 0.99
+
+  // Drag state refs
+  const hDragging = useRef(false)
+  const vDragging = useRef(false)
+  const dragStart = useRef({ x: 0, y: 0, thumbPos: 0 })
+
+  useEffect(() => {
+    const handleMove = (e: MouseEvent) => {
+      if (hDragging.current) {
+        const delta = e.clientX - dragStart.current.x
+        const newThumb = Math.max(0, Math.min(hScrollRange, dragStart.current.thumbPos + delta))
+        const scrollFraction = hScrollRange > 0 ? newThumb / hScrollRange : 0
+        const newContentMinCX = -scrollFraction * (totalW - dimensions.width)
+        const newOffsetX = newContentMinCX - contentBounds.minX * canvasScale
+        dispatch({ type: 'SET_CANVAS_OFFSET', x: newOffsetX, y: canvasOffsetY })
+      }
+      if (vDragging.current) {
+        const delta = e.clientY - dragStart.current.y
+        const newThumb = Math.max(0, Math.min(vScrollRange, dragStart.current.thumbPos + delta))
+        const scrollFraction = vScrollRange > 0 ? newThumb / vScrollRange : 0
+        const newContentMinCY = -scrollFraction * (totalH - dimensions.height)
+        const newOffsetY = newContentMinCY - contentBounds.minY * canvasScale
+        dispatch({ type: 'SET_CANVAS_OFFSET', x: canvasOffsetX, y: newOffsetY })
+      }
+    }
+    const handleUp = () => {
+      hDragging.current = false
+      vDragging.current = false
+    }
+    window.addEventListener('mousemove', handleMove)
+    window.addEventListener('mouseup', handleUp)
+    return () => {
+      window.removeEventListener('mousemove', handleMove)
+      window.removeEventListener('mouseup', handleUp)
+    }
+  }, [hScrollRange, vScrollRange, totalW, totalH, dimensions, contentBounds, canvasScale, canvasOffsetX, canvasOffsetY, dispatch])
+
+  return (
+    <>
+      {/* Horizontal scrollbar */}
+      {showH && (
+        <div
+          className="absolute left-0 bg-transparent"
+          style={{
+            bottom: MARGIN,
+            height: SCROLLBAR_SIZE,
+            width: hTrackWidth,
+            left: MARGIN,
+          }}
+        >
+          <div
+            className="absolute top-0 h-full rounded-full bg-gray-600/40 hover:bg-gray-500/50 cursor-pointer transition-colors"
+            style={{
+              left: hThumbLeft,
+              width: hThumbWidth,
+            }}
+            onMouseDown={(e) => {
+              e.preventDefault()
+              hDragging.current = true
+              dragStart.current = { x: e.clientX, y: e.clientY, thumbPos: hThumbLeft }
+            }}
+          />
+        </div>
+      )}
+      {/* Vertical scrollbar */}
+      {showV && (
+        <div
+          className="absolute top-0 bg-transparent"
+          style={{
+            right: MARGIN,
+            width: SCROLLBAR_SIZE,
+            height: vTrackHeight,
+            top: MARGIN,
+          }}
+        >
+          <div
+            className="absolute left-0 w-full rounded-full bg-gray-600/40 hover:bg-gray-500/50 cursor-pointer transition-colors"
+            style={{
+              top: vThumbTop,
+              height: vThumbHeight,
+            }}
+            onMouseDown={(e) => {
+              e.preventDefault()
+              vDragging.current = true
+              dragStart.current = { x: e.clientX, y: e.clientY, thumbPos: vThumbTop }
+            }}
+          />
+        </div>
+      )}
+    </>
   )
 }
