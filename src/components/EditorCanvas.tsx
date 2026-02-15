@@ -260,6 +260,7 @@ export default function EditorCanvas() {
 
         const sourceImage: SourceImage = {
           element: img,
+          fileName: file.name,
           naturalWidth: img.naturalWidth,
           naturalHeight: img.naturalHeight,
           physicalX: centerX,

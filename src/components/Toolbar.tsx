@@ -34,9 +34,27 @@ export default function Toolbar() {
       {/* Unit toggle */}
       <button
         onClick={() => dispatch({ type: 'TOGGLE_UNIT' })}
-        className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-2.5 py-1 rounded border border-gray-700 transition-colors"
+        className="flex items-center bg-gray-800 rounded border border-gray-700 overflow-hidden"
       >
-        {state.unit === 'inches' ? 'Inches' : 'Centimeters'}
+        <span
+          className={`text-xs px-2 py-1 transition-colors ${
+            state.unit === 'inches'
+              ? 'bg-blue-600/30 text-blue-300 font-medium'
+              : 'text-gray-500 hover:text-gray-400'
+          }`}
+        >
+          in
+        </span>
+        <span className="text-gray-600 text-xs">|</span>
+        <span
+          className={`text-xs px-2 py-1 transition-colors ${
+            state.unit === 'cm'
+              ? 'bg-blue-600/30 text-blue-300 font-medium'
+              : 'text-gray-500 hover:text-gray-400'
+          }`}
+        >
+          cm
+        </span>
       </button>
 
       {/* Snap toggle */}
@@ -48,7 +66,7 @@ export default function Toolbar() {
             : 'bg-gray-800 text-gray-500 border-gray-700'
         }`}
       >
-        Snap
+        Snap to Grid
       </button>
 
       {/* Monitor count */}

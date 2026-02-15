@@ -21,6 +21,7 @@ export interface Monitor {
 
 export interface SourceImage {
   element: HTMLImageElement
+  fileName: string
   naturalWidth: number
   naturalHeight: number
   // Position and scale in physical space (inches)

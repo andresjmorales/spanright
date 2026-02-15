@@ -43,6 +43,7 @@ export default function ImageUpload() {
 
         const sourceImage: SourceImage = {
           element: img,
+          fileName: file.name,
           naturalWidth: img.naturalWidth,
           naturalHeight: img.naturalHeight,
           physicalX: centerX,
@@ -100,14 +101,17 @@ export default function ImageUpload() {
         </div>
       ) : (
         <div className="flex items-center gap-2">
-          <div className="text-xs text-gray-400">
-            {state.sourceImage.naturalWidth} x {state.sourceImage.naturalHeight} px
+          <div className="text-xs text-gray-300">
+            {state.sourceImage.fileName}
+            <span className="text-gray-500 ml-1">
+              ({state.sourceImage.naturalWidth} x {state.sourceImage.naturalHeight} px)
+            </span>
           </div>
           <button
             onClick={() => fileInputRef.current?.click()}
             className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
           >
-            Replace
+            Replace Image
           </button>
           <button
             onClick={() => dispatch({ type: 'CLEAR_SOURCE_IMAGE' })}
