@@ -17,6 +17,7 @@ interface State {
 type Action =
   | { type: 'ADD_MONITOR'; preset: MonitorPreset; x: number; y: number }
   | { type: 'REMOVE_MONITOR'; id: string }
+  | { type: 'CLEAR_ALL_MONITORS' }
   | { type: 'MOVE_MONITOR'; id: string; x: number; y: number }
   | { type: 'SELECT_MONITOR'; id: string | null }
   | { type: 'SET_SOURCE_IMAGE'; image: SourceImage }
@@ -38,7 +39,7 @@ const initialState: State = {
   canvasOffsetY: 50,
   unit: 'inches',
   selectedMonitorId: null,
-  snapToGrid: true,
+  snapToGrid: false,
   gridSize: 1,
 }
 
@@ -54,6 +55,8 @@ function reducer(state: State, action: Action): State {
         monitors: state.monitors.filter(m => m.id !== action.id),
         selectedMonitorId: state.selectedMonitorId === action.id ? null : state.selectedMonitorId,
       }
+    case 'CLEAR_ALL_MONITORS':
+      return { ...state, monitors: [], selectedMonitorId: null }
     case 'MOVE_MONITOR':
       return {
         ...state,
@@ -83,7 +86,7 @@ function reducer(state: State, action: Action): State {
           }
         : state
     case 'SET_CANVAS_SCALE':
-      return { ...state, canvasScale: Math.max(2, Math.min(40, action.scale)) }
+      return { ...state, canvasScale: Math.max(2, Math.min(20, action.scale)) }
     case 'PAN_CANVAS':
       return {
         ...state,
