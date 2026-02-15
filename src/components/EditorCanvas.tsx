@@ -64,6 +64,23 @@ export default function EditorCanvas() {
       if (e.key === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         fitView()
       }
+      // Arrow keys to nudge selected monitor
+      if (state.selectedMonitorId && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault()
+        const mon = state.monitors.find(m => m.id === state.selectedMonitorId)
+        if (mon) {
+          // Shift = fine (0.1"), default = 1", Ctrl = large (5")
+          const step = e.shiftKey ? 0.1 : e.ctrlKey ? 5 : 1
+          let dx = 0, dy = 0
+          if (e.key === 'ArrowLeft') dx = -step
+          if (e.key === 'ArrowRight') dx = step
+          if (e.key === 'ArrowUp') dy = -step
+          if (e.key === 'ArrowDown') dy = step
+          const newX = state.snapToGrid ? Math.round((mon.physicalX + dx) / state.gridSize) * state.gridSize : mon.physicalX + dx
+          const newY = state.snapToGrid ? Math.round((mon.physicalY + dy) / state.gridSize) * state.gridSize : mon.physicalY + dy
+          dispatch({ type: 'MOVE_MONITOR', id: mon.id, x: newX, y: newY })
+        }
+      }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
@@ -78,7 +95,7 @@ export default function EditorCanvas() {
     const availH = dimensions.height - padding * 2
     const scaleX = availW / bbox.width
     const scaleY = availH / bbox.height
-    const newScale = Math.max(2, Math.min(20, Math.min(scaleX, scaleY)))
+    const newScale = Math.max(5, Math.min(20, Math.min(scaleX, scaleY)))
     const newOffsetX = padding - bbox.minX * newScale + (availW - bbox.width * newScale) / 2
     const newOffsetY = padding - bbox.minY * newScale + (availH - bbox.height * newScale) / 2
     dispatch({ type: 'SET_CANVAS_SCALE', scale: newScale })
@@ -124,7 +141,7 @@ export default function EditorCanvas() {
       // Ctrl+Scroll = Zoom (toward pointer)
       const oldScale = state.canvasScale
       const zoomFactor = e.evt.deltaY > 0 ? 0.9 : 1.1
-      const newScale = Math.max(2, Math.min(20, oldScale * zoomFactor))
+      const newScale = Math.max(5, Math.min(20, oldScale * zoomFactor))
       const physX = (pointer.x - state.canvasOffsetX) / oldScale
       const physY = (pointer.y - state.canvasOffsetY) / oldScale
       const newOffsetX = pointer.x - physX * newScale
@@ -186,14 +203,21 @@ export default function EditorCanvas() {
     if (presetData) {
       try {
         const preset = JSON.parse(presetData) as import('../types').MonitorPreset
-        // Calculate physical position from drop coordinates
+        // Calculate physical position from drop coordinates, centering on cursor
         const container = containerRef.current
         if (container) {
           const rect = container.getBoundingClientRect()
           const canvasX = e.clientX - rect.left
           const canvasY = e.clientY - rect.top
-          const physX = (canvasX - state.canvasOffsetX) / state.canvasScale
-          const physY = (canvasY - state.canvasOffsetY) / state.canvasScale
+          // Convert cursor position to physical coordinates
+          const physCursorX = (canvasX - state.canvasOffsetX) / state.canvasScale
+          const physCursorY = (canvasY - state.canvasOffsetY) / state.canvasScale
+          // Calculate physical dimensions so we can center on cursor
+          const ppi = Math.sqrt(preset.resolutionX ** 2 + preset.resolutionY ** 2) / preset.diagonal
+          const physW = preset.resolutionX / ppi
+          const physH = preset.resolutionY / ppi
+          const physX = physCursorX - physW / 2
+          const physY = physCursorY - physH / 2
           // Snap position if enabled
           const snappedX = state.snapToGrid ? Math.round(physX / state.gridSize) * state.gridSize : physX
           const snappedY = state.snapToGrid ? Math.round(physY / state.gridSize) * state.gridSize : physY
@@ -510,6 +534,7 @@ export default function EditorCanvas() {
   return (
     <div
       ref={containerRef}
+      data-editor-canvas
       className={`flex-1 bg-gray-950 relative overflow-hidden ${isDragOverCanvas ? 'ring-2 ring-blue-500 ring-inset' : ''}`}
       onDrop={handleDrop}
       onDragOver={handleDragOver}

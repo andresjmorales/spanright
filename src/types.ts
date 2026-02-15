@@ -30,6 +30,14 @@ export interface SourceImage {
   physicalHeight: number
 }
 
+export interface WindowsMonitorPosition {
+  monitorId: string       // Links to the Monitor in the physical layout
+  pixelX: number          // X position in Windows arrangement (pixels)
+  pixelY: number          // Y position in Windows arrangement (pixels)
+}
+
+export type ActiveTab = 'physical' | 'windows' | 'preview'
+
 export interface AppState {
   monitors: Monitor[]
   sourceImage: SourceImage | null
@@ -37,4 +45,8 @@ export interface AppState {
   canvasOffsetX: number   // pan offset
   canvasOffsetY: number
   unit: 'inches' | 'cm'
+  // Windows arrangement
+  windowsArrangement: WindowsMonitorPosition[]
+  useWindowsArrangement: boolean  // false = assume top-aligned, same order as physical
+  activeTab: ActiveTab
 }

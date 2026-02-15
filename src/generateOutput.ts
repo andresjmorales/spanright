@@ -1,4 +1,4 @@
-import type { Monitor, SourceImage } from './types'
+import type { Monitor, SourceImage, WindowsMonitorPosition } from './types'
 
 export interface OutputResult {
   canvas: HTMLCanvasElement
@@ -10,27 +10,51 @@ export interface OutputResult {
 /**
  * Generate the final stitched wallpaper image.
  *
+ * Uses two coordinate spaces:
+ * - Physical layout: determines what portion of the source image each monitor sees
+ * - Windows arrangement: determines stitching order (left-to-right) and vertical pixel offsets
+ *
  * Steps:
- * 1. Sort monitors left-to-right by physical x-position.
- * 2. For each monitor, determine what region of the source image falls behind it.
+ * 1. Sort monitors by Windows arrangement x-position (left-to-right).
+ * 2. For each monitor, determine what region of the source image falls behind it
+ *    (using physical coordinates).
  * 3. Crop that region and scale it to the monitor's native resolution.
- * 4. Stitch all strips side by side. Output height = max vertical resolution.
- *    Shorter monitors are positioned based on their physical vertical offset.
+ * 4. Stitch all strips side by side using Windows arrangement vertical offsets.
  */
-export function generateOutput(monitors: Monitor[], sourceImage: SourceImage | null): OutputResult | null {
+export function generateOutput(
+  monitors: Monitor[],
+  sourceImage: SourceImage | null,
+  windowsArrangement: WindowsMonitorPosition[],
+): OutputResult | null {
   if (monitors.length === 0) return null
 
-  // Sort monitors left-to-right by physical x position
-  const sorted = [...monitors].sort((a, b) => a.physicalX - b.physicalX)
+  // Build lookup maps
+  const monitorMap = new Map<string, Monitor>()
+  for (const m of monitors) monitorMap.set(m.id, m)
+
+  const winPosMap = new Map<string, WindowsMonitorPosition>()
+  for (const wp of windowsArrangement) winPosMap.set(wp.monitorId, wp)
+
+  // Sort by Windows arrangement x-position (left-to-right)
+  const sortedWinPos = [...windowsArrangement]
+    .filter(wp => monitorMap.has(wp.monitorId))
+    .sort((a, b) => a.pixelX - b.pixelX)
+
+  if (sortedWinPos.length === 0) return null
+
+  // Calculate vertical offsets relative to the topmost monitor
+  const minWinY = Math.min(...sortedWinPos.map(wp => wp.pixelY))
 
   // Calculate total output dimensions
-  const totalWidth = sorted.reduce((sum, m) => sum + m.preset.resolutionX, 0)
-  const maxHeight = Math.max(...sorted.map(m => m.preset.resolutionY))
+  const totalWidth = sortedWinPos.reduce((sum, wp) => {
+    const mon = monitorMap.get(wp.monitorId)!
+    return sum + mon.preset.resolutionX
+  }, 0)
 
-  // Find the physical vertical range to determine relative positioning
-  const minPhysicalY = Math.min(...sorted.map(m => m.physicalY))
-  const maxPhysicalBottom = Math.max(...sorted.map(m => m.physicalY + m.physicalHeight))
-  const totalPhysicalHeight = maxPhysicalBottom - minPhysicalY
+  const maxHeight = Math.max(...sortedWinPos.map(wp => {
+    const mon = monitorMap.get(wp.monitorId)!
+    return (wp.pixelY - minWinY) + mon.preset.resolutionY
+  }))
 
   // Create output canvas
   const outputCanvas = document.createElement('canvas')
@@ -45,19 +69,17 @@ export function generateOutput(monitors: Monitor[], sourceImage: SourceImage | n
   let xOffset = 0
   const monitorStrips: OutputResult['monitors'] = []
 
-  for (const monitor of sorted) {
+  for (const wp of sortedWinPos) {
+    const monitor = monitorMap.get(wp.monitorId)!
     const stripWidth = monitor.preset.resolutionX
     const stripHeight = monitor.preset.resolutionY
 
-    // Calculate vertical position: map physical Y offset to pixel offset
-    // The monitor's relative physical position determines where it sits in the output
-    const physicalYOffset = monitor.physicalY - minPhysicalY
-    const yRatio = totalPhysicalHeight > 0 ? physicalYOffset / totalPhysicalHeight : 0
-    const yPixelOffset = Math.round(yRatio * (maxHeight - stripHeight))
+    // Vertical offset from Windows arrangement
+    const yPixelOffset = Math.round(wp.pixelY - minWinY)
 
     if (sourceImage) {
       // Determine what portion of the source image falls behind this monitor
-      // Monitor physical bounds
+      // using the PHYSICAL layout coordinates
       const monLeft = monitor.physicalX
       const monTop = monitor.physicalY
       const monRight = monLeft + monitor.physicalWidth
