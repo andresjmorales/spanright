@@ -1,6 +1,5 @@
 import React, { useCallback, useRef } from 'react'
 import { useStore } from '../store'
-import { getMonitorsBoundingBox } from '../utils'
 import type { SourceImage } from '../types'
 
 export default function ImageUpload() {
@@ -12,42 +11,24 @@ export default function ImageUpload() {
     reader.onload = (e) => {
       const img = new Image()
       img.onload = () => {
-        // Calculate initial physical size:
-        // Try to cover the monitor bounding box
-        const bbox = getMonitorsBoundingBox(state.monitors)
-        let physWidth: number
-        let physHeight: number
         const imgAspect = img.naturalWidth / img.naturalHeight
+        const physWidth = 72 // 6 feet
+        const physHeight = physWidth / imgAspect
 
-        if (bbox.width > 0 && bbox.height > 0) {
-          // Scale to cover the monitor layout
-          const bboxAspect = bbox.width / bbox.height
-          if (imgAspect > bboxAspect) {
-            // Image is wider than layout — fit by height
-            physHeight = bbox.height * 1.1
-            physWidth = physHeight * imgAspect
-          } else {
-            // Image is taller — fit by width
-            physWidth = bbox.width * 1.1
-            physHeight = physWidth / imgAspect
-          }
-        } else {
-          // No monitors yet — use a reasonable default (30 inches wide)
-          physWidth = 30
-          physHeight = physWidth / imgAspect
-        }
-
-        // Center on the monitor layout or canvas origin
-        const centerX = bbox.width > 0 ? bbox.minX + (bbox.width - physWidth) / 2 : 0
-        const centerY = bbox.height > 0 ? bbox.minY + (bbox.height - physHeight) / 2 : 0
+        // Center on current viewport
+        const containerEl = document.querySelector('[data-editor-canvas]')
+        const canvasW = containerEl?.clientWidth ?? 800
+        const canvasH = containerEl?.clientHeight ?? 500
+        const centerPhysX = (canvasW / 2 - state.canvasOffsetX) / state.canvasScale
+        const centerPhysY = (canvasH / 2 - state.canvasOffsetY) / state.canvasScale
 
         const sourceImage: SourceImage = {
           element: img,
           fileName: file.name,
           naturalWidth: img.naturalWidth,
           naturalHeight: img.naturalHeight,
-          physicalX: centerX,
-          physicalY: centerY,
+          physicalX: centerPhysX - physWidth / 2,
+          physicalY: centerPhysY - physHeight / 2,
           physicalWidth: physWidth,
           physicalHeight: physHeight,
         }
@@ -56,7 +37,7 @@ export default function ImageUpload() {
       img.src = e.target?.result as string
     }
     reader.readAsDataURL(file)
-  }, [state.monitors, dispatch])
+  }, [state.canvasOffsetX, state.canvasOffsetY, state.canvasScale, dispatch])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -75,6 +56,8 @@ export default function ImageUpload() {
     if (file) {
       loadImage(file)
     }
+    // Reset so the same file can be re-selected after deletion
+    e.target.value = ''
   }, [loadImage])
 
   return (

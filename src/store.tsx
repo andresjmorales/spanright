@@ -45,9 +45,9 @@ type Action =
 const initialState: State = {
   monitors: [],
   sourceImage: null,
-  canvasScale: 10, // 10 pixels per inch on canvas
-  canvasOffsetX: 50,
-  canvasOffsetY: 50,
+  canvasScale: 7.5, // 7.5 pixels per inch = 75% zoom
+  canvasOffsetX: 90,
+  canvasOffsetY: 90,
   unit: 'inches',
   selectedMonitorId: null,
   snapToGrid: false,
@@ -135,7 +135,7 @@ function reducer(state: State, action: Action): State {
           }
         : state
     case 'SET_CANVAS_SCALE':
-      return { ...state, canvasScale: Math.max(6, Math.min(20, action.scale)) }
+      return { ...state, canvasScale: Math.max(7.5, Math.min(20, action.scale)) }
     case 'PAN_CANVAS':
       return {
         ...state,
