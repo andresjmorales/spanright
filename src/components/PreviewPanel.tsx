@@ -2,8 +2,9 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { useStore } from '../store'
 import { generateOutput, type OutputResult } from '../generateOutput'
 
+
 export default function PreviewPanel() {
-  const { state } = useStore()
+  const { state, dispatch } = useStore()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [output, setOutput] = useState<OutputResult | null>(null)
@@ -167,6 +168,18 @@ export default function PreviewPanel() {
           </div>
         )}
       </div>
+
+      {/* Troubleshooting link */}
+      {output && (
+        <div className="flex items-center justify-end px-4 py-1.5 border-b border-gray-800 bg-gray-900/60 shrink-0">
+          <button
+            onClick={() => dispatch({ type: 'SET_SHOW_TROUBLESHOOTING_GUIDE', value: true })}
+            className="text-xs text-gray-500 hover:text-gray-300 transition-colors underline underline-offset-2 decoration-gray-600 hover:decoration-gray-400"
+          >
+            Wallpaper not looking right? See the Troubleshooting Guide
+          </button>
+        </div>
+      )}
 
       {/* Preview canvas */}
       <div ref={containerRef} className="flex-1 flex items-center justify-center p-8 overflow-auto">

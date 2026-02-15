@@ -8,6 +8,112 @@ const MONITOR_COLORS = [
   '#f59e0b', '#ef4444', '#ec4899', '#6366f1',
 ]
 
+/** Snap threshold in screen pixels — how close an edge must be to "stick" */
+const SNAP_SCREEN_PX = 30
+
+/**
+ * Compute a snapped position for a dragged monitor.
+ * Checks all edge pairs (left/right/top/bottom) against all other monitors.
+ */
+function computeSnap(
+  dragId: string,
+  rawX: number,
+  rawY: number,
+  arrangement: import('../types').WindowsMonitorPosition[],
+  monMap: Map<string, import('../types').Monitor>,
+  scale: number
+): { x: number; y: number } {
+  const dragMon = monMap.get(dragId)
+  if (!dragMon) return { x: rawX, y: rawY }
+
+  const dw = dragMon.preset.resolutionX
+  const dh = dragMon.preset.resolutionY
+  const threshold = SNAP_SCREEN_PX / scale
+
+  let bestDx = Infinity
+  let bestDy = Infinity
+  let snapX = rawX
+  let snapY = rawY
+
+  for (const wp of arrangement) {
+    if (wp.monitorId === dragId) continue
+    const mon = monMap.get(wp.monitorId)
+    if (!mon) continue
+
+    const ow = mon.preset.resolutionX
+    const oh = mon.preset.resolutionY
+
+    // Horizontal snapping — compare left/right edges
+    const hChecks = [
+      { dragEdge: rawX, otherEdge: wp.pixelX, offset: 0 },
+      { dragEdge: rawX, otherEdge: wp.pixelX + ow, offset: 0 },
+      { dragEdge: rawX + dw, otherEdge: wp.pixelX, offset: -dw },
+      { dragEdge: rawX + dw, otherEdge: wp.pixelX + ow, offset: -dw },
+    ]
+    for (const { dragEdge, otherEdge, offset } of hChecks) {
+      const dist = Math.abs(dragEdge - otherEdge)
+      if (dist < bestDx) {
+        bestDx = dist
+        snapX = otherEdge + offset
+      }
+    }
+
+    // Vertical snapping — compare top/bottom edges
+    const vChecks = [
+      { dragEdge: rawY, otherEdge: wp.pixelY, offset: 0 },
+      { dragEdge: rawY, otherEdge: wp.pixelY + oh, offset: 0 },
+      { dragEdge: rawY + dh, otherEdge: wp.pixelY, offset: -dh },
+      { dragEdge: rawY + dh, otherEdge: wp.pixelY + oh, offset: -dh },
+    ]
+    for (const { dragEdge, otherEdge, offset } of vChecks) {
+      const dist = Math.abs(dragEdge - otherEdge)
+      if (dist < bestDy) {
+        bestDy = dist
+        snapY = otherEdge + offset
+      }
+    }
+  }
+
+  return {
+    x: bestDx <= threshold ? snapX : rawX,
+    y: bestDy <= threshold ? snapY : rawY,
+  }
+}
+
+/**
+ * Resolve overlaps by pushing the dragged monitor to the nearest
+ * non-overlapping position. Iterates to handle cascading overlaps.
+ */
+function resolveOverlaps(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  others: Array<{ x: number; y: number; w: number; h: number }>,
+  maxIter = 5
+): { x: number; y: number } {
+  for (let iter = 0; iter < maxIter; iter++) {
+    let found = false
+    for (const o of others) {
+      if (x < o.x + o.w && x + w > o.x && y < o.y + o.h && y + h > o.y) {
+        found = true
+        const pushes = [
+          { nx: o.x - w, ny: y, dist: Math.abs(x - (o.x - w)) },
+          { nx: o.x + o.w, ny: y, dist: Math.abs(x - (o.x + o.w)) },
+          { nx: x, ny: o.y - h, dist: Math.abs(y - (o.y - h)) },
+          { nx: x, ny: o.y + o.h, dist: Math.abs(y - (o.y + o.h)) },
+        ]
+        const best = pushes.reduce((a, b) => (a.dist < b.dist ? a : b))
+        x = best.nx
+        y = best.ny
+        break // re-check all monitors after adjustment
+      }
+    }
+    if (!found) break
+  }
+  return { x, y }
+}
+
 export default function WindowsArrangementCanvas() {
   const { state, dispatch } = useStore()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -16,6 +122,7 @@ export default function WindowsArrangementCanvas() {
   const [dragging, setDragging] = useState<string | null>(null)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
   const [showInfoDialog, setShowInfoDialog] = useState(false)
+  const [frozenLayout, setFrozenLayout] = useState<{ displayScale: number; offsetX: number; offsetY: number } | null>(null)
 
   // Resize observer
   useEffect(() => {
@@ -41,7 +148,7 @@ export default function WindowsArrangementCanvas() {
   }, [state.monitors])
 
   // Compute display scale: fit all monitors within the canvas with padding
-  const { displayScale, offsetX, offsetY } = useMemo(() => {
+  const computed = useMemo(() => {
     if (state.windowsArrangement.length === 0) {
       return { displayScale: 0.1, offsetX: 0, offsetY: 0 }
     }
@@ -66,6 +173,11 @@ export default function WindowsArrangementCanvas() {
     const oy = pad + (availH - contentH * scale) / 2 - minY * scale
     return { displayScale: scale, offsetX: ox, offsetY: oy }
   }, [state.windowsArrangement, monitorMap, dimensions])
+
+  // Lock scale/offset during drag so auto-fit doesn't fight the cursor
+  const displayScale = frozenLayout?.displayScale ?? computed.displayScale
+  const offsetX = frozenLayout?.offsetX ?? computed.offsetX
+  const offsetY = frozenLayout?.offsetY ?? computed.offsetY
 
   // Convert pixel position to display position
   const toDisplayX = useCallback((px: number) => px * displayScale + offsetX, [displayScale, offsetX])
@@ -185,20 +297,12 @@ export default function WindowsArrangementCanvas() {
       if (mx >= x && mx <= x + w && my >= y && my <= y + h) {
         setDragging(wp.monitorId)
         setDragOffset({ x: mx - x, y: my - y })
+        // Freeze the scale so auto-fit doesn't jitter while dragging
+        setFrozenLayout({ displayScale, offsetX, offsetY })
         return
       }
     }
-  }, [state.windowsArrangement, state.useWindowsArrangement, monitorMap, displayScale, toDisplayX, toDisplayY])
-
-  // Compute total pixel dimensions of all monitors for drag clamping
-  const totalMonitorBounds = useMemo(() => {
-    let totalW = 0, totalH = 0
-    for (const m of state.monitors) {
-      totalW += m.preset.resolutionX
-      totalH = Math.max(totalH, m.preset.resolutionY)
-    }
-    return { totalW, totalH }
-  }, [state.monitors])
+  }, [state.windowsArrangement, state.useWindowsArrangement, monitorMap, displayScale, offsetX, offsetY, toDisplayX, toDisplayY])
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!dragging) return
@@ -207,33 +311,39 @@ export default function WindowsArrangementCanvas() {
     const mx = e.clientX - rect.left
     const my = e.clientY - rect.top
 
-    let newPixelX = Math.round(toPixelX(mx - dragOffset.x))
-    let newPixelY = Math.round(toPixelY(my - dragOffset.y))
+    const rawPixelX = Math.round(toPixelX(mx - dragOffset.x))
+    const rawPixelY = Math.round(toPixelY(my - dragOffset.y))
 
-    // Clamp: don't let any monitor drift beyond 2x the total arrangement width/height
-    // from the bounding box of the other monitors
-    const others = state.windowsArrangement.filter(wp => wp.monitorId !== dragging)
-    if (others.length > 0) {
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-      for (const wp of others) {
+    // Snap to edges of other monitors
+    const snapped = computeSnap(
+      dragging, rawPixelX, rawPixelY,
+      state.windowsArrangement, monitorMap, displayScale
+    )
+
+    // Prevent overlap
+    const dragMon = monitorMap.get(dragging)
+    if (!dragMon) return
+    const otherRects = state.windowsArrangement
+      .filter(wp => wp.monitorId !== dragging)
+      .map(wp => {
         const mon = monitorMap.get(wp.monitorId)
-        if (!mon) continue
-        minX = Math.min(minX, wp.pixelX)
-        minY = Math.min(minY, wp.pixelY)
-        maxX = Math.max(maxX, wp.pixelX + mon.preset.resolutionX)
-        maxY = Math.max(maxY, wp.pixelY + mon.preset.resolutionY)
-      }
-      const limitW = totalMonitorBounds.totalW
-      const limitH = totalMonitorBounds.totalH
-      newPixelX = Math.max(minX - limitW, Math.min(maxX + limitW, newPixelX))
-      newPixelY = Math.max(minY - limitH, Math.min(maxY + limitH, newPixelY))
-    }
+        if (!mon) return null
+        return { x: wp.pixelX, y: wp.pixelY, w: mon.preset.resolutionX, h: mon.preset.resolutionY }
+      })
+      .filter((r): r is { x: number; y: number; w: number; h: number } => r !== null)
 
-    dispatch({ type: 'MOVE_WINDOWS_MONITOR', monitorId: dragging, pixelX: newPixelX, pixelY: newPixelY })
-  }, [dragging, dragOffset, toPixelX, toPixelY, dispatch, state.windowsArrangement, monitorMap, totalMonitorBounds])
+    const resolved = resolveOverlaps(
+      snapped.x, snapped.y,
+      dragMon.preset.resolutionX, dragMon.preset.resolutionY,
+      otherRects
+    )
+
+    dispatch({ type: 'MOVE_WINDOWS_MONITOR', monitorId: dragging, pixelX: resolved.x, pixelY: resolved.y })
+  }, [dragging, dragOffset, toPixelX, toPixelY, dispatch, state.windowsArrangement, monitorMap, displayScale])
 
   const handleMouseUp = useCallback(() => {
     setDragging(null)
+    setFrozenLayout(null) // Unfreeze — let auto-fit recalculate
   }, [])
 
   // Compute validation warnings
@@ -326,24 +436,23 @@ export default function WindowsArrangementCanvas() {
         </button>
       </div>
 
-      {/* Warnings */}
-      {warnings.length > 0 && (
-        <div className="px-4 py-2 space-y-1 bg-yellow-900/20 border-b border-yellow-700/30">
-          {warnings.map((w, i) => (
-            <div key={i} className="text-xs text-yellow-400 flex items-start gap-1.5">
-              <span className="shrink-0 mt-0.5">⚠</span>
-              <span>{w}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* Canvas area */}
       <div
         ref={containerRef}
         className="flex-1 relative overflow-hidden"
         style={{ cursor: state.useWindowsArrangement ? (dragging ? 'grabbing' : 'default') : 'default' }}
       >
+        {/* Warnings — overlaid so they don't shift the canvas layout */}
+        {warnings.length > 0 && (
+          <div className="absolute top-0 left-0 right-0 z-10 px-4 py-2 space-y-1 bg-yellow-900/80 backdrop-blur-sm border-b border-yellow-700/30 pointer-events-none">
+            {warnings.map((w, i) => (
+              <div key={i} className="text-xs text-yellow-400 flex items-start gap-1.5">
+                <span className="shrink-0 mt-0.5">⚠</span>
+                <span>{w}</span>
+              </div>
+            ))}
+          </div>
+        )}
         <canvas
           ref={canvasRef}
           style={{ width: dimensions.width, height: dimensions.height }}
