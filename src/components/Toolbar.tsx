@@ -89,13 +89,6 @@ export default function Toolbar() {
 
       {/* Spacer */}
       <div className="flex-1" />
-
-      {/* Windows note */}
-      {hasMonitors && (
-        <div className="text-xs text-gray-600 max-w-xs text-right">
-          Ensure your Windows display arrangement matches this physical layout.
-        </div>
-      )}
     </div>
   )
 }

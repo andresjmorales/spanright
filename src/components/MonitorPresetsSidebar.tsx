@@ -48,9 +48,24 @@ export default function MonitorPresetsSidebar() {
   }
 
   function addPreset(preset: MonitorPreset) {
-    // Place at a default position, slightly offset for each new monitor
-    const offset = state.monitors.length * 2
-    dispatch({ type: 'ADD_MONITOR', preset, x: 5 + offset, y: 5 })
+    // Place at the center of the visible canvas area
+    const ppi = calculatePPI(preset.resolutionX, preset.resolutionY, preset.diagonal)
+    const { width: physW, height: physH } = calculatePhysicalDimensions(preset.resolutionX, preset.resolutionY, ppi)
+
+    // Get the visible canvas center in physical coordinates
+    // The canvas container is the sibling element, so approximate using window size
+    const containerEl = document.querySelector('[data-editor-canvas]')
+    const canvasW = containerEl?.clientWidth ?? window.innerWidth
+    const canvasH = containerEl?.clientHeight ?? (window.innerHeight - 150)
+    const centerPhysX = (canvasW / 2 - state.canvasOffsetX) / state.canvasScale
+    const centerPhysY = (canvasH / 2 - state.canvasOffsetY) / state.canvasScale
+
+    // Offset slightly for each new monitor so they don't stack exactly
+    const jitter = state.monitors.length * 1.5
+    const x = centerPhysX - physW / 2 + jitter
+    const y = centerPhysY - physH / 2 + jitter
+
+    dispatch({ type: 'ADD_MONITOR', preset, x, y })
   }
 
   function addCustom() {
@@ -84,34 +99,69 @@ export default function MonitorPresetsSidebar() {
   const standard = filtered.filter(p => p.diagonal >= 20 && p.aspectRatio[0] === 16)
   const ultrawides = filtered.filter(p => p.aspectRatio[0] >= 21)
 
+  const [collapsed, setCollapsed] = useState(false)
+
+  if (collapsed) {
+    return (
+      <button
+        onClick={() => setCollapsed(false)}
+        className="absolute top-2 left-2 z-30 flex items-center gap-1.5 bg-gray-800/90 hover:bg-gray-700 border border-gray-600/50 hover:border-gray-500 backdrop-blur-sm text-gray-300 hover:text-white text-xs font-medium px-2.5 py-1.5 rounded-md shadow-lg transition-all"
+      >
+        <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+        </svg>
+        Add a Monitor
+      </button>
+    )
+  }
+
   return (
-    <div className="w-72 bg-gray-900 border-r border-gray-800 flex flex-col h-full overflow-hidden">
-      <div className="p-3 border-b border-gray-800">
-        <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-2">
-          Monitor Presets
-        </h2>
-        <input
-          type="text"
-          placeholder="Search presets..."
-          value={searchFilter}
-          onChange={e => setSearchFilter(e.target.value)}
-          className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-blue-500"
-        />
-      </div>
+    <div
+      className="absolute top-0 left-0 bottom-0 w-72 z-30 bg-gray-900 border-r border-gray-800 flex flex-col overflow-hidden shadow-xl"
+    >
+          {/* Header with title and collapse button */}
+          <div className="p-3 border-b border-gray-800 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-gray-200">
+              Add a Monitor
+            </h2>
+            <button
+              onClick={() => setCollapsed(true)}
+              className="text-gray-500 hover:text-gray-300 transition-colors p-0.5 -mr-1"
+              title="Collapse sidebar"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
 
-      <div className="flex-1 overflow-y-auto p-2 space-y-3">
-        {laptops.length > 0 && (
-          <PresetGroup title="Laptops" presets={laptops} onAdd={addPreset} unit={state.unit} canvasScale={state.canvasScale} />
-        )}
-        {standard.length > 0 && (
-          <PresetGroup title="Standard Monitors" presets={standard} onAdd={addPreset} unit={state.unit} canvasScale={state.canvasScale} />
-        )}
-        {ultrawides.length > 0 && (
-          <PresetGroup title="Ultrawides" presets={ultrawides} onAdd={addPreset} unit={state.unit} canvasScale={state.canvasScale} />
-        )}
-      </div>
+          {/* Presets section */}
+          <div className="p-3 border-b border-gray-800">
+            <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+              Monitor Presets
+            </h3>
+            <input
+              type="text"
+              placeholder="Search presets..."
+              value={searchFilter}
+              onChange={e => setSearchFilter(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-blue-500"
+            />
+          </div>
 
-      <div className="p-3 border-t border-gray-800">
+          <div className="flex-1 overflow-y-auto p-2 space-y-3">
+            {laptops.length > 0 && (
+              <PresetGroup title="Laptops" presets={laptops} onAdd={addPreset} unit={state.unit} canvasScale={state.canvasScale} />
+            )}
+            {standard.length > 0 && (
+              <PresetGroup title="Standard Monitors" presets={standard} onAdd={addPreset} unit={state.unit} canvasScale={state.canvasScale} />
+            )}
+            {ultrawides.length > 0 && (
+              <PresetGroup title="Ultrawides" presets={ultrawides} onAdd={addPreset} unit={state.unit} canvasScale={state.canvasScale} />
+            )}
+          </div>
+
+          <div className="p-3 border-t border-gray-800">
         {!showCustom ? (
           <button
             onClick={() => setShowCustom(true)}
@@ -238,9 +288,18 @@ function buildDragImage(preset: MonitorPreset, index: number, canvasScale: numbe
   const ppi = calculatePPI(preset.resolutionX, preset.resolutionY, preset.diagonal)
   const { width: physW, height: physH } = calculatePhysicalDimensions(preset.resolutionX, preset.resolutionY, ppi)
 
-  // Match the canvas zoom scale so the ghost is the same size as on the editor
-  const w = Math.round(physW * canvasScale)
-  const h = Math.round(physH * canvasScale)
+  // Match the canvas zoom scale, but cap to avoid browser drag image limits
+  const MAX_DRAG_DIM = 500
+  let w = Math.round(physW * canvasScale)
+  let h = Math.round(physH * canvasScale)
+  if (w > MAX_DRAG_DIM || h > MAX_DRAG_DIM) {
+    const downscale = MAX_DRAG_DIM / Math.max(w, h)
+    w = Math.round(w * downscale)
+    h = Math.round(h * downscale)
+  }
+  // Ensure minimum size so it's always visible
+  w = Math.max(w, 40)
+  h = Math.max(h, 20)
 
   const canvas = document.createElement('canvas')
   canvas.width = w

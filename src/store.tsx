@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, type ReactNode } from 'react'
-import type { Monitor, SourceImage, MonitorPreset } from './types'
+import type { Monitor, SourceImage, MonitorPreset, WindowsMonitorPosition, ActiveTab } from './types'
 import { createMonitor } from './utils'
 
 interface State {
@@ -12,6 +12,10 @@ interface State {
   selectedMonitorId: string | null
   snapToGrid: boolean
   gridSize: number // in inches
+  // Windows arrangement
+  windowsArrangement: WindowsMonitorPosition[]
+  useWindowsArrangement: boolean
+  activeTab: ActiveTab
 }
 
 type Action =
@@ -30,6 +34,11 @@ type Action =
   | { type: 'TOGGLE_UNIT' }
   | { type: 'TOGGLE_SNAP' }
   | { type: 'SET_GRID_SIZE'; size: number }
+  // Windows arrangement actions
+  | { type: 'SET_ACTIVE_TAB'; tab: ActiveTab }
+  | { type: 'SET_USE_WINDOWS_ARRANGEMENT'; value: boolean }
+  | { type: 'MOVE_WINDOWS_MONITOR'; monitorId: string; pixelX: number; pixelY: number }
+  | { type: 'SYNC_WINDOWS_ARRANGEMENT' }
 
 const initialState: State = {
   monitors: [],
@@ -41,29 +50,66 @@ const initialState: State = {
   selectedMonitorId: null,
   snapToGrid: false,
   gridSize: 1,
+  windowsArrangement: [],
+  useWindowsArrangement: false,
+  activeTab: 'physical',
+}
+
+/**
+ * Generate a default Windows arrangement from the physical layout:
+ * same left-to-right order, all top-aligned, laid out side-by-side by pixel width.
+ */
+function generateDefaultWindowsArrangement(monitors: Monitor[]): WindowsMonitorPosition[] {
+  const sorted = [...monitors].sort((a, b) => a.physicalX - b.physicalX)
+  let xOffset = 0
+  return sorted.map(m => {
+    const pos: WindowsMonitorPosition = {
+      monitorId: m.id,
+      pixelX: xOffset,
+      pixelY: 0,
+    }
+    xOffset += m.preset.resolutionX
+    return pos
+  })
 }
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'ADD_MONITOR': {
       const monitor = createMonitor(action.preset, action.x, action.y)
-      return { ...state, monitors: [...state.monitors, monitor], selectedMonitorId: monitor.id }
+      const newMonitors = [...state.monitors, monitor]
+      return {
+        ...state,
+        monitors: newMonitors,
+        selectedMonitorId: monitor.id,
+        windowsArrangement: generateDefaultWindowsArrangement(newMonitors),
+      }
     }
-    case 'REMOVE_MONITOR':
+    case 'REMOVE_MONITOR': {
+      const newMonitors = state.monitors.filter(m => m.id !== action.id)
       return {
         ...state,
-        monitors: state.monitors.filter(m => m.id !== action.id),
+        monitors: newMonitors,
         selectedMonitorId: state.selectedMonitorId === action.id ? null : state.selectedMonitorId,
+        windowsArrangement: generateDefaultWindowsArrangement(newMonitors),
       }
+    }
     case 'CLEAR_ALL_MONITORS':
-      return { ...state, monitors: [], selectedMonitorId: null }
-    case 'MOVE_MONITOR':
+      return { ...state, monitors: [], selectedMonitorId: null, windowsArrangement: [] }
+    case 'MOVE_MONITOR': {
+      const newMonitors = state.monitors.map(m =>
+        m.id === action.id ? { ...m, physicalX: action.x, physicalY: action.y } : m
+      )
+      // Auto-sync Windows arrangement if not using custom arrangement
+      const newArrangement = state.useWindowsArrangement
+        ? state.windowsArrangement
+        : generateDefaultWindowsArrangement(newMonitors)
       return {
         ...state,
-        monitors: state.monitors.map(m =>
-          m.id === action.id ? { ...m, physicalX: action.x, physicalY: action.y } : m
-        ),
+        monitors: newMonitors,
+        windowsArrangement: newArrangement,
       }
+    }
     case 'SELECT_MONITOR':
       return { ...state, selectedMonitorId: action.id }
     case 'SET_SOURCE_IMAGE':
@@ -86,7 +132,7 @@ function reducer(state: State, action: Action): State {
           }
         : state
     case 'SET_CANVAS_SCALE':
-      return { ...state, canvasScale: Math.max(2, Math.min(20, action.scale)) }
+      return { ...state, canvasScale: Math.max(5, Math.min(20, action.scale)) }
     case 'PAN_CANVAS':
       return {
         ...state,
@@ -101,6 +147,34 @@ function reducer(state: State, action: Action): State {
       return { ...state, snapToGrid: !state.snapToGrid }
     case 'SET_GRID_SIZE':
       return { ...state, gridSize: action.size }
+    // Windows arrangement
+    case 'SET_ACTIVE_TAB':
+      return { ...state, activeTab: action.tab }
+    case 'SET_USE_WINDOWS_ARRANGEMENT': {
+      if (!action.value) {
+        // Switching back to auto: regenerate from physical layout
+        return {
+          ...state,
+          useWindowsArrangement: false,
+          windowsArrangement: generateDefaultWindowsArrangement(state.monitors),
+        }
+      }
+      return { ...state, useWindowsArrangement: true }
+    }
+    case 'MOVE_WINDOWS_MONITOR':
+      return {
+        ...state,
+        windowsArrangement: state.windowsArrangement.map(wp =>
+          wp.monitorId === action.monitorId
+            ? { ...wp, pixelX: action.pixelX, pixelY: action.pixelY }
+            : wp
+        ),
+      }
+    case 'SYNC_WINDOWS_ARRANGEMENT':
+      return {
+        ...state,
+        windowsArrangement: generateDefaultWindowsArrangement(state.monitors),
+      }
     default:
       return state
   }

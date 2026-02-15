@@ -26,7 +26,7 @@ export default function PreviewPanel() {
     }
 
     debounceRef.current = requestAnimationFrame(() => {
-      const result = generateOutput(state.monitors, state.sourceImage)
+      const result = generateOutput(state.monitors, state.sourceImage, state.windowsArrangement)
       setOutput(result)
       setIsGenerating(false)
     })
@@ -36,7 +36,7 @@ export default function PreviewPanel() {
         cancelAnimationFrame(debounceRef.current)
       }
     }
-  }, [state.monitors, state.sourceImage])
+  }, [state.monitors, state.sourceImage, state.windowsArrangement])
 
   // Draw preview
   useEffect(() => {
@@ -45,10 +45,11 @@ export default function PreviewPanel() {
     if (!canvas || !container || !output) return
 
     const ctx = canvas.getContext('2d')!
-    const containerWidth = container.clientWidth - 32
+    const containerWidth = container.clientWidth - 64
+    const containerHeight = container.clientHeight - 32
 
     // Scale to fit container
-    const displayScale = Math.min(1, containerWidth / output.width, 200 / output.height)
+    const displayScale = Math.min(1, containerWidth / output.width, containerHeight / output.height)
     canvas.width = Math.round(output.width * displayScale)
     canvas.height = Math.round(output.height * displayScale)
 
@@ -89,7 +90,7 @@ export default function PreviewPanel() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `wallpaper-${output.width}x${output.height}.${format}`
+      a.download = `spanwright-${output.width}x${output.height}.${format}`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -99,7 +100,7 @@ export default function PreviewPanel() {
 
   if (state.monitors.length === 0) {
     return (
-      <div className="bg-gray-900 border-t border-gray-800 p-4 shrink-0">
+      <div className="flex items-center justify-center h-full">
         <div className="text-center text-gray-600 text-sm py-2">
           Add monitors and upload an image to see the output preview
         </div>
@@ -108,9 +109,9 @@ export default function PreviewPanel() {
   }
 
   return (
-    <div className="bg-gray-900 border-t border-gray-800 shrink-0">
+    <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-800">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-800 bg-gray-900 shrink-0">
         <div className="flex items-center gap-3">
           <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
             Output Preview
@@ -168,13 +169,22 @@ export default function PreviewPanel() {
       </div>
 
       {/* Preview canvas */}
-      <div ref={containerRef} className="p-4 flex justify-center overflow-x-auto">
+      <div ref={containerRef} className="flex-1 flex items-center justify-center p-8 overflow-auto">
         <canvas
           ref={canvasRef}
           className="border border-gray-800 rounded bg-black"
-          style={{ imageRendering: 'auto', maxHeight: '200px' }}
+          style={{ imageRendering: 'auto' }}
         />
       </div>
+
+      {/* Windows arrangement info */}
+      {state.useWindowsArrangement && (
+        <div className="px-4 py-2 border-t border-gray-800 bg-gray-900 shrink-0">
+          <div className="text-xs text-gray-500">
+            Output uses your custom Windows arrangement for monitor ordering and vertical offsets.
+          </div>
+        </div>
+      )}
     </div>
   )
 }

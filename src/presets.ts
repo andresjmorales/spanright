@@ -20,8 +20,8 @@ export const MONITOR_PRESETS: MonitorPreset[] = [
   { name: '32" 4K', diagonal: 32, aspectRatio: [16, 9], resolutionX: 3840, resolutionY: 2160 },
 
   // Ultrawides
-  { name: '34" Ultrawide QHD', diagonal: 34, aspectRatio: [21, 9], resolutionX: 3440, resolutionY: 1440 },
   { name: '34" Ultrawide WFHD', diagonal: 34, aspectRatio: [21, 9], resolutionX: 2560, resolutionY: 1080 },
+  { name: '34" Ultrawide QHD', diagonal: 34, aspectRatio: [21, 9], resolutionX: 3440, resolutionY: 1440 },
   { name: '38" Ultrawide QHD+', diagonal: 38, aspectRatio: [21, 9], resolutionX: 3840, resolutionY: 1600 },
 
   // Super Ultrawides
