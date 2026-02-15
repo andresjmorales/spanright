@@ -35,10 +35,7 @@ function AppContent() {
       {/* Header */}
       <header className="bg-gray-900 border-b border-gray-800 px-4 py-2.5 flex items-center gap-3 shrink-0">
         <div className="flex items-center gap-2">
-          <svg className="w-5 h-5 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="2" y="3" width="20" height="14" rx="2" />
-            <path d="M8 21h8M12 17v4" />
-          </svg>
+          <img src="/spanwright-logo-large.png" alt="Spanwright" className="h-6 w-auto" />
           <h1 className="text-sm font-bold text-gray-100 tracking-tight">
             Spanwright
           </h1>
