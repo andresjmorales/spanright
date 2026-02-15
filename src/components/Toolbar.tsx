@@ -1,6 +1,7 @@
 import { useStore } from '../store'
 import { getRecommendedImageSize, getMonitorsBoundingBox, formatDimension } from '../utils'
 import ImageUpload from './ImageUpload'
+import ConfigManager from './ConfigManager'
 
 export default function Toolbar() {
   const { state, dispatch } = useStore()
@@ -56,6 +57,9 @@ export default function Toolbar() {
           cm
         </span>
       </button>
+
+      {/* Config manager */}
+      <ConfigManager />
 
       {/* Snap toggle */}
       <button

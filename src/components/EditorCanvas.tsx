@@ -550,27 +550,26 @@ export default function EditorCanvas() {
     const newCanvasH = node.height() * scaleY
     const newPhysW = newCanvasW / scale
     const newPhysH = newCanvasH / scale
-    const newPhysX = toPhysicalX(node.x())
-    const newPhysY = toPhysicalY(node.y())
+    // Image is inside a Group — get absolute position
+    const absPos = node.getAbsolutePosition()
+    const newPhysX = toPhysicalX(absPos.x)
+    const newPhysY = toPhysicalY(absPos.y)
 
-    // Reset the Konva node's scale (we store size in state)
+    // Reset the Konva node's scale and local position (we store size in state)
     node.scaleX(1)
     node.scaleY(1)
+    node.position({ x: 0, y: 0 })
 
     dispatch({ type: 'MOVE_IMAGE', x: newPhysX, y: newPhysY })
     dispatch({ type: 'SCALE_IMAGE', physicalWidth: newPhysW, physicalHeight: newPhysH })
   }, [dispatch, scale, toPhysicalX, toPhysicalY, state.sourceImage])
 
-  // Render source image
+  // Render source image (wrapped in Group with delete button so they move together)
+  const imgW = state.sourceImage ? state.sourceImage.physicalWidth * scale : 0
   const imageNode = state.sourceImage ? (
-    <KonvaImage
-      ref={imageRef}
-      image={state.sourceImage.element}
+    <Group
       x={toCanvasX(state.sourceImage.physicalX)}
       y={toCanvasY(state.sourceImage.physicalY)}
-      width={state.sourceImage.physicalWidth * scale}
-      height={state.sourceImage.physicalHeight * scale}
-      opacity={0.7}
       draggable
       onClick={() => {
         setImageSelected(true)
@@ -581,8 +580,36 @@ export default function EditorCanvas() {
         dispatch({ type: 'SELECT_MONITOR', id: null })
       }}
       onDragEnd={handleImageDragEnd}
-      onTransformEnd={handleImageTransformEnd}
-    />
+    >
+      <KonvaImage
+        ref={imageRef}
+        image={state.sourceImage.element}
+        width={imgW}
+        height={state.sourceImage.physicalHeight * scale}
+        opacity={0.7}
+        onTransformEnd={handleImageTransformEnd}
+      />
+      {/* Delete button — top-right, only when selected */}
+      {imageSelected && (
+        <Group
+          x={imgW - 22}
+          y={4}
+          onClick={(e) => {
+            e.cancelBubble = true
+            setImageSelected(false)
+            dispatch({ type: 'CLEAR_SOURCE_IMAGE' })
+          }}
+          onTap={(e) => {
+            e.cancelBubble = true
+            setImageSelected(false)
+            dispatch({ type: 'CLEAR_SOURCE_IMAGE' })
+          }}
+        >
+          <Rect width={18} height={18} fill="#ef4444" cornerRadius={3} />
+          <Text x={4} y={1} text="✕" fontSize={12} fill="#ffffff" />
+        </Group>
+      )}
+    </Group>
   ) : null
 
   // Render monitors
@@ -629,53 +656,65 @@ export default function EditorCanvas() {
           cornerRadius={2}
           listening={false}
         />
-        {/* Label background */}
-        <Rect
-          x={4}
-          y={4}
-          width={Math.min(Math.max(cw - 8, 60), 200)}
-          height={cw > 100 ? 44 : 28}
-          fill="rgba(0,0,0,0.75)"
-          cornerRadius={3}
-          listening={false}
-        />
-        {/* Monitor name */}
-        <Text
-          x={8}
-          y={7}
-          text={monitor.preset.name}
-          fontSize={cw > 100 ? 11 : 9}
-          fill="#ffffff"
-          fontStyle="bold"
-          listening={false}
-          width={Math.min(Math.max(cw - 16, 50), 190)}
-          ellipsis
-          wrap="none"
-        />
-        {/* Resolution + physical dimensions */}
-        {cw > 100 && (
-          <Text
-            x={8}
-            y={21}
-            text={`${monitor.preset.resolutionX}x${monitor.preset.resolutionY} · ${formatDimension(monitor.physicalWidth, state.unit)} x ${formatDimension(monitor.physicalHeight, state.unit)}`}
-            fontSize={9}
-            fill="#94a3b8"
-            listening={false}
-            width={Math.min(Math.max(cw - 16, 50), 190)}
-            ellipsis
-            wrap="none"
-          />
-        )}
-        {cw > 100 && (
-          <Text
-            x={8}
-            y={33}
-            text={`${Math.round(monitor.ppi)} PPI`}
-            fontSize={9}
-            fill="#64748b"
-            listening={false}
-          />
-        )}
+        {/* Label background — pinned to bottom */}
+        {(() => {
+          const labelH = cw > 100 ? 44 : 28
+          const labelW = Math.min(Math.max(cw - 8, 60), 200)
+          const labelY = ch - labelH - 4
+          return (
+            <>
+              <Rect
+                x={4}
+                y={labelY}
+                width={labelW}
+                height={labelH}
+                fill="rgba(0,0,0,0.55)"
+                cornerRadius={3}
+                listening={false}
+              />
+              {/* Monitor name */}
+              <Text
+                x={8}
+                y={labelY + 3}
+                text={monitor.preset.name}
+                fontSize={cw > 100 ? 11 : 9}
+                fill="#ffffff"
+                fontStyle="bold"
+                listening={false}
+                width={Math.min(Math.max(cw - 16, 50), 190)}
+                ellipsis
+                wrap="none"
+                opacity={0.9}
+              />
+              {/* Resolution + physical dimensions */}
+              {cw > 100 && (
+                <Text
+                  x={8}
+                  y={labelY + 17}
+                  text={`${monitor.preset.resolutionX}x${monitor.preset.resolutionY} · ${formatDimension(monitor.physicalWidth, state.unit)} x ${formatDimension(monitor.physicalHeight, state.unit)}`}
+                  fontSize={9}
+                  fill="#94a3b8"
+                  listening={false}
+                  width={Math.min(Math.max(cw - 16, 50), 190)}
+                  ellipsis
+                  wrap="none"
+                  opacity={0.8}
+                />
+              )}
+              {cw > 100 && (
+                <Text
+                  x={8}
+                  y={labelY + 29}
+                  text={`${Math.round(monitor.ppi)} PPI`}
+                  fontSize={9}
+                  fill="#64748b"
+                  listening={false}
+                  opacity={0.8}
+                />
+              )}
+            </>
+          )
+        })()}
         {/* Delete button */}
         {isSelected && (
           <Group

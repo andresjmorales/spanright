@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, type FormEvent } from 'react'
 import { useStore } from '../store'
 import { generateOutput, type OutputResult } from '../generateOutput'
 
@@ -11,6 +11,9 @@ export default function PreviewPanel() {
   const [format, setFormat] = useState<'png' | 'jpeg'>('png')
   const [jpegQuality, setJpegQuality] = useState(92)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [showDownloadDialog, setShowDownloadDialog] = useState(false)
+  const [downloadFilename, setDownloadFilename] = useState('')
+  const downloadPopoverRef = useRef<HTMLDivElement>(null)
   const debounceRef = useRef<number | null>(null)
 
   // Debounced output generation
@@ -81,23 +84,49 @@ export default function PreviewPanel() {
     }
   }, [output])
 
-  const handleDownload = useCallback(() => {
+  const getDefaultFilename = useCallback(() => {
+    if (!output) return 'spanwright'
+    const srcName = state.sourceImage?.fileName
+    const baseName = srcName ? srcName.replace(/\.[^.]+$/, '') : 'wallpaper'
+    return `spanwright-${baseName}-${output.width}x${output.height}`
+  }, [output, state.sourceImage])
+
+  const openDownloadDialog = useCallback(() => {
+    setDownloadFilename(getDefaultFilename())
+    setShowDownloadDialog(true)
+  }, [getDefaultFilename])
+
+  // Close popover on outside click
+  useEffect(() => {
+    if (!showDownloadDialog) return
+    const handler = (e: MouseEvent) => {
+      if (downloadPopoverRef.current && !downloadPopoverRef.current.contains(e.target as Node)) {
+        setShowDownloadDialog(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showDownloadDialog])
+
+  const doDownload = useCallback((filename: string) => {
     if (!output) return
     const mimeType = format === 'png' ? 'image/png' : 'image/jpeg'
     const quality = format === 'jpeg' ? jpegQuality / 100 : undefined
+    const cleanName = filename.trim() || getDefaultFilename()
 
     output.canvas.toBlob((blob) => {
       if (!blob) return
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `spanwright-${output.width}x${output.height}.${format}`
+      a.download = `${cleanName}.${format}`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
     }, mimeType, quality)
-  }, [output, format, jpegQuality])
+    setShowDownloadDialog(false)
+  }, [output, format, jpegQuality, getDefaultFilename])
 
   if (state.monitors.length === 0) {
     return (
@@ -155,16 +184,52 @@ export default function PreviewPanel() {
                 </div>
               )}
             </div>
-            <button
-              onClick={handleDownload}
-              disabled={!state.sourceImage}
-              className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm font-medium py-1.5 px-4 rounded transition-colors flex items-center gap-1.5"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              Download
-            </button>
+            <div className="relative" ref={downloadPopoverRef}>
+              <button
+                onClick={openDownloadDialog}
+                disabled={!state.sourceImage}
+                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm font-medium py-1.5 px-4 rounded transition-colors flex items-center gap-1.5"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Download
+              </button>
+              {showDownloadDialog && (
+                <form
+                  className="absolute right-0 top-full mt-2 w-80 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl p-3 z-50"
+                  onSubmit={(e: FormEvent) => { e.preventDefault(); doDownload(downloadFilename) }}
+                >
+                  <div className="text-xs font-medium text-gray-400 mb-2">Save as</div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      autoFocus
+                      type="text"
+                      value={downloadFilename}
+                      onChange={(e) => setDownloadFilename(e.target.value)}
+                      className="flex-1 bg-gray-800 border border-gray-600 focus:border-blue-500 rounded px-2.5 py-1.5 text-sm text-gray-100 outline-none transition-colors"
+                      placeholder="filename"
+                    />
+                    <span className="text-xs text-gray-500 shrink-0">.{format}</span>
+                  </div>
+                  <div className="flex justify-end gap-2 mt-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setShowDownloadDialog(false)}
+                      className="px-2.5 py-1 text-xs text-gray-400 hover:text-gray-200 rounded hover:bg-gray-800 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-3 py-1 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                    >
+                      Download
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -198,6 +263,7 @@ export default function PreviewPanel() {
           </div>
         </div>
       )}
+
     </div>
   )
 }
