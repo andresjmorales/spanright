@@ -16,7 +16,7 @@ Spanright operates in **physical space** (inches/cm), so you arrange monitors as
 - **Monitor rotation** — Rotate any monitor 90° (portrait/landscape) via the ↻ button on each monitor tile. Resolution is swapped (e.g. 1080×1920 when rotated); rotation is saved in saved layouts and reflected in output and the Windows Arrangement view.
 - **Image placement** — Upload a source image and drag/scale it behind the monitor layout. Semi-transparent monitor overlays let you see exactly what portion of the image each screen will display. Vertical images (height > width) default to 6 ft tall; horizontal ones default to 6 ft wide.
 - **Smart image recommendations** — Calculates the minimum source image resolution needed based on your layout's physical size and the highest-PPI monitor.
-- **Accurate output generation** — Crops and scales the source image per-monitor at each screen's native PPI, then stitches the results side-by-side. Handles vertical offsets and fills empty space with black.
+- **Accurate output generation** — Crops and scales the source image per-monitor at each screen's native PPI, then stitches at each monitor's Windows arrangement position (side-by-side, stacked, or mixed). Fills any gaps in the layout with black.
 - **Preview & download** — Live preview of the final stitched wallpaper with one-click PNG/JPEG export.
 - **Canvas controls** — Scroll to pan, Ctrl+Scroll to zoom (up to 250%), right-click drag to pan. Custom scrollbars, snap-to-grid, and fit-to-view.
 - **Saved Layouts** — Save and load monitor layouts (names, positions, rotation, Windows arrangement). Layouts are stored in your browser (localStorage); you can keep several setups (e.g. desk vs laptop-only) and switch between them. Basic but very useful for multi-setup workflows.
@@ -108,14 +108,13 @@ For example, a 27" QHD (2560x1440) monitor:
 
 ### Output Generation
 
-For each monitor (sorted left-to-right by physical position):
-1. Determine the physical bounding box on the canvas
-2. Find the overlapping region of the source image
-3. Map physical coordinates back to source image pixels
-4. Crop and scale that region to the monitor's native resolution
-5. Stitch all strips side-by-side into the final output
+Output matches the Windows virtual desktop bounding box (Settings > Display). For each monitor:
 
-The output height equals the tallest monitor's resolution. Shorter monitors are vertically positioned based on their physical offset, with black fill for empty space.
+1. **Physical layout** determines what portion of the source image that monitor sees.
+2. **Windows arrangement** (pixel positions) determines where the monitor sits in the output image.
+3. The source image is cropped and scaled to the monitor's native resolution (PPI-correct).
+4. Each monitor is drawn at its `(pixelX, pixelY)` position in the output. This supports side-by-side, stacked vertical, and mixed layouts.
+5. Output dimensions = bounding box of all monitors (`maxX − minX` × `maxY − minY`). Any unfilled area (gaps or differing sizes) is filled with black.
 
 ## Tech Stack
 
@@ -138,11 +137,15 @@ src/
 ├── generateOutput.ts          # Wallpaper stitching logic
 ├── index.css                  # Tailwind imports
 └── components/
-    ├── EditorCanvas.tsx       # Interactive canvas editor
-    ├── MonitorPresetsSidebar.tsx  # Preset list + custom form
-    ├── Toolbar.tsx            # Top toolbar controls
-    ├── PreviewPanel.tsx       # Output preview + download
-    └── ImageUpload.tsx        # File upload component
+    ├── EditorCanvas.tsx           # Physical layout canvas
+    ├── WindowsArrangementCanvas.tsx  # Windows display-order canvas
+    ├── MonitorPresetsSidebar.tsx   # Preset list + custom form
+    ├── Toolbar.tsx                 # Top toolbar controls
+    ├── PreviewPanel.tsx            # Output preview + download
+    ├── ImageUpload.tsx             # File upload component
+    ├── ConfigManager.tsx            # Saved layouts (save/load)
+    ├── InfoDialog.tsx              # App info / keyboard shortcuts
+    └── TroubleshootingGuide.tsx     # Wallpaper troubleshooting
 ```
 
 ## Running locally
