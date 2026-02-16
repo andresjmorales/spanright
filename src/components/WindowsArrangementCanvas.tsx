@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { useStore } from '../store'
 import type { Monitor } from '../types'
+import { getMonitorDisplayName } from '../utils'
 import InfoDialog from './InfoDialog'
 
 const MONITOR_COLORS = [
@@ -273,7 +274,7 @@ export default function WindowsArrangementCanvas() {
         ctx.fillStyle = '#ffffff'
         ctx.font = 'bold 11px system-ui, sans-serif'
         ctx.textAlign = 'left'
-        ctx.fillText(mon.preset.name, x + 8, y + 17, labelW - 8)
+        ctx.fillText(getMonitorDisplayName(mon), x + 8, y + 17, labelW - 8)
 
         if (showRes) {
           ctx.fillStyle = '#94a3b8'

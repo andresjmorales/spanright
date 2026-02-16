@@ -20,8 +20,9 @@ interface State {
 }
 
 type Action =
-  | { type: 'ADD_MONITOR'; preset: MonitorPreset; x: number; y: number; rotation?: 0 | 90 }
+  | { type: 'ADD_MONITOR'; preset: MonitorPreset; x: number; y: number; rotation?: 0 | 90; displayName?: string }
   | { type: 'REMOVE_MONITOR'; id: string }
+  | { type: 'SET_MONITOR_DISPLAY_NAME'; id: string; displayName: string }
   | { type: 'ROTATE_MONITOR'; id: string }
   | { type: 'CLEAR_ALL_MONITORS' }
   | { type: 'MOVE_MONITOR'; id: string; x: number; y: number }
@@ -87,13 +88,22 @@ function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'ADD_MONITOR': {
       const rotation = action.rotation ?? 0
-      const monitor = createMonitor(action.preset, action.x, action.y, rotation)
+      const monitor = createMonitor(action.preset, action.x, action.y, rotation, action.displayName)
       const newMonitors = [...state.monitors, monitor]
       return {
         ...state,
         monitors: newMonitors,
         selectedMonitorId: monitor.id,
         windowsArrangement: generateDefaultWindowsArrangement(newMonitors),
+      }
+    }
+    case 'SET_MONITOR_DISPLAY_NAME': {
+      const name = action.displayName.trim()
+      return {
+        ...state,
+        monitors: state.monitors.map(m =>
+          m.id === action.id ? { ...m, displayName: name || undefined } : m
+        ),
       }
     }
     case 'REMOVE_MONITOR': {

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback, type FormEvent } from 'react'
 import { useStore } from '../store'
 import { generateOutput, type OutputResult } from '../generateOutput'
+import { getMonitorDisplayName } from '../utils'
 
 
 export default function PreviewPanel() {
@@ -77,7 +78,7 @@ export default function PreviewPanel() {
       ctx.fillStyle = 'rgba(255,255,255,0.8)'
       ctx.font = '10px system-ui, sans-serif'
       ctx.textAlign = 'center'
-      const label = `${strip.monitor.preset.name} (${strip.stripWidth}x${strip.stripHeight})`
+      const label = `${getMonitorDisplayName(strip.monitor)} (${strip.stripWidth}x${strip.stripHeight})`
       ctx.fillText(label, x + w / 2, 12, w - 4)
 
       xOffset += strip.stripWidth

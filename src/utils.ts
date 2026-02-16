@@ -28,6 +28,7 @@ export function createMonitor(
   physicalX: number,
   physicalY: number,
   rotation: 0 | 90 = 0,
+  displayName?: string,
 ): Monitor {
   const ppi = calculatePPI(preset.resolutionX, preset.resolutionY, preset.diagonal)
   let { width, height } = calculatePhysicalDimensions(preset.resolutionX, preset.resolutionY, ppi)
@@ -37,6 +38,7 @@ export function createMonitor(
   return {
     id: uuidv4(),
     preset,
+    displayName,
     physicalX,
     physicalY,
     physicalWidth: width,
@@ -44,6 +46,11 @@ export function createMonitor(
     ppi,
     rotation,
   }
+}
+
+/** Display name for a monitor (custom name or preset name). */
+export function getMonitorDisplayName(monitor: Monitor): string {
+  return (monitor.displayName?.trim() || '') || monitor.preset.name
 }
 
 /**
