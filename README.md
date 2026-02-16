@@ -12,50 +12,14 @@ Spanwright operates in **physical space** (inches/cm), so you arrange monitors a
 
 - **Physical-space monitor layout** — Arrange monitors on a canvas using real-world dimensions (calculated from diagonal size + resolution). A 27" monitor appears physically larger than a 15.6" laptop, exactly as on your desk.
 - **Drag-and-drop presets** — Choose from 18+ built-in monitor presets (laptops, standard monitors, ultrawides, super ultrawides) and drag them directly onto the canvas.
-- **Custom monitors** — Define any monitor by diagonal size, aspect ratio, and resolution. Supports fully custom resolution entry or filtered presets by aspect ratio.
-- **Image placement** — Upload a source image and drag/scale it behind the monitor layout. Semi-transparent monitor overlays let you see exactly what portion of the image each screen will display.
+- **Custom monitors** — Define any monitor by diagonal size, aspect ratio, and resolution. Supports fully custom resolution entry or filtered presets by aspect ratio. Diagonal is limited to 5"–120"; aspect ratio is limited to 10:1 or less (no ultra-thin “line” monitors). Validation warnings appear when limits are exceeded; Add is disabled until fixed.
+- **Monitor rotation** — Rotate any monitor 90° (portrait/landscape) via the ↻ button on each monitor tile. Resolution is swapped (e.g. 1080×1920 when rotated); rotation is saved in configs and reflected in output and the Windows Arrangement view.
+- **Image placement** — Upload a source image and drag/scale it behind the monitor layout. Semi-transparent monitor overlays let you see exactly what portion of the image each screen will display. Vertical images (height > width) default to 6 ft tall; horizontal ones default to 6 ft wide.
 - **Smart image recommendations** — Calculates the minimum source image resolution needed based on your layout's physical size and the highest-PPI monitor.
 - **Accurate output generation** — Crops and scales the source image per-monitor at each screen's native PPI, then stitches the results side-by-side. Handles vertical offsets and fills empty space with black.
 - **Preview & download** — Live preview of the final stitched wallpaper with one-click PNG/JPEG export.
-- **Canvas controls** — Scroll to pan, Ctrl+Scroll to zoom, right-click drag to pan. Custom scrollbars, snap-to-grid, and fit-to-view.
-- **Unit toggle** — Switch between inches and centimeters.
-
-## Getting Started
-
-### Prerequisites
-
-- [Node.js](https://nodejs.org/) 18+ (LTS recommended)
-- npm, yarn, or pnpm
-
-### Installation
-
-```bash
-git clone https://github.com/your-username/spanwright.git
-cd spanwright
-npm install
-```
-
-### Development
-
-```bash
-npm run dev
-```
-
-Opens at [http://localhost:5173](http://localhost:5173) by default.
-
-### Build for Production
-
-```bash
-npm run build
-```
-
-Output is in the `dist/` folder, ready for static hosting (e.g., Vercel, Netlify, GitHub Pages).
-
-### Preview Production Build
-
-```bash
-npm run preview
-```
+- **Canvas controls** — Scroll to pan, Ctrl+Scroll to zoom (up to 250%), right-click drag to pan. Custom scrollbars, snap-to-grid, and fit-to-view.
+- **Custom configs** — Save and load monitor layouts (names, positions, rotation, Windows arrangement). Configs are stored in your browser (localStorage); you can keep several setups (e.g. desk vs laptop-only) and switch between them. Basic but very useful for multi-setup workflows.
 
 ## How to Use
 
@@ -65,7 +29,7 @@ Use the sidebar on the left to add monitors to the canvas:
 
 - **Click** a preset to add it at a default position
 - **Drag** a preset directly onto the canvas to place it where you want
-- **Custom monitors**: Click "+ Custom Monitor" to define a monitor by diagonal size, aspect ratio, and resolution
+- **Custom monitors**: Click "+ Custom Monitor" to define a monitor by diagonal size, aspect ratio, and resolution (diagonal 5"–120", aspect ratio ≤ 10:1)
 
 ### 2. Arrange Your Layout
 
@@ -74,8 +38,10 @@ Drag monitors on the canvas to match your physical desk arrangement:
 - Position your laptop screen lower-left, your main monitor centered, etc.
 - The canvas uses physical dimensions — a 27" monitor will appear larger than a 13" laptop
 - Enable **Snap to Grid** in the toolbar for precise alignment
+- Use the **↻** (rotate) button on a monitor to switch it between landscape and portrait
 - Click a monitor and press **Delete** to remove it
 - Press **F** to fit all monitors in view
+- Use the **config** button in the toolbar to save or load monitor layouts (e.g. desk vs laptop-only); configs are stored in your browser
 
 ### 3. Upload & Position Your Image
 
@@ -91,7 +57,13 @@ Drag monitors on the canvas to match your physical desk arrangement:
 - Click **Download** to save as PNG or JPEG
 - The output dimensions are displayed (e.g., "7280 x 1440")
 
-### 5. Set as Windows Wallpaper
+### 5. Windows Arrangement (optional)
+
+The **Windows Arrangement** tab (next to Physical Layout) lets you match how Windows sees your displays (Settings > System > Display). Use it if your Windows display order or positions don’t match a simple left-to-right layout.
+
+> **Warning:** Changing Windows Display Settings (position, order, resolution) can get messy. For best results, keep all monitors **top-aligned or bottom-aligned** in Windows; other alignments may produce unwanted (visible) black bars in the spanned wallpaper.
+
+### 6. Set as Windows Wallpaper
 
 1. Download the generated image
 2. Open **Settings > Personalization > Background**
@@ -106,7 +78,7 @@ Drag monitors on the canvas to match your physical desk arrangement:
 |--------|---------|
 | Pan | Scroll wheel / Right-click drag |
 | Horizontal pan | Shift + Scroll |
-| Zoom | Ctrl + Scroll |
+| Zoom | Ctrl + Scroll (up to 250%) |
 | Fit view | Press **F** / click **Fit** button |
 | Select monitor | Click on it |
 | Delete monitor | Select + **Delete** or **Backspace** |
@@ -173,6 +145,39 @@ src/
     └── ImageUpload.tsx        # File upload component
 ```
 
-## License
+## Running locally
 
-MIT
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) 18+ (LTS recommended)
+- npm, yarn, or pnpm
+
+### Installation
+
+```bash
+git clone https://github.com/your-username/spanwright.git
+cd spanwright
+npm install
+```
+
+### Development
+
+```bash
+npm run dev
+```
+
+Opens at [http://localhost:5173](http://localhost:5173) by default.
+
+### Build for Production
+
+```bash
+npm run build
+```
+
+Output is in the `dist/` folder, ready for static hosting (e.g., Vercel, Netlify, GitHub Pages).
+
+### Preview Production Build
+
+```bash
+npm run preview
+```

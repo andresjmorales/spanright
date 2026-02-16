@@ -60,14 +60,14 @@ export default function InfoDialog({ onClose }: InfoDialogProps) {
           {/* Illustration placeholder */}
           <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
             <div className="flex items-center justify-center gap-6">
-              {/* Physical layout illustration */}
+              {/* Physical layout illustration — gap between monitors (your desk has physical space) */}
               <div className="text-center">
                 <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Your desk</div>
                 <div className="relative w-32 h-16">
                   <div className="absolute left-0 bottom-0 w-12 h-9 border border-cyan-500/60 bg-cyan-500/10 rounded-sm flex items-center justify-center">
                     <span className="text-[8px] text-cyan-400">Laptop</span>
                   </div>
-                  <div className="absolute right-0 top-0 w-20 h-14 border border-blue-500/60 bg-blue-500/10 rounded-sm flex items-center justify-center">
+                  <div className="absolute left-14 top-0 w-18 h-14 border border-blue-500/60 bg-blue-500/10 rounded-sm flex items-center justify-center">
                     <span className="text-[8px] text-blue-400">Monitor</span>
                   </div>
                 </div>
@@ -75,15 +75,17 @@ export default function InfoDialog({ onClose }: InfoDialogProps) {
 
               <div className="text-gray-600 text-lg">&rarr;</div>
 
-              {/* Windows arrangement illustration */}
+              {/* Windows arrangement illustration — one continuous strip, small gap so edges don’t mesh */}
               <div className="text-center">
                 <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Windows sees</div>
-                <div className="relative w-32 h-14">
-                  <div className="absolute left-0 top-0 w-10 h-8 border border-cyan-500/60 bg-cyan-500/10 rounded-sm flex items-center justify-center">
-                    <span className="text-[8px] text-cyan-400">1</span>
-                  </div>
-                  <div className="absolute right-0 top-0 w-18 h-12 border border-blue-500/60 bg-blue-500/10 rounded-sm flex items-center justify-center" style={{ width: '72px', height: '48px', right: '0' }}>
-                    <span className="text-[8px] text-blue-400">2</span>
+                <div className="inline-block overflow-visible p-px">
+                  <div className="flex gap-px items-stretch">
+                    <div className="shrink-0 w-10 h-10 border border-cyan-500/60 bg-cyan-500/10 rounded-l-md rounded-r-sm flex items-center justify-center">
+                      <span className="text-[8px] text-cyan-400">1</span>
+                    </div>
+                    <div className="shrink-0 w-[72px] h-10 border border-blue-500/60 bg-blue-500/10 rounded-r-md rounded-l-sm flex items-center justify-center">
+                      <span className="text-[8px] text-blue-400">2</span>
+                    </div>
                   </div>
                 </div>
               </div>
