@@ -5,6 +5,8 @@ export interface OutputResult {
   width: number
   height: number
   monitors: { monitor: Monitor; stripWidth: number; stripHeight: number }[]
+  /** True when the output contains black fill (vertical offsets or different strip heights) */
+  hasBlackBars: boolean
 }
 
 /**
@@ -131,10 +133,19 @@ export function generateOutput(
     xOffset += sw
   }
 
+  // Black bars appear when any strip doesn't fill the full height (vertical offset or shorter strip)
+  const hasBlackBars = sortedWinPos.some((wp) => {
+    const mon = monitorMap.get(wp.monitorId)!
+    const sh = stripHeight(mon)
+    const yPixelOffset = Math.round(wp.pixelY - minWinY)
+    return yPixelOffset > 0 || yPixelOffset + sh < maxHeight
+  })
+
   return {
     canvas: outputCanvas,
     width: totalWidth,
     height: maxHeight,
     monitors: monitorStrips,
+    hasBlackBars,
   }
 }

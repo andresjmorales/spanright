@@ -246,11 +246,20 @@ export default function PreviewPanel() {
         </div>
       )}
 
-      {/* Preview canvas */}
-      <div ref={containerRef} className="flex-1 flex items-center justify-center p-8 overflow-auto">
+      {/* Black bars note — when output has black fill (vertical offsets / different heights) */}
+      {output?.hasBlackBars && (
+        <div className="shrink-0 px-4 py-2 bg-gray-800/80 border-b border-gray-700/50">
+          <p className="text-xs text-gray-400">
+            Black bars in the preview are normal — they fill the negative space around your displays and <strong className="text-gray-300">should not be visible</strong> on the monitors themselves.
+          </p>
+        </div>
+      )}
+
+      {/* Preview canvas — background matches canvas workspace (#0a0a1a) so black bars stand out */}
+      <div ref={containerRef} className="flex-1 flex items-center justify-center p-8 overflow-auto bg-[#12122a]">
         <canvas
           ref={canvasRef}
-          className="border border-gray-800 rounded bg-black"
+          className="border-2 border-gray-600 rounded bg-black"
           style={{ imageRendering: 'auto' }}
         />
       </div>
