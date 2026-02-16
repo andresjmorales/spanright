@@ -32,31 +32,7 @@ export default function Toolbar() {
       {/* Separator */}
       <div className="w-px h-6 bg-gray-700" />
 
-      {/* Unit toggle */}
-      <button
-        onClick={() => dispatch({ type: 'TOGGLE_UNIT' })}
-        className="flex items-center bg-gray-800 rounded border border-gray-700 overflow-hidden"
-      >
-        <span
-          className={`text-xs px-2 py-1 transition-colors ${
-            state.unit === 'inches'
-              ? 'bg-blue-600/30 text-blue-300 font-medium'
-              : 'text-gray-500 hover:text-gray-400'
-          }`}
-        >
-          in
-        </span>
-        <span className="text-gray-600 text-xs">|</span>
-        <span
-          className={`text-xs px-2 py-1 transition-colors ${
-            state.unit === 'cm'
-              ? 'bg-blue-600/30 text-blue-300 font-medium'
-              : 'text-gray-500 hover:text-gray-400'
-          }`}
-        >
-          cm
-        </span>
-      </button>
+      {/* Unit toggle — hidden for now, cm support kept in backend */}
 
       {/* Config manager */}
       <ConfigManager />
