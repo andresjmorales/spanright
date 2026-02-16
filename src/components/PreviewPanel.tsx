@@ -62,26 +62,25 @@ export default function PreviewPanel() {
     ctx.fillRect(0, 0, canvas.width, canvas.height)
     ctx.drawImage(output.canvas, 0, 0, canvas.width, canvas.height)
 
-    // Draw monitor strip boundaries
-    let xOffset = 0
+    // Draw monitor strip boundaries and labels (each at its actual position)
     for (const strip of output.monitors) {
-      const x = Math.round(xOffset * displayScale)
+      const x = Math.round(strip.stripX * displayScale)
+      const y = Math.round(strip.stripY * displayScale)
       const w = Math.round(strip.stripWidth * displayScale)
+      const h = Math.round(strip.stripHeight * displayScale)
 
       ctx.strokeStyle = 'rgba(255,255,255,0.25)'
       ctx.lineWidth = 1
-      ctx.strokeRect(x + 0.5, 0.5, w - 1, canvas.height - 1)
+      ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1)
 
-      // Label
+      // Label at top of this monitor
       ctx.fillStyle = 'rgba(0,0,0,0.65)'
-      ctx.fillRect(x, 0, w, 18)
+      ctx.fillRect(x, y, w, 18)
       ctx.fillStyle = 'rgba(255,255,255,0.8)'
       ctx.font = '10px system-ui, sans-serif'
       ctx.textAlign = 'center'
       const label = `${getMonitorDisplayName(strip.monitor)} (${strip.stripWidth}x${strip.stripHeight})`
-      ctx.fillText(label, x + w / 2, 12, w - 4)
-
-      xOffset += strip.stripWidth
+      ctx.fillText(label, x + w / 2, y + 12, w - 4)
     }
   }, [output])
 
@@ -245,7 +244,7 @@ export default function PreviewPanel() {
       {output?.hasBlackBars && (
         <div className="shrink-0 px-4 py-2 bg-gray-800/80 border-b border-gray-700/50">
           <p className="text-xs text-gray-400">
-            Black bars in the preview are normal — they fill the negative space around your displays and <strong className="text-gray-300">should not be visible</strong> on the monitors themselves.
+            Black bars in the preview are normal — they fill the negative space around your displays and shouldn’t be visible on the monitors themselves.
           </p>
         </div>
       )}

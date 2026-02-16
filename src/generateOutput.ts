@@ -86,7 +86,7 @@ export interface OutputResult {
   canvas: HTMLCanvasElement
   width: number
   height: number
-  monitors: { monitor: Monitor; stripWidth: number; stripHeight: number }[]
+  monitors: { monitor: Monitor; stripWidth: number; stripHeight: number; stripX: number; stripY: number }[]
   /** True when the output contains black fill (vertical offsets or different strip heights) */
   hasBlackBars: boolean
 }
@@ -197,21 +197,13 @@ export function generateOutput(
       }
     }
 
-    monitorStrips.push({ monitor, stripWidth: sw, stripHeight: sh })
+    monitorStrips.push({ monitor, stripWidth: sw, stripHeight: sh, stripX: drawX, stripY: drawY })
   }
 
-  // Black bars when the bounding box has empty regions (gaps or non-rectangular layout)
-  const hasBlackBars = winPosList.some((wp) => {
-    const mon = monitorMap.get(wp.monitorId)!
-    const sh = stripHeight(mon)
-    const drawY = Math.round(wp.pixelY - minY)
-    return drawY > 0 || drawY + sh < totalHeight
-  }) || winPosList.some((wp) => {
-    const mon = monitorMap.get(wp.monitorId)!
-    const sw = stripWidth(mon)
-    const drawX = Math.round(wp.pixelX - minX)
-    return drawX > 0 || drawX + sw < totalWidth
-  })
+  // Black bars when the bounding box has empty regions (monitors don't tile the full area)
+  const monitorArea = monitorStrips.reduce((sum, s) => sum + s.stripWidth * s.stripHeight, 0)
+  const boundingArea = totalWidth * totalHeight
+  const hasBlackBars = monitorArea < boundingArea
 
   return {
     canvas: outputCanvas,
