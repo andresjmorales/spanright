@@ -27,7 +27,7 @@ export default function InfoDialog({ onClose }: InfoDialogProps) {
               How Windows Span Mode Works
             </h2>
             <p className="text-xs text-gray-500 mt-0.5">
-              Understanding how Spanwright generates your wallpaper
+              Understanding how Spanright generates your wallpaper
             </p>
           </div>
 
@@ -38,7 +38,7 @@ export default function InfoDialog({ onClose }: InfoDialogProps) {
               <div>
                 <h3 className="text-sm font-medium text-gray-200">One wide image, stretched across all screens</h3>
                 <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                  Spanwright generates a single wide image that Windows will stretch across all your monitors using <strong className="text-gray-300">Span</strong> mode. Each monitor gets a slice of this image.
+                  Spanright generates a single wide image that Windows will stretch across all your monitors using <strong className="text-gray-300">Span</strong> mode. Each monitor gets a slice of this image.
                 </p>
               </div>
             </div>
@@ -112,7 +112,7 @@ export default function InfoDialog({ onClose }: InfoDialogProps) {
               <div>
                 <h3 className="text-sm font-medium text-gray-200">You don't need to change Windows settings</h3>
                 <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                  Just tell Spanwright how your monitors are currently arranged in Windows. If your Windows arrangement roughly matches your physical layout with monitors top-aligned, you can skip this step entirely — the default "auto-aligned" option handles it.
+                  Just tell Spanright how your monitors are currently arranged in Windows. If your Windows arrangement roughly matches your physical layout with monitors top-aligned, you can skip this step entirely — the default "auto-aligned" option handles it.
                 </p>
               </div>
             </div>

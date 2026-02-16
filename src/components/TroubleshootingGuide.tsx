@@ -128,7 +128,7 @@ export default function TroubleshootingGuide({ onClose }: TroubleshootingGuidePr
                 Your image height should equal the tallest monitor's vertical resolution (plus any vertical offset if your monitors aren't top-aligned in the Windows arrangement).
               </p>
               <p className="text-xs text-gray-400 leading-relaxed">
-                If these numbers don't match, go back to Spanwright and verify your monitor resolutions are entered correctly.
+                If these numbers don't match, go back to Spanright and verify your monitor resolutions are entered correctly.
               </p>
             </AccordionSection>
 
@@ -138,7 +138,7 @@ export default function TroubleshootingGuide({ onClose }: TroubleshootingGuidePr
                 Try creating a simple test wallpaper to diagnose alignment issues:
               </p>
               <ol className="text-sm text-gray-300 leading-relaxed list-decimal list-inside space-y-1.5 ml-1">
-                <li>In Spanwright, set up your monitor layout as usual.</li>
+                <li>In Spanright, set up your monitor layout as usual.</li>
                 <li>Use a test image with a grid pattern or clearly marked regions — or just use a solid color with distinct colored blocks where each monitor boundary should be.</li>
                 <li>Apply the wallpaper using <strong className="text-gray-100">Tile</strong> mode.</li>
                 <li>Check each monitor: do the boundaries line up exactly at the screen edges? If you see part of the next monitor's section bleeding over, your Windows display arrangement may have a small offset (see the "Virtual Desktop Misalignment" section above).</li>
@@ -148,13 +148,13 @@ export default function TroubleshootingGuide({ onClose }: TroubleshootingGuidePr
             {/* Section: Monitor Order Mismatch */}
             <AccordionSection title="The wallpaper sections appear on the wrong monitors">
               <p className="text-sm text-gray-300 leading-relaxed">
-                Spanwright stitches the wallpaper left-to-right based on the physical layout you've built. Windows applies it left-to-right based on your display arrangement in Settings &gt; Display.
+                Spanright stitches the wallpaper left-to-right based on the physical layout you've built. Windows applies it left-to-right based on your display arrangement in Settings &gt; Display.
               </p>
               <p className="text-sm text-gray-300 leading-relaxed">
                 If these orders don't match, the wallpaper sections will appear on the wrong screens.
               </p>
               <p className="text-sm text-gray-300 leading-relaxed">
-                <strong className="text-gray-100">To fix:</strong> Open Settings &gt; System &gt; Display and make sure your monitors are arranged in the same left-to-right order as your Spanwright layout. You can drag monitors to reorder them. Click <strong className="text-gray-100">"Identify"</strong> to see which number corresponds to which physical screen.
+                <strong className="text-gray-100">To fix:</strong> Open Settings &gt; System &gt; Display and make sure your monitors are arranged in the same left-to-right order as your Spanright layout. You can drag monitors to reorder them. Click <strong className="text-gray-100">"Identify"</strong> to see which number corresponds to which physical screen.
               </p>
             </AccordionSection>
 

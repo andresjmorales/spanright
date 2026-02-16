@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useStore } from '../store'
 import type { SavedConfig } from '../types'
 
-const STORAGE_KEY = 'spanwright-saved-configs'
+const STORAGE_KEY = 'spanright-saved-configs'
 const MAX_CONFIGS = 10
 
 function loadConfigs(): SavedConfig[] {
