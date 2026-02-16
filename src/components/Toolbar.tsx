@@ -4,7 +4,7 @@ import ImageUpload from './ImageUpload'
 import ConfigManager from './ConfigManager'
 
 export default function Toolbar() {
-  const { state, dispatch } = useStore()
+  const { state } = useStore()
 
   const recommended = getRecommendedImageSize(state.monitors)
   const bbox = getMonitorsBoundingBox(state.monitors)
