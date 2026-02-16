@@ -1,12 +1,12 @@
-# Spanwright — Multi-Monitor Wallpaper Alignment Tool
+# Spanright — Multi-Monitor Wallpaper Alignment Tool
 
-Spanwright is a single-page web app that lets you create pixel-perfect spanning wallpapers for non-standard multi-monitor setups. Windows' "span" wallpaper mode concatenates monitors by pixel resolution, ignoring physical size differences — Spanwright solves this by letting you model your physical desk layout, position a source image across it, and export a stitched wallpaper that looks seamless when spanned.
+Spanright is a single-page web app that lets you create pixel-perfect spanning wallpapers for non-standard multi-monitor setups. Windows' "span" wallpaper mode concatenates monitors by pixel resolution, ignoring physical size differences — Spanright solves this by letting you model your physical desk layout, position a source image across it, and export a stitched wallpaper that looks seamless when spanned.
 
 ## The Problem
 
 If you have monitors of different sizes or resolutions (e.g., a 15.6" laptop next to a 27" QHD desktop), Windows span mode produces misaligned wallpapers. A single wide image gets split based on raw pixel counts, not physical dimensions. A mountain peak that should flow across both screens ends up with a jarring offset.
 
-Spanwright operates in **physical space** (inches/cm), so you arrange monitors as they actually sit on your desk. It then renders each monitor's portion of the source image at the correct PPI, producing one output image that Windows can span correctly.
+Spanright operates in **physical space** (inches/cm), so you arrange monitors as they actually sit on your desk. It then renders each monitor's portion of the source image at the correct PPI, producing one output image that Windows can span correctly.
 
 ## Features
 
@@ -70,7 +70,7 @@ The **Windows Arrangement** tab (next to Physical Layout) lets you match how Win
 3. Set "Choose a fit" to **Span**
 4. Select the downloaded image
 
-> **Important:** Make sure your Windows display arrangement (Settings > Display) matches the physical layout you configured in Spanwright.
+> **Important:** Make sure your Windows display arrangement (Settings > Display) matches the physical layout you configured in Spanright.
 
 ## Canvas Controls
 
@@ -88,7 +88,7 @@ The **Windows Arrangement** tab (next to Physical Layout) lets you match how Win
 
 ### Coordinate Spaces
 
-Spanwright operates in two coordinate spaces:
+Spanright operates in two coordinate spaces:
 
 - **Physical space (inches)** — The canvas grid. Monitor sizes and image positioning happen here. 1 canvas unit = 1 physical inch.
 - **Pixel space** — Each monitor's native resolution. The output image lives here.
@@ -155,8 +155,8 @@ src/
 ### Installation
 
 ```bash
-git clone https://github.com/your-username/spanwright.git
-cd spanwright
+git clone https://github.com/your-username/spanright.git
+cd spanright
 npm install
 ```
 

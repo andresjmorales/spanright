@@ -40,8 +40,8 @@ function AboutDialog({ onClose }: { onClose: () => void }) {
           </svg>
         </button>
         <div className="p-6 text-center space-y-3">
-          <img src="/spanwright-logo-large.png" alt="Spanwright" className="h-10 w-auto mx-auto" />
-          <h2 className="text-lg font-bold text-gray-100">Spanwright</h2>
+          <img src="/spanright-logo-large.png" alt="Spanright" className="h-10 w-auto mx-auto" />
+          <h2 className="text-lg font-bold text-gray-100">Spanright</h2>
           <p className="text-sm text-gray-400">
             Multi-Monitor Wallpaper Alignment Tool
           </p>
@@ -68,7 +68,7 @@ function AboutDialog({ onClose }: { onClose: () => void }) {
   )
 }
 
-const WELCOME_SEEN_KEY = 'spanwright-welcome-seen'
+const WELCOME_SEEN_KEY = 'spanright-welcome-seen'
 
 function WelcomeDialog({ onClose }: { onClose: () => void }) {
   const handleClose = () => {
@@ -91,8 +91,8 @@ function WelcomeDialog({ onClose }: { onClose: () => void }) {
 
         <div className="p-6 space-y-5">
           <div className="text-center">
-            <img src="/spanwright-logo-large.png" alt="Spanwright" className="h-8 w-auto mx-auto mb-2" />
-            <h2 className="text-lg font-bold text-gray-100">Welcome to Spanwright</h2>
+            <img src="/spanright-logo-large.png" alt="Spanright" className="h-8 w-auto mx-auto mb-2" />
+            <h2 className="text-lg font-bold text-gray-100">Welcome to Spanright</h2>
             <p className="text-xs text-gray-500 mt-0.5">Create pixel-perfect multi-monitor wallpapers in a few steps.</p>
           </div>
 
@@ -163,9 +163,9 @@ function AppContent() {
           onClick={(e) => { e.preventDefault() }}
           className="flex items-center gap-2 no-underline"
         >
-          <img src="/spanwright-logo-large.png" alt="Spanwright" className="h-6 w-auto" />
+          <img src="/spanright-logo-large.png" alt="Spanright" className="h-6 w-auto" />
           <h1 className="text-sm font-bold text-gray-100 tracking-tight">
-            Spanwright
+            Spanright
           </h1>
         </a>
         <span className="text-xs text-gray-500 flex-1">
@@ -194,7 +194,7 @@ function AppContent() {
         <button
           onClick={() => setShowAbout(true)}
           className="flex items-center gap-1.5 text-gray-500 hover:text-gray-300 transition-colors px-2 py-1 rounded hover:bg-gray-800"
-          title="About Spanwright"
+          title="About Spanright"
         >
           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <circle cx="12" cy="12" r="10" />

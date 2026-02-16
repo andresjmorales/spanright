@@ -85,10 +85,10 @@ export default function PreviewPanel() {
   }, [output])
 
   const getDefaultFilename = useCallback(() => {
-    if (!output) return 'spanwright'
+    if (!output) return 'spanright'
     const srcName = state.sourceImage?.fileName
     const baseName = srcName ? srcName.replace(/\.[^.]+$/, '') : 'wallpaper'
-    return `spanwright-${baseName}-${output.width}x${output.height}`
+    return `spanright-${baseName}-${output.width}x${output.height}`
   }, [output, state.sourceImage])
 
   const openDownloadDialog = useCallback(() => {
