@@ -446,13 +446,26 @@ export default function WindowsArrangementCanvas() {
         </button>
       </div>
 
+      {/* Baseline warning when customizing — in flow so it’s always visible */}
+      {state.useWindowsArrangement && (
+        <div className="shrink-0 px-4 py-2.5 bg-amber-950/70 border-b border-amber-700/50 space-y-1">
+          <p className="text-xs text-amber-200">
+            <strong>Note:</strong> Changing Windows Display Settings (position, order, resolution) can get messy.
+          </p>
+          <p className="text-xs text-amber-200">
+            For best results, keep all monitors <strong>top-aligned or bottom-aligned</strong> in Windows; other alignments may produce unwanted (visible) black bars in the spanned wallpaper.
+            For more info, see “How does this work?” in the top bar.
+          </p>
+        </div>
+      )}
+
       {/* Canvas area */}
       <div
         ref={containerRef}
-        className="flex-1 relative overflow-hidden"
+        className="flex-1 relative overflow-hidden min-h-0"
         style={{ cursor: state.useWindowsArrangement ? (dragging ? 'grabbing' : 'default') : 'default' }}
       >
-        {/* Warnings — overlaid so they don't shift the canvas layout */}
+        {/* Conditional warnings only (e.g. “differs significantly”) — overlaid on canvas */}
         {warnings.length > 0 && (
           <div className="absolute top-0 left-0 right-0 z-10 px-4 py-2 space-y-1 bg-yellow-900/80 backdrop-blur-sm border-b border-yellow-700/30 pointer-events-none">
             {warnings.map((w, i) => (
