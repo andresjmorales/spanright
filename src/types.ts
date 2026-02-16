@@ -17,6 +17,8 @@ export interface Monitor {
   physicalHeight: number
   // PPI
   ppi: number
+  /** 0 = landscape, 90 = portrait (rotated 90° CW). Omitted on older saved configs. */
+  rotation?: 0 | 90
 }
 
 export interface SourceImage {
@@ -47,6 +49,7 @@ export interface SavedConfig {
     preset: MonitorPreset
     physicalX: number
     physicalY: number
+    rotation?: 0 | 90
   }[]
 }
 

@@ -68,20 +68,45 @@ export default function MonitorPresetsSidebar() {
     dispatch({ type: 'ADD_MONITOR', preset, x, y })
   }
 
-  function addCustom() {
-    let resW: number, resH: number
+  const MAX_ASPECT_RATIO = 10
+  const MIN_DIAGONAL = 5
+  const MAX_DIAGONAL = 120
+
+  function getCustomRes(): { resW: number; resH: number } {
     if (useCustomRes) {
-      resW = parseInt(customResW) || 1920
-      resH = parseInt(customResH) || 1080
-    } else {
-      const res = filteredResolutions[customResIdx]
-      if (!res) return
-      resW = res.w
-      resH = res.h
+      return { resW: parseInt(customResW) || 1920, resH: parseInt(customResH) || 1080 }
     }
+    const res = filteredResolutions[customResIdx]
+    return res ? { resW: res.w, resH: res.h } : { resW: 1920, resH: 1080 }
+  }
+
+  const customValidationWarnings = useMemo(() => {
+    const warnings: string[] = []
+    const diag = parseFloat(customDiagonal)
+    if (Number.isNaN(diag) || diag < MIN_DIAGONAL) {
+      warnings.push(`Diagonal must be at least ${MIN_DIAGONAL}".`)
+    } else if (diag > MAX_DIAGONAL) {
+      warnings.push(`Diagonal cannot exceed ${MAX_DIAGONAL}".`)
+    }
+    const { resW, resH } = getCustomRes()
+    if (resW > 0 && resH > 0) {
+      const ratio = Math.max(resW, resH) / Math.min(resW, resH)
+      if (ratio > MAX_ASPECT_RATIO) {
+        warnings.push(`Aspect ratio cannot exceed ${MAX_ASPECT_RATIO}:1 (e.g. ${MAX_ASPECT_RATIO}:1 or 1:${MAX_ASPECT_RATIO}).`)
+      }
+    }
+    return warnings
+  }, [customDiagonal, useCustomRes, customResW, customResH, customResIdx, filteredResolutions])
+
+  function addCustom() {
+    if (customValidationWarnings.length > 0) return
+    const { resW, resH } = getCustomRes()
+    const res = filteredResolutions[customResIdx]
+    if (!useCustomRes && !res) return
+    const diagonal = parseFloat(customDiagonal) || 27
     const preset: MonitorPreset = {
-      name: `Custom ${customDiagonal}" ${resW}x${resH}`,
-      diagonal: parseFloat(customDiagonal) || 27,
+      name: `Custom ${diagonal}" ${resW}x${resH}`,
+      diagonal,
       aspectRatio: customAspect,
       resolutionX: resW,
       resolutionY: resH,
@@ -178,9 +203,8 @@ export default function MonitorPresetsSidebar() {
                 type="number"
                 value={customDiagonal}
                 onChange={e => setCustomDiagonal(e.target.value)}
-                min="5"
-                max="100"
                 step="0.1"
+                placeholder="5–120"
                 className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
               />
             </div>
@@ -253,10 +277,20 @@ export default function MonitorPresetsSidebar() {
                 </>
               )}
             </div>
+            {customValidationWarnings.length > 0 && (
+              <div className="rounded bg-amber-950/50 border border-amber-700/50 px-2.5 py-2 space-y-1">
+                {customValidationWarnings.map((msg, i) => (
+                  <p key={i} className="text-xs text-amber-200">
+                    {msg}
+                  </p>
+                ))}
+              </div>
+            )}
             <div className="flex gap-2">
               <button
                 onClick={addCustom}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm py-1.5 rounded transition-colors"
+                disabled={customValidationWarnings.length > 0}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed text-white text-sm py-1.5 rounded transition-colors"
               >
                 Add
               </button>

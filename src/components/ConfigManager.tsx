@@ -64,6 +64,7 @@ export default function ConfigManager() {
         preset: m.preset,
         physicalX: m.physicalX,
         physicalY: m.physicalY,
+        rotation: m.rotation,
       })),
     }
     const updated = [newConfig, ...configs].slice(0, MAX_CONFIGS)
@@ -78,7 +79,7 @@ export default function ConfigManager() {
     dispatch({ type: 'CLEAR_ALL_MONITORS' })
     // Add each monitor from the saved config
     for (const m of config.monitors) {
-      dispatch({ type: 'ADD_MONITOR', preset: m.preset, x: m.physicalX, y: m.physicalY })
+      dispatch({ type: 'ADD_MONITOR', preset: m.preset, x: m.physicalX, y: m.physicalY, rotation: m.rotation ?? 0 })
     }
     setOpen(false)
   }

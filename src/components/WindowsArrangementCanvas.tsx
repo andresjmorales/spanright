@@ -11,6 +11,14 @@ const MONITOR_COLORS = [
 /** Snap threshold in screen pixels — how close an edge must be to "stick" */
 const SNAP_SCREEN_PX = 30
 
+/** Strip dimensions in pixels (depends on rotation) */
+function getStripWidth(mon: Monitor): number {
+  return (mon.rotation ?? 0) === 90 ? mon.preset.resolutionY : mon.preset.resolutionX
+}
+function getStripHeight(mon: Monitor): number {
+  return (mon.rotation ?? 0) === 90 ? mon.preset.resolutionX : mon.preset.resolutionY
+}
+
 /**
  * Compute a snapped position for a dragged monitor.
  * Checks all edge pairs (left/right/top/bottom) against all other monitors.
@@ -26,8 +34,8 @@ function computeSnap(
   const dragMon = monMap.get(dragId)
   if (!dragMon) return { x: rawX, y: rawY }
 
-  const dw = dragMon.preset.resolutionX
-  const dh = dragMon.preset.resolutionY
+  const dw = getStripWidth(dragMon)
+  const dh = getStripHeight(dragMon)
   const threshold = SNAP_SCREEN_PX / scale
 
   let bestDx = Infinity
@@ -40,8 +48,8 @@ function computeSnap(
     const mon = monMap.get(wp.monitorId)
     if (!mon) continue
 
-    const ow = mon.preset.resolutionX
-    const oh = mon.preset.resolutionY
+    const ow = getStripWidth(mon)
+    const oh = getStripHeight(mon)
 
     // Horizontal snapping — compare left/right edges
     const hChecks = [
@@ -158,8 +166,8 @@ export default function WindowsArrangementCanvas() {
       if (!mon) continue
       minX = Math.min(minX, wp.pixelX)
       minY = Math.min(minY, wp.pixelY)
-      maxX = Math.max(maxX, wp.pixelX + mon.preset.resolutionX)
-      maxY = Math.max(maxY, wp.pixelY + mon.preset.resolutionY)
+      maxX = Math.max(maxX, wp.pixelX + getStripWidth(mon))
+      maxY = Math.max(maxY, wp.pixelY + getStripHeight(mon))
     }
     const contentW = maxX - minX
     const contentH = maxY - minY
@@ -234,8 +242,8 @@ export default function WindowsArrangementCanvas() {
 
       const x = toDisplayX(wp.pixelX)
       const y = toDisplayY(wp.pixelY)
-      const w = mon.preset.resolutionX * displayScale
-      const h = mon.preset.resolutionY * displayScale
+      const w = getStripWidth(mon) * displayScale
+      const h = getStripHeight(mon) * displayScale
 
       // Fill
       ctx.fillStyle = color
@@ -270,7 +278,9 @@ export default function WindowsArrangementCanvas() {
         if (showRes) {
           ctx.fillStyle = '#94a3b8'
           ctx.font = '9px system-ui, sans-serif'
-          ctx.fillText(`${mon.preset.resolutionX} x ${mon.preset.resolutionY} px`, x + 8, y + 31, labelW - 8)
+          const resW = getStripWidth(mon)
+          const resH = getStripHeight(mon)
+          ctx.fillText(`${resW} x ${resH} px`, x + 8, y + 31, labelW - 8)
         }
       }
     }
@@ -291,8 +301,8 @@ export default function WindowsArrangementCanvas() {
       if (!mon) continue
       const x = toDisplayX(wp.pixelX)
       const y = toDisplayY(wp.pixelY)
-      const w = mon.preset.resolutionX * displayScale
-      const h = mon.preset.resolutionY * displayScale
+      const w = getStripWidth(mon) * displayScale
+      const h = getStripHeight(mon) * displayScale
 
       if (mx >= x && mx <= x + w && my >= y && my <= y + h) {
         setDragging(wp.monitorId)
@@ -328,13 +338,13 @@ export default function WindowsArrangementCanvas() {
       .map(wp => {
         const mon = monitorMap.get(wp.monitorId)
         if (!mon) return null
-        return { x: wp.pixelX, y: wp.pixelY, w: mon.preset.resolutionX, h: mon.preset.resolutionY }
+        return { x: wp.pixelX, y: wp.pixelY, w: getStripWidth(mon), h: getStripHeight(mon) }
       })
       .filter((r): r is { x: number; y: number; w: number; h: number } => r !== null)
 
     const resolved = resolveOverlaps(
       snapped.x, snapped.y,
-      dragMon.preset.resolutionX, dragMon.preset.resolutionY,
+      getStripWidth(dragMon), getStripHeight(dragMon),
       otherRects
     )
 

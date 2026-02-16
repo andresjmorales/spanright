@@ -277,7 +277,7 @@ export default function EditorCanvas() {
     const availH = dimensions.height - padding * 2
     const scaleX = availW / bbox.width
     const scaleY = availH / bbox.height
-    const newScale = Math.max(7.5, Math.min(20, Math.min(scaleX, scaleY)))
+    const newScale = Math.max(7.5, Math.min(25, Math.min(scaleX, scaleY)))
     const newOffsetX = padding - bbox.minX * newScale + (availW - bbox.width * newScale) / 2
     const newOffsetY = padding - bbox.minY * newScale + (availH - bbox.height * newScale) / 2
     dispatch({ type: 'SET_CANVAS_SCALE', scale: newScale })
@@ -342,7 +342,7 @@ export default function EditorCanvas() {
     if (e.evt.ctrlKey || e.evt.metaKey) {
       // Ctrl+Scroll = Zoom (toward pointer)
       const zoomFactor = e.evt.deltaY > 0 ? 0.9 : 1.1
-      const newScale = Math.max(7.5, Math.min(20, cs.scale * zoomFactor))
+      const newScale = Math.max(7.5, Math.min(25, cs.scale * zoomFactor))
       const physX = (pointer.x - cs.offsetX) / cs.scale
       const physY = (pointer.y - cs.offsetY) / cs.scale
       const newOffsetX = pointer.x - physX * newScale
@@ -415,9 +415,20 @@ export default function EditorCanvas() {
           const rect = container.getBoundingClientRect()
           const canvasX = e.clientX - rect.left
           const canvasY = e.clientY - rect.top
-          // Convert cursor position to physical coordinates
-          const physCursorX = (canvasX - state.canvasOffsetX) / state.canvasScale
-          const physCursorY = (canvasY - state.canvasOffsetY) / state.canvasScale
+          // Use clamped offset so drop position matches visible canvas
+          const w = container.clientWidth
+          const h = container.clientHeight
+          const s = state.canvasScale
+          const OVERFLOW = 80
+          const minOX = w - PHYS_MAX_X * s - OVERFLOW
+          const maxOX = -PHYS_MIN_X * s + OVERFLOW
+          const minOY = h - PHYS_MAX_Y * s - OVERFLOW
+          const maxOY = -PHYS_MIN_Y * s + OVERFLOW
+          const clamp = (v: number, lo: number, hi: number) => (lo <= hi ? Math.max(lo, Math.min(hi, v)) : (lo + hi) / 2)
+          const dropOffsetX = clamp(state.canvasOffsetX, minOX, maxOX)
+          const dropOffsetY = clamp(state.canvasOffsetY, minOY, maxOY)
+          const physCursorX = (canvasX - dropOffsetX) / s
+          const physCursorY = (canvasY - dropOffsetY) / s
           // Calculate physical dimensions so we can center on cursor
           const ppi = Math.sqrt(preset.resolutionX ** 2 + preset.resolutionY ** 2) / preset.diagonal
           const physW = preset.resolutionX / ppi
@@ -444,8 +455,9 @@ export default function EditorCanvas() {
       const img = new Image()
       img.onload = () => {
         const imgAspect = img.naturalWidth / img.naturalHeight
-        const physWidth = 72 // 6 feet
-        const physHeight = physWidth / imgAspect
+        const sixFeet = 72 // inches
+        const physWidth = img.naturalHeight > img.naturalWidth ? sixFeet * imgAspect : sixFeet
+        const physHeight = img.naturalHeight > img.naturalWidth ? sixFeet : sixFeet / imgAspect
 
         // Center on current viewport
         const container = containerRef.current
@@ -731,6 +743,22 @@ export default function EditorCanvas() {
             <Text x={4} y={1} text="✕" fontSize={12} fill="#ffffff" />
           </Group>
         )}
+        {/* Rotate 90° button — bottom-right */}
+        <Group
+          x={cw - 22}
+          y={ch - 22}
+          onClick={(e) => {
+            e.cancelBubble = true
+            dispatch({ type: 'ROTATE_MONITOR', id: monitor.id })
+          }}
+          onTap={(e) => {
+            e.cancelBubble = true
+            dispatch({ type: 'ROTATE_MONITOR', id: monitor.id })
+          }}
+        >
+          <Rect width={18} height={18} fill="#475569" cornerRadius={3} />
+          <Text x={3} y={2} text="↻" fontSize={12} fill="#e2e8f0" />
+        </Group>
       </Group>
     )
   })
@@ -859,7 +887,7 @@ export default function EditorCanvas() {
           <button
             onClick={() => {
               const pct = (state.canvasScale / DEFAULT_SCALE) * 100
-              const newPct = Math.min(200, Math.ceil((pct + 0.5) / 25) * 25)
+              const newPct = Math.min(250, Math.ceil((pct + 0.5) / 25) * 25)
               dispatch({ type: 'SET_CANVAS_SCALE', scale: (newPct / 100) * DEFAULT_SCALE })
             }}
             className="hover:text-white transition-colors px-1"
