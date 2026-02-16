@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useCallback, useState, useMemo, type Dispatch
 import { Stage, Layer, Rect, Text, Group, Image as KonvaImage, Line, Transformer } from 'react-konva'
 import type Konva from 'konva'
 import { useStore } from '../store'
-import { formatDimension, getMonitorsBoundingBox } from '../utils'
+import { formatDimension, getMonitorsBoundingBox, getMonitorDisplayName } from '../utils'
 import type { Monitor, SourceImage } from '../types'
 
 const MONITOR_COLORS = [
@@ -211,6 +211,8 @@ export default function EditorCanvas() {
   const [isDragOverCanvas, setIsDragOverCanvas] = useState(false)
   const lastPointerPos = useRef<{ x: number; y: number } | null>(null)
   const [imageSelected, setImageSelected] = useState(false)
+  const [renameMonitorId, setRenameMonitorId] = useState<string | null>(null)
+  const [renameInputValue, setRenameInputValue] = useState('')
   // Refs for values used in hot-path event handlers (avoids callback recreation)
   const canvasStateRef = useRef({ scale: 10, offsetX: 50, offsetY: 50, dimW: 800, dimH: 500 })
 
@@ -693,7 +695,7 @@ export default function EditorCanvas() {
               <Text
                 x={8}
                 y={labelY + 3}
-                text={monitor.preset.name}
+                text={getMonitorDisplayName(monitor)}
                 fontSize={cw > 100 ? 11 : 9}
                 fill="#ffffff"
                 fontStyle="bold"
@@ -748,6 +750,26 @@ export default function EditorCanvas() {
           >
             <Rect width={18} height={18} fill="#ef4444" cornerRadius={3} />
             <Text x={4} y={1} text="✕" fontSize={12} fill="#ffffff" />
+          </Group>
+        )}
+        {/* Pencil icon — rename (when selected), left of rotate */}
+        {isSelected && (
+          <Group
+            x={cw - 42}
+            y={ch - 22}
+            onClick={(e) => {
+              e.cancelBubble = true
+              setRenameMonitorId(monitor.id)
+              setRenameInputValue(getMonitorDisplayName(monitor))
+            }}
+            onTap={(e) => {
+              e.cancelBubble = true
+              setRenameMonitorId(monitor.id)
+              setRenameInputValue(getMonitorDisplayName(monitor))
+            }}
+          >
+            <Rect width={16} height={16} fill="#64748b" cornerRadius={2} />
+            <Text x={2} y={1} text="✎" fontSize={11} fill="#e2e8f0" />
           </Group>
         )}
         {/* Rotate 90° button — bottom-right */}
@@ -847,6 +869,55 @@ export default function EditorCanvas() {
           {monitorNodes}
         </Layer>
       </Stage>
+
+      {/* Rename monitor modal */}
+      {renameMonitorId && (
+        <div
+          className="absolute inset-0 z-50 flex items-center justify-center bg-black/30"
+          onClick={() => setRenameMonitorId(null)}
+        >
+          <div
+            className="bg-gray-900 border border-gray-700 rounded-lg shadow-xl p-4 w-72"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-sm font-medium text-gray-200 mb-2">Rename monitor</div>
+            <input
+              type="text"
+              value={renameInputValue}
+              onChange={(e) => setRenameInputValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  dispatch({ type: 'SET_MONITOR_DISPLAY_NAME', id: renameMonitorId, displayName: renameInputValue })
+                  setRenameMonitorId(null)
+                }
+                if (e.key === 'Escape') setRenameMonitorId(null)
+              }}
+              placeholder={state.monitors.find(m => m.id === renameMonitorId)?.preset.name ?? 'Monitor name'}
+              className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500"
+              autoFocus
+            />
+            <div className="flex justify-end gap-2 mt-3">
+              <button
+                type="button"
+                onClick={() => setRenameMonitorId(null)}
+                className="px-3 py-1.5 text-xs text-gray-400 hover:text-gray-200 rounded hover:bg-gray-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  dispatch({ type: 'SET_MONITOR_DISPLAY_NAME', id: renameMonitorId, displayName: renameInputValue })
+                  setRenameMonitorId(null)
+                }}
+                className="px-3 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Rulers */}
       <RulerOverlay

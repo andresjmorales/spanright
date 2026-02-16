@@ -9,6 +9,8 @@ export interface MonitorPreset {
 export interface Monitor {
   id: string
   preset: MonitorPreset
+  /** Custom display name (e.g. "Main display"). Falls back to preset.name when unset. */
+  displayName?: string
   // Physical position on canvas in inches (top-left corner)
   physicalX: number
   physicalY: number
@@ -52,6 +54,7 @@ export interface SavedConfig {
     physicalX: number
     physicalY: number
     rotation?: 0 | 90
+    displayName?: string
   }[]
 }
 
