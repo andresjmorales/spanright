@@ -28,6 +28,7 @@ type Action =
   | { type: 'SELECT_MONITOR'; id: string | null }
   | { type: 'SET_SOURCE_IMAGE'; image: SourceImage }
   | { type: 'CLEAR_SOURCE_IMAGE' }
+  | { type: 'ROTATE_SOURCE_IMAGE' }
   | { type: 'MOVE_IMAGE'; x: number; y: number }
   | { type: 'SCALE_IMAGE'; physicalWidth: number; physicalHeight: number }
   | { type: 'SET_CANVAS_SCALE'; scale: number }
@@ -153,6 +154,12 @@ function reducer(state: State, action: Action): State {
       return { ...state, sourceImage: action.image }
     case 'CLEAR_SOURCE_IMAGE':
       return { ...state, sourceImage: null }
+    case 'ROTATE_SOURCE_IMAGE': {
+      if (!state.sourceImage) return state
+      const r = state.sourceImage.rotation ?? 0
+      const next: 0 | 90 | 180 | 270 = r === 270 ? 0 : (r + 90) as 0 | 90 | 180 | 270
+      return { ...state, sourceImage: { ...state.sourceImage, rotation: next } }
+    }
     case 'MOVE_IMAGE':
       return state.sourceImage
         ? { ...state, sourceImage: { ...state.sourceImage, physicalX: action.x, physicalY: action.y } }

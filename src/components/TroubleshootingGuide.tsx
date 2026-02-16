@@ -76,7 +76,7 @@ export default function TroubleshootingGuide({ onClose }: TroubleshootingGuidePr
               Your wallpaper is designed for Windows <strong className="text-blue-300">Span</strong> mode, and that should work perfectly in most setups. But if you're seeing stretching, bleed, or misalignment, try switching to <strong className="text-blue-300">Tile</strong> instead: right-click your desktop &gt; Personalize &gt; Background, and change the fit mode.
             </p>
             <p className="text-xs text-gray-400 leading-relaxed">
-              <strong className="text-gray-300">Why does this help?</strong> Span mode scales your image to fit the Windows virtual desktop bounding box. If any monitor is even a few pixels offset in your display arrangement, Windows will stretch the image to compensate, causing visible bleed. Tile mode places the image at exact 1:1 pixel scale with no resizing, bypassing the issue entirely.
+              <strong className="text-gray-300">Why does this help?</strong> Span mode scales your image to fit the Windows virtual desktop bounding box — the exterior rectangle that contains your entire display setup (side-by-side, stacked vertical, or mixed). If any monitor is even a few pixels offset, Windows will stretch the image to compensate, causing visible bleed. Tile mode places the image at exact 1:1 pixel scale with no resizing, bypassing the issue entirely.
             </p>
           </div>
 
@@ -122,10 +122,7 @@ export default function TroubleshootingGuide({ onClose }: TroubleshootingGuidePr
                 Right-click your downloaded wallpaper file &gt; Properties &gt; Details tab. Check the <strong className="text-gray-100">Width</strong> and <strong className="text-gray-100">Height</strong> values.
               </p>
               <p className="text-sm text-gray-300 leading-relaxed">
-                Your image width should equal the sum of all your monitors' horizontal resolutions. For example: 1920 + 1920 + 2560 = 6400px wide.
-              </p>
-              <p className="text-sm text-gray-300 leading-relaxed">
-                Your image height should equal the tallest monitor's vertical resolution (plus any vertical offset if your monitors aren't top-aligned in the Windows arrangement).
+                Your image dimensions match the <strong className="text-gray-100">bounding box</strong> of your Windows arrangement: the smallest rectangle that contains every monitor. Width = horizontal extent (e.g. two 1920×1080 side-by-side → 3840px; stacked vertically → 1920px). Height = vertical extent (e.g. stacked → 2160px). So the image is exactly the size Windows expects for the virtual desktop.
               </p>
               <p className="text-xs text-gray-400 leading-relaxed">
                 If these numbers don't match, go back to Spanright and verify your monitor resolutions are entered correctly.
@@ -148,7 +145,7 @@ export default function TroubleshootingGuide({ onClose }: TroubleshootingGuidePr
             {/* Section: Monitor Order Mismatch */}
             <AccordionSection title="The wallpaper sections appear on the wrong monitors">
               <p className="text-sm text-gray-300 leading-relaxed">
-                Spanright stitches the wallpaper left-to-right based on the physical layout you've built. Windows applies it left-to-right based on your display arrangement in Settings &gt; Display.
+                Spanright’s output matches the bounding box of your Windows arrangement (positions and order). Windows applies that same image based on your display arrangement in Settings &gt; Display — so the layout there (left-to-right, top-to-bottom, or mixed) must match what you set in the Windows Arrangement tab.
               </p>
               <p className="text-sm text-gray-300 leading-relaxed">
                 If these orders don't match, the wallpaper sections will appear on the wrong screens.

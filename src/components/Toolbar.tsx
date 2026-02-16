@@ -4,7 +4,7 @@ import ImageUpload from './ImageUpload'
 import ConfigManager from './ConfigManager'
 
 export default function Toolbar() {
-  const { state, dispatch } = useStore()
+  const { state } = useStore()
 
   const recommended = getRecommendedImageSize(state.monitors)
   const bbox = getMonitorsBoundingBox(state.monitors)
@@ -34,20 +34,8 @@ export default function Toolbar() {
 
       {/* Unit toggle — hidden for now, cm support kept in backend */}
 
-      {/* Config manager */}
+      {/* Saved Layouts */}
       <ConfigManager />
-
-      {/* Snap toggle */}
-      <button
-        onClick={() => dispatch({ type: 'TOGGLE_SNAP' })}
-        className={`text-xs px-2.5 py-1 rounded border transition-colors ${
-          state.snapToGrid
-            ? 'bg-blue-600/20 text-blue-400 border-blue-500/50'
-            : 'bg-gray-800 text-gray-500 border-gray-700'
-        }`}
-      >
-        Snap to Grid
-      </button>
 
       {/* Monitor count */}
       {hasMonitors && (
@@ -75,10 +63,9 @@ export default function Toolbar() {
                 imageSizeStatus === 'warn' ? 'text-yellow-400' :
                 'text-red-400'
               }`}>
-                (Your image: {state.sourceImage!.naturalWidth} x {state.sourceImage!.naturalHeight})
-                {imageSizeStatus === 'ok' && ' ✓'}
-                {imageSizeStatus === 'warn' && ' ⚠ Slightly undersized'}
-                {imageSizeStatus === 'error' && ' ✗ Undersized'}
+                {imageSizeStatus === 'ok' && '✓ Correct size'}
+                {imageSizeStatus === 'warn' && '⚠ Slightly undersized'}
+                {imageSizeStatus === 'error' && '✗ Undersized'}
               </span>
             )}
           </div>

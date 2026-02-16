@@ -53,6 +53,9 @@ export default function InfoDialog({ onClose }: InfoDialogProps) {
                 <p className="text-xs text-gray-400 mt-1 leading-relaxed">
                   Windows paints this image based on how your monitors are arranged in <strong className="text-gray-300">Settings &gt; Display</strong>, starting from the top-left corner. The left-to-right order and vertical offsets in Windows determine which slice each monitor gets.
                 </p>
+                <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">
+                  Spanright’s output is the <strong className="text-gray-300">bounding box</strong> of that arrangement — the smallest rectangle that contains all your monitors. So side-by-side, stacked vertically, or any mix all work: the image size matches the virtual desktop Windows uses.
+                </p>
               </div>
             </div>
           </section>

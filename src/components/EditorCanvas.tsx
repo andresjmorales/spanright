@@ -541,13 +541,16 @@ export default function EditorCanvas() {
     node.position({ x: toCanvasX(newPhysX), y: toCanvasY(newPhysY) })
   }, [dispatch, snap, toPhysicalX, toPhysicalY, toCanvasX, toCanvasY])
 
-  // Handle image drag
+  // Handle image drag (Group position is image center)
   const handleImageDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
     const node = e.target
-    const newPhysX = toPhysicalX(node.x())
-    const newPhysY = toPhysicalY(node.y())
+    if (!state.sourceImage) return
+    const centerPhysX = toPhysicalX(node.x())
+    const centerPhysY = toPhysicalY(node.y())
+    const newPhysX = centerPhysX - state.sourceImage.physicalWidth / 2
+    const newPhysY = centerPhysY - state.sourceImage.physicalHeight / 2
     dispatch({ type: 'MOVE_IMAGE', x: newPhysX, y: newPhysY })
-  }, [dispatch, toPhysicalX, toPhysicalY])
+  }, [dispatch, toPhysicalX, toPhysicalY, state.sourceImage])
 
   // Handle image transform (resize via handles)
   const handleImageTransformEnd = useCallback(() => {
@@ -576,10 +579,14 @@ export default function EditorCanvas() {
 
   // Render source image (wrapped in Group with delete button so they move together)
   const imgW = state.sourceImage ? state.sourceImage.physicalWidth * scale : 0
+  const imgH = state.sourceImage ? state.sourceImage.physicalHeight * scale : 0
+  const imgRotation = state.sourceImage?.rotation ?? 0
   const imageNode = state.sourceImage ? (
     <Group
-      x={toCanvasX(state.sourceImage.physicalX)}
-      y={toCanvasY(state.sourceImage.physicalY)}
+      x={toCanvasX(state.sourceImage.physicalX) + imgW / 2}
+      y={toCanvasY(state.sourceImage.physicalY) + imgH / 2}
+      offset={{ x: imgW / 2, y: imgH / 2 }}
+      rotation={imgRotation}
       draggable
       onClick={() => {
         setImageSelected(true)
@@ -595,7 +602,7 @@ export default function EditorCanvas() {
         ref={imageRef}
         image={state.sourceImage.element}
         width={imgW}
-        height={state.sourceImage.physicalHeight * scale}
+        height={imgH}
         opacity={0.7}
         onTransformEnd={handleImageTransformEnd}
       />
@@ -855,6 +862,7 @@ export default function EditorCanvas() {
       <CanvasMenu
         hasMonitors={state.monitors.length > 0}
         hasImage={!!state.sourceImage}
+        snapToGrid={state.snapToGrid}
         dispatch={dispatch}
       />
 
@@ -940,10 +948,12 @@ export default function EditorCanvas() {
 function CanvasMenu({
   hasMonitors,
   hasImage,
+  snapToGrid,
   dispatch,
 }: {
   hasMonitors: boolean
   hasImage: boolean
+  snapToGrid: boolean
   dispatch: Dispatch<any>
 }) {
   const [open, setOpen] = useState(false)
@@ -972,7 +982,7 @@ function CanvasMenu({
   }, [open])
 
   return (
-    <div ref={menuRef} className="absolute top-3 right-3 select-none z-10">
+    <div ref={menuRef} className="absolute top-6 right-3 select-none z-10">
       <button
         onClick={() => setOpen(o => !o)}
         className="bg-gray-900/80 backdrop-blur hover:bg-gray-800/90 text-gray-400 hover:text-gray-200 px-2 py-1.5 rounded transition-colors"
@@ -986,6 +996,30 @@ function CanvasMenu({
       </button>
       {open && (
         <div className="absolute right-0 mt-1 w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-xl overflow-hidden">
+          <button
+            onClick={() => {
+              dispatch({ type: 'TOGGLE_SNAP' })
+              setOpen(false)
+            }}
+            className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between gap-2 ${
+              snapToGrid ? 'text-blue-400 bg-blue-500/10' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+            }`}
+          >
+            Snap to Grid
+            <span className="shrink-0 w-4 h-4 flex items-center justify-center">
+              {snapToGrid ? (
+                <svg className="w-4 h-4" viewBox="0 0 16 16">
+                  <rect x="2" y="2" width="12" height="12" rx="2" fill="currentColor" className="text-blue-400" />
+                  <path d="M4 8l3 3 5-6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4 text-gray-500" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="2" y="2" width="12" height="12" rx="1" />
+                </svg>
+              )}
+            </span>
+          </button>
+          <div className="border-t border-gray-700" />
           <button
             disabled={!hasMonitors}
             onClick={() => {

@@ -84,22 +84,40 @@ export default function ImageUpload() {
           <span className="text-sm text-gray-300">Upload Image</span>
         </div>
       ) : (
-        <div className="flex items-center gap-2">
-          <div className="text-xs text-gray-300">
-            {state.sourceImage.fileName}
-            <span className="text-gray-500 ml-1">
-              ({state.sourceImage.naturalWidth} x {state.sourceImage.naturalHeight} px)
-            </span>
+        <div className="flex items-center gap-2 flex-nowrap min-w-0">
+          <div className="text-xs text-gray-300 min-w-0 max-w-[280px] truncate" title={state.sourceImage.fileName}>
+            {(() => {
+              const name = state.sourceImage.fileName
+              if (name.length <= 32) return name
+              const lastDot = name.lastIndexOf('.')
+              const ext = lastDot >= 0 ? name.slice(lastDot) : ''
+              const base = lastDot >= 0 ? name.slice(0, lastDot) : name
+              const maxBase = 32 - ext.length - 1
+              return base.length > maxBase ? base.slice(0, maxBase) + '…' + ext : name
+            })()}
           </div>
+          <span className="text-xs text-gray-500 shrink-0">
+            ({state.sourceImage.naturalWidth} x {state.sourceImage.naturalHeight} px)
+          </span>
+          <button
+            onClick={() => dispatch({ type: 'ROTATE_SOURCE_IMAGE' })}
+            className="text-xs text-gray-400 hover:text-gray-200 transition-colors flex items-center gap-1 shrink-0"
+            title="Rotate image 90° clockwise"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Rotate
+          </button>
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+            className="text-xs text-blue-400 hover:text-blue-300 transition-colors shrink-0 whitespace-nowrap"
           >
             Replace Image
           </button>
           <button
             onClick={() => dispatch({ type: 'CLEAR_SOURCE_IMAGE' })}
-            className="text-xs text-red-400 hover:text-red-300 transition-colors"
+            className="text-xs text-red-400 hover:text-red-300 transition-colors shrink-0"
           >
             Remove
           </button>
