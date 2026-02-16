@@ -21,11 +21,19 @@ export function calculatePhysicalDimensions(resX: number, resY: number, ppi: num
 
 /**
  * Create a Monitor from a preset and position.
+ * rotation 90 = portrait (dimensions swapped).
  */
-export function createMonitor(preset: MonitorPreset, physicalX: number, physicalY: number): Monitor {
+export function createMonitor(
+  preset: MonitorPreset,
+  physicalX: number,
+  physicalY: number,
+  rotation: 0 | 90 = 0,
+): Monitor {
   const ppi = calculatePPI(preset.resolutionX, preset.resolutionY, preset.diagonal)
-  const { width, height } = calculatePhysicalDimensions(preset.resolutionX, preset.resolutionY, ppi)
-
+  let { width, height } = calculatePhysicalDimensions(preset.resolutionX, preset.resolutionY, ppi)
+  if (rotation === 90) {
+    ;[width, height] = [height, width]
+  }
   return {
     id: uuidv4(),
     preset,
@@ -34,6 +42,7 @@ export function createMonitor(preset: MonitorPreset, physicalX: number, physical
     physicalWidth: width,
     physicalHeight: height,
     ppi,
+    rotation,
   }
 }
 

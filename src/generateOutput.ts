@@ -45,15 +45,18 @@ export function generateOutput(
   // Calculate vertical offsets relative to the topmost monitor
   const minWinY = Math.min(...sortedWinPos.map(wp => wp.pixelY))
 
+  const stripWidth = (mon: Monitor) => (mon.rotation ?? 0) === 90 ? mon.preset.resolutionY : mon.preset.resolutionX
+  const stripHeight = (mon: Monitor) => (mon.rotation ?? 0) === 90 ? mon.preset.resolutionX : mon.preset.resolutionY
+
   // Calculate total output dimensions
   const totalWidth = sortedWinPos.reduce((sum, wp) => {
     const mon = monitorMap.get(wp.monitorId)!
-    return sum + mon.preset.resolutionX
+    return sum + stripWidth(mon)
   }, 0)
 
   const maxHeight = Math.max(...sortedWinPos.map(wp => {
     const mon = monitorMap.get(wp.monitorId)!
-    return (wp.pixelY - minWinY) + mon.preset.resolutionY
+    return (wp.pixelY - minWinY) + stripHeight(mon)
   }))
 
   // Create output canvas
@@ -71,8 +74,8 @@ export function generateOutput(
 
   for (const wp of sortedWinPos) {
     const monitor = monitorMap.get(wp.monitorId)!
-    const stripWidth = monitor.preset.resolutionX
-    const stripHeight = monitor.preset.resolutionY
+    const sw = stripWidth(monitor)
+    const sh = stripHeight(monitor)
 
     // Vertical offset from Windows arrangement
     const yPixelOffset = Math.round(wp.pixelY - minWinY)
@@ -108,8 +111,8 @@ export function generateOutput(
         const srcH = (intBottom - intTop) * imgScaleY
 
         // Calculate destination pixel coordinates within the monitor strip
-        const monScaleX = stripWidth / monitor.physicalWidth
-        const monScaleY = stripHeight / monitor.physicalHeight
+        const monScaleX = sw / monitor.physicalWidth
+        const monScaleY = sh / monitor.physicalHeight
 
         const dstX = (intLeft - monLeft) * monScaleX
         const dstY = (intTop - monTop) * monScaleY
@@ -124,8 +127,8 @@ export function generateOutput(
       }
     }
 
-    monitorStrips.push({ monitor, stripWidth, stripHeight })
-    xOffset += stripWidth
+    monitorStrips.push({ monitor, stripWidth: sw, stripHeight: sh })
+    xOffset += sw
   }
 
   return {

@@ -12,8 +12,9 @@ export default function ImageUpload() {
       const img = new Image()
       img.onload = () => {
         const imgAspect = img.naturalWidth / img.naturalHeight
-        const physWidth = 72 // 6 feet
-        const physHeight = physWidth / imgAspect
+        const sixFeet = 72 // inches
+        const physWidth = img.naturalHeight > img.naturalWidth ? sixFeet * imgAspect : sixFeet
+        const physHeight = img.naturalHeight > img.naturalWidth ? sixFeet : sixFeet / imgAspect
 
         // Center on current viewport
         const containerEl = document.querySelector('[data-editor-canvas]')

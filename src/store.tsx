@@ -20,8 +20,9 @@ interface State {
 }
 
 type Action =
-  | { type: 'ADD_MONITOR'; preset: MonitorPreset; x: number; y: number }
+  | { type: 'ADD_MONITOR'; preset: MonitorPreset; x: number; y: number; rotation?: 0 | 90 }
   | { type: 'REMOVE_MONITOR'; id: string }
+  | { type: 'ROTATE_MONITOR'; id: string }
   | { type: 'CLEAR_ALL_MONITORS' }
   | { type: 'MOVE_MONITOR'; id: string; x: number; y: number }
   | { type: 'SELECT_MONITOR'; id: string | null }
@@ -58,6 +59,11 @@ const initialState: State = {
   showTroubleshootingGuide: false,
 }
 
+/** Strip width in pixels for output (depends on rotation). */
+function getMonitorStripWidth(m: Monitor): number {
+  return (m.rotation ?? 0) === 90 ? m.preset.resolutionY : m.preset.resolutionX
+}
+
 /**
  * Generate a default Windows arrangement from the physical layout:
  * same left-to-right order, all top-aligned, laid out side-by-side by pixel width.
@@ -71,7 +77,7 @@ function generateDefaultWindowsArrangement(monitors: Monitor[]): WindowsMonitorP
       pixelX: xOffset,
       pixelY: 0,
     }
-    xOffset += m.preset.resolutionX
+    xOffset += getMonitorStripWidth(m)
     return pos
   })
 }
@@ -79,7 +85,8 @@ function generateDefaultWindowsArrangement(monitors: Monitor[]): WindowsMonitorP
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'ADD_MONITOR': {
-      const monitor = createMonitor(action.preset, action.x, action.y)
+      const rotation = action.rotation ?? 0
+      const monitor = createMonitor(action.preset, action.x, action.y, rotation)
       const newMonitors = [...state.monitors, monitor]
       return {
         ...state,
@@ -94,6 +101,33 @@ function reducer(state: State, action: Action): State {
         ...state,
         monitors: newMonitors,
         selectedMonitorId: state.selectedMonitorId === action.id ? null : state.selectedMonitorId,
+        windowsArrangement: generateDefaultWindowsArrangement(newMonitors),
+      }
+    }
+    case 'ROTATE_MONITOR': {
+      const m = state.monitors.find(m => m.id === action.id)
+      if (!m) return state
+      const centerX = m.physicalX + m.physicalWidth / 2
+      const centerY = m.physicalY + m.physicalHeight / 2
+      const currentRotation = m.rotation ?? 0
+      const newRotation: 0 | 90 = currentRotation === 90 ? 0 : 90
+      const newW = m.physicalHeight
+      const newH = m.physicalWidth
+      const newMonitors = state.monitors.map(mon =>
+        mon.id === action.id
+          ? {
+              ...mon,
+              physicalX: centerX - newW / 2,
+              physicalY: centerY - newH / 2,
+              physicalWidth: newW,
+              physicalHeight: newH,
+              rotation: newRotation,
+            }
+          : mon
+      )
+      return {
+        ...state,
+        monitors: newMonitors,
         windowsArrangement: generateDefaultWindowsArrangement(newMonitors),
       }
     }
@@ -135,7 +169,7 @@ function reducer(state: State, action: Action): State {
           }
         : state
     case 'SET_CANVAS_SCALE':
-      return { ...state, canvasScale: Math.max(7.5, Math.min(20, action.scale)) }
+      return { ...state, canvasScale: Math.max(7.5, Math.min(25, action.scale)) }
     case 'PAN_CANVAS':
       return {
         ...state,
