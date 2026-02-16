@@ -14,14 +14,15 @@ export interface OutputResult {
  *
  * Uses two coordinate spaces:
  * - Physical layout: determines what portion of the source image each monitor sees
- * - Windows arrangement: determines stitching order (left-to-right) and vertical pixel offsets
+ * - Windows arrangement: determines where each monitor sits in the virtual desktop (pixel positions)
+ *
+ * Output matches the Windows virtual desktop bounding box: each monitor is drawn at its
+ * (pixelX, pixelY) position. This supports side-by-side, stacked vertical, and mixed layouts.
  *
  * Steps:
- * 1. Sort monitors by Windows arrangement x-position (left-to-right).
- * 2. For each monitor, determine what region of the source image falls behind it
- *    (using physical coordinates).
- * 3. Crop that region and scale it to the monitor's native resolution.
- * 4. Stitch all strips side by side using Windows arrangement vertical offsets.
+ * 1. Compute bounding box of all monitors in Windows arrangement (min/max X and Y).
+ * 2. Output dimensions = (maxX - minX) × (maxY - minY).
+ * 3. For each monitor, draw its strip at (pixelX - minX, pixelY - minY).
  */
 export function generateOutput(
   monitors: Monitor[],
@@ -34,53 +35,44 @@ export function generateOutput(
   const monitorMap = new Map<string, Monitor>()
   for (const m of monitors) monitorMap.set(m.id, m)
 
-  const winPosMap = new Map<string, WindowsMonitorPosition>()
-  for (const wp of windowsArrangement) winPosMap.set(wp.monitorId, wp)
-
-  // Sort by Windows arrangement x-position (left-to-right)
-  const sortedWinPos = [...windowsArrangement]
-    .filter(wp => monitorMap.has(wp.monitorId))
-    .sort((a, b) => a.pixelX - b.pixelX)
-
-  if (sortedWinPos.length === 0) return null
-
-  // Calculate vertical offsets relative to the topmost monitor
-  const minWinY = Math.min(...sortedWinPos.map(wp => wp.pixelY))
+  const winPosList = windowsArrangement.filter(wp => monitorMap.has(wp.monitorId))
+  if (winPosList.length === 0) return null
 
   const stripWidth = (mon: Monitor) => (mon.rotation ?? 0) === 90 ? mon.preset.resolutionY : mon.preset.resolutionX
   const stripHeight = (mon: Monitor) => (mon.rotation ?? 0) === 90 ? mon.preset.resolutionX : mon.preset.resolutionY
 
-  // Calculate total output dimensions
-  const totalWidth = sortedWinPos.reduce((sum, wp) => {
+  // Bounding box of the Windows virtual desktop (same as Windows Display Settings)
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (const wp of winPosList) {
     const mon = monitorMap.get(wp.monitorId)!
-    return sum + stripWidth(mon)
-  }, 0)
-
-  const maxHeight = Math.max(...sortedWinPos.map(wp => {
-    const mon = monitorMap.get(wp.monitorId)!
-    return (wp.pixelY - minWinY) + stripHeight(mon)
-  }))
+    const sw = stripWidth(mon)
+    const sh = stripHeight(mon)
+    minX = Math.min(minX, wp.pixelX)
+    minY = Math.min(minY, wp.pixelY)
+    maxX = Math.max(maxX, wp.pixelX + sw)
+    maxY = Math.max(maxY, wp.pixelY + sh)
+  }
+  const totalWidth = maxX - minX
+  const totalHeight = maxY - minY
 
   // Create output canvas
   const outputCanvas = document.createElement('canvas')
   outputCanvas.width = totalWidth
-  outputCanvas.height = maxHeight
+  outputCanvas.height = totalHeight
   const ctx = outputCanvas.getContext('2d')!
 
   // Fill with black
   ctx.fillStyle = '#000000'
-  ctx.fillRect(0, 0, totalWidth, maxHeight)
+  ctx.fillRect(0, 0, totalWidth, totalHeight)
 
-  let xOffset = 0
   const monitorStrips: OutputResult['monitors'] = []
 
-  for (const wp of sortedWinPos) {
+  for (const wp of winPosList) {
     const monitor = monitorMap.get(wp.monitorId)!
     const sw = stripWidth(monitor)
     const sh = stripHeight(monitor)
-
-    // Vertical offset from Windows arrangement
-    const yPixelOffset = Math.round(wp.pixelY - minWinY)
+    const drawX = Math.round(wp.pixelX - minX)
+    const drawY = Math.round(wp.pixelY - minY)
 
     if (sourceImage) {
       // Determine what portion of the source image falls behind this monitor
@@ -124,27 +116,31 @@ export function generateOutput(
         ctx.drawImage(
           sourceImage.element,
           srcX, srcY, srcW, srcH,
-          xOffset + dstX, yPixelOffset + dstY, dstW, dstH
+          drawX + dstX, drawY + dstY, dstW, dstH
         )
       }
     }
 
     monitorStrips.push({ monitor, stripWidth: sw, stripHeight: sh })
-    xOffset += sw
   }
 
-  // Black bars appear when any strip doesn't fill the full height (vertical offset or shorter strip)
-  const hasBlackBars = sortedWinPos.some((wp) => {
+  // Black bars when the bounding box has empty regions (gaps or non-rectangular layout)
+  const hasBlackBars = winPosList.some((wp) => {
     const mon = monitorMap.get(wp.monitorId)!
     const sh = stripHeight(mon)
-    const yPixelOffset = Math.round(wp.pixelY - minWinY)
-    return yPixelOffset > 0 || yPixelOffset + sh < maxHeight
+    const drawY = Math.round(wp.pixelY - minY)
+    return drawY > 0 || drawY + sh < totalHeight
+  }) || winPosList.some((wp) => {
+    const mon = monitorMap.get(wp.monitorId)!
+    const sw = stripWidth(mon)
+    const drawX = Math.round(wp.pixelX - minX)
+    return drawX > 0 || drawX + sw < totalWidth
   })
 
   return {
     canvas: outputCanvas,
     width: totalWidth,
-    height: maxHeight,
+    height: totalHeight,
     monitors: monitorStrips,
     hasBlackBars,
   }

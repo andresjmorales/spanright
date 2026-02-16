@@ -361,9 +361,9 @@ export default function WindowsArrangementCanvas() {
     const warns: string[] = []
     if (!state.useWindowsArrangement || state.monitors.length < 2) return warns
 
-    // Check if left-to-right order matches physical layout
-    const physicalOrder = [...state.monitors].sort((a, b) => a.physicalX - b.physicalX).map(m => m.id)
-    const windowsOrder = [...state.windowsArrangement].sort((a, b) => a.pixelX - b.pixelX).map(wp => wp.monitorId)
+    // Check if arrangement order (left-to-right, top-to-bottom) matches physical layout
+    const physicalOrder = [...state.monitors].sort((a, b) => a.physicalX - b.physicalX || a.physicalY - b.physicalY).map(m => m.id)
+    const windowsOrder = [...state.windowsArrangement].sort((a, b) => a.pixelX - b.pixelX || a.pixelY - b.pixelY).map(wp => wp.monitorId)
 
     if (physicalOrder.join(',') !== windowsOrder.join(',')) {
       warns.push('Your Windows display order doesn\'t match your physical layout. This is fine but make sure it\'s intentional.')
@@ -371,7 +371,7 @@ export default function WindowsArrangementCanvas() {
 
     // Check for large vertical offset differences
     const physicalSorted = [...state.monitors].sort((a, b) => a.physicalX - b.physicalX)
-    const windowsSorted = [...state.windowsArrangement].sort((a, b) => a.pixelX - b.pixelX)
+    const windowsSorted = [...state.windowsArrangement].sort((a, b) => a.pixelX - b.pixelX || a.pixelY - b.pixelY)
 
     for (let i = 0; i < Math.min(physicalSorted.length, windowsSorted.length); i++) {
       const phys = physicalSorted[i]
@@ -417,7 +417,7 @@ export default function WindowsArrangementCanvas() {
             className="accent-blue-500"
           />
           <span className="text-xs text-gray-300">
-            My Windows display arrangement matches my physical layout (top-aligned)
+            My Windows display arrangement is top-aligned (Display Settings default)
           </span>
         </label>
 
@@ -451,9 +451,8 @@ export default function WindowsArrangementCanvas() {
         <div className="shrink-0 px-4 py-2.5 bg-amber-950/70 border-b border-amber-700/50 space-y-1">
           <p className="text-xs text-amber-200">
             <strong>Note:</strong> Changing Windows Display Settings (position, order, resolution) can get messy.
-          </p>
-          <p className="text-xs text-amber-200">
-            For best results, keep all monitors <strong>top-aligned or bottom-aligned</strong> in Windows; other alignments may produce unwanted (visible) black bars in the spanned wallpaper.
+            For best results, align monitor edges in Windows (e.g. top-aligned side-by-side, or stacked vertically with left/right edges aligned.
+            Black bars are normal in some setups, but misaligned arrangements may produce visible black bars in the spanned wallpaper.
             For more info, see “How does this work?” in the top bar.
           </p>
         </div>
