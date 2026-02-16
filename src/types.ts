@@ -39,6 +39,17 @@ export interface WindowsMonitorPosition {
 
 export type ActiveTab = 'physical' | 'windows' | 'preview'
 
+export interface SavedConfig {
+  id: string
+  name: string
+  savedAt: number // timestamp
+  monitors: {
+    preset: MonitorPreset
+    physicalX: number
+    physicalY: number
+  }[]
+}
+
 export interface AppState {
   monitors: Monitor[]
   sourceImage: SourceImage | null

@@ -45,9 +45,9 @@ type Action =
 const initialState: State = {
   monitors: [],
   sourceImage: null,
-  canvasScale: 7.5, // 7.5 pixels per inch = 75% zoom
-  canvasOffsetX: 90,
-  canvasOffsetY: 90,
+  canvasScale: 10, // 10 pixels per inch = 100% zoom
+  canvasOffsetX: 50,
+  canvasOffsetY: 50,
   unit: 'inches',
   selectedMonitorId: null,
   snapToGrid: false,

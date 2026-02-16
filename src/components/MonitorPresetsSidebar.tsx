@@ -328,27 +328,30 @@ function buildDragImage(preset: MonitorPreset, index: number, canvasScale: numbe
   ctx.roundRect(0, 0, w, h, 3)
   ctx.stroke()
 
-  // Only draw labels if the rectangle is large enough to read them
+  // Only draw labels if the rectangle is large enough to read them (pinned to bottom)
   ctx.globalAlpha = 1
   if (w > 60 && h > 30) {
     const labelW = Math.min(w - 8, 200)
     const showDetails = w > 100 && h > 44
     const labelH = showDetails ? 44 : 28
-    ctx.fillStyle = 'rgba(0,0,0,0.75)'
+    const labelY = h - labelH - 4
+    ctx.fillStyle = 'rgba(0,0,0,0.55)'
     ctx.beginPath()
-    ctx.roundRect(4, 4, labelW, labelH, 3)
+    ctx.roundRect(4, labelY, labelW, labelH, 3)
     ctx.fill()
 
     // Monitor name
     ctx.fillStyle = '#ffffff'
+    ctx.globalAlpha = 0.9
     ctx.font = 'bold 11px system-ui, sans-serif'
-    ctx.fillText(preset.name, 8, 16, labelW - 8)
+    ctx.fillText(preset.name, 8, labelY + 14, labelW - 8)
 
     // Resolution subtitle
     if (showDetails) {
+      ctx.globalAlpha = 0.8
       ctx.fillStyle = '#94a3b8'
       ctx.font = '9px system-ui, sans-serif'
-      ctx.fillText(`${preset.resolutionX}x${preset.resolutionY}  ·  ${Math.round(ppi)} PPI`, 8, 30, labelW - 8)
+      ctx.fillText(`${preset.resolutionX}x${preset.resolutionY}  ·  ${Math.round(ppi)} PPI`, 8, labelY + 28, labelW - 8)
     }
   }
 

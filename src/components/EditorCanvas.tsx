@@ -24,10 +24,10 @@ const RULER_SIZE = 24
 const DEFAULT_SCALE = 10
 
 // Physical workspace bounds (inches) — ~12ft x 8ft
-const PHYS_MIN_X = -12
-const PHYS_MAX_X = 132
-const PHYS_MIN_Y = -12
-const PHYS_MAX_Y = 84
+const PHYS_MIN_X = 0
+const PHYS_MAX_X = 144
+const PHYS_MIN_Y = 0
+const PHYS_MAX_Y = 96
 
 function getNiceInterval(pixelsPerUnit: number, minPixelGap = 60): { major: number; minor: number } {
   if (pixelsPerUnit <= 0) return { major: 10, minor: 2 }
@@ -115,7 +115,7 @@ function RulerOverlay({
         ctx.lineTo(Math.round(screenX) + 0.5, RULER_SIZE - tickLen)
         ctx.stroke()
 
-        if (isMaj) {
+        if (isMaj && u >= -0.001) {
           ctx.fillStyle = '#94a3b8'
           ctx.font = '9px system-ui, -apple-system, sans-serif'
           ctx.textAlign = 'center'
@@ -161,7 +161,7 @@ function RulerOverlay({
         ctx.lineTo(RULER_SIZE - tickLen, Math.round(screenY) + 0.5)
         ctx.stroke()
 
-        if (isMaj) {
+        if (isMaj && u >= -0.001) {
           ctx.fillStyle = '#94a3b8'
           ctx.font = '9px system-ui, -apple-system, sans-serif'
           ctx.save()
@@ -211,6 +211,8 @@ export default function EditorCanvas() {
   const [isDragOverCanvas, setIsDragOverCanvas] = useState(false)
   const lastPointerPos = useRef<{ x: number; y: number } | null>(null)
   const [imageSelected, setImageSelected] = useState(false)
+  // Refs for values used in hot-path event handlers (avoids callback recreation)
+  const canvasStateRef = useRef({ scale: 10, offsetX: 50, offsetY: 50, dimW: 800, dimH: 500 })
 
   // Resize observer
   useEffect(() => {
@@ -294,36 +296,26 @@ export default function EditorCanvas() {
   }, [imageSelected, state.sourceImage])
 
   const scale = state.canvasScale
-  const offsetX = state.canvasOffsetX
-  const offsetY = state.canvasOffsetY
 
-  // Clamp panning to workspace bounds (with overflow so the boundary line is visible)
-  useEffect(() => {
-    const OVERFLOW = 80 // extra screen pixels past the boundary edge
-    const minOX = dimensions.width - PHYS_MAX_X * scale - OVERFLOW
-    const maxOX = -PHYS_MIN_X * scale + OVERFLOW
-    const minOY = dimensions.height - PHYS_MAX_Y * scale - OVERFLOW
-    const maxOY = -PHYS_MIN_Y * scale + OVERFLOW
+  // Clamp panning to workspace bounds (synchronous — no jitter)
+  const OVERFLOW = 80 // extra screen pixels past the boundary edge
+  const clampOffset = useCallback((ox: number, oy: number, w: number, h: number, s: number) => {
+    const minOX = w - PHYS_MAX_X * s - OVERFLOW
+    const maxOX = -PHYS_MIN_X * s + OVERFLOW
+    const minOY = h - PHYS_MAX_Y * s - OVERFLOW
+    const maxOY = -PHYS_MIN_Y * s + OVERFLOW
+    const cx = minOX <= maxOX ? Math.max(minOX, Math.min(maxOX, ox)) : (minOX + maxOX) / 2
+    const cy = minOY <= maxOY ? Math.max(minOY, Math.min(maxOY, oy)) : (minOY + maxOY) / 2
+    return { x: cx, y: cy }
+  }, [])
 
-    let clampedX = offsetX
-    let clampedY = offsetY
+  const { x: offsetX, y: offsetY } = clampOffset(
+    state.canvasOffsetX, state.canvasOffsetY,
+    dimensions.width, dimensions.height, scale
+  )
 
-    if (minOX <= maxOX) {
-      clampedX = Math.max(minOX, Math.min(maxOX, offsetX))
-    } else {
-      clampedX = (minOX + maxOX) / 2
-    }
-
-    if (minOY <= maxOY) {
-      clampedY = Math.max(minOY, Math.min(maxOY, offsetY))
-    } else {
-      clampedY = (minOY + maxOY) / 2
-    }
-
-    if (Math.abs(clampedX - offsetX) > 0.5 || Math.abs(clampedY - offsetY) > 0.5) {
-      dispatch({ type: 'SET_CANVAS_OFFSET', x: clampedX, y: clampedY })
-    }
-  }, [offsetX, offsetY, scale, dimensions.width, dimensions.height, dispatch])
+  // Keep ref in sync for hot-path handlers
+  canvasStateRef.current = { scale, offsetX, offsetY, dimW: dimensions.width, dimH: dimensions.height }
 
   // Convert physical inches to canvas pixels
   const toCanvasX = useCallback((physInches: number) => physInches * scale + offsetX, [scale, offsetX])
@@ -338,34 +330,36 @@ export default function EditorCanvas() {
   }, [state.snapToGrid, state.gridSize])
 
   // Handle wheel: default = pan, Ctrl = zoom
+  // Uses ref to avoid recreating callback on every offset/scale change
   const handleWheel = useCallback((e: Konva.KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault()
     const stage = stageRef.current
     if (!stage) return
     const pointer = stage.getPointerPosition()
     if (!pointer) return
+    const cs = canvasStateRef.current
 
     if (e.evt.ctrlKey || e.evt.metaKey) {
       // Ctrl+Scroll = Zoom (toward pointer)
-      const oldScale = state.canvasScale
       const zoomFactor = e.evt.deltaY > 0 ? 0.9 : 1.1
-      const newScale = Math.max(7.5, Math.min(20, oldScale * zoomFactor))
-      const physX = (pointer.x - state.canvasOffsetX) / oldScale
-      const physY = (pointer.y - state.canvasOffsetY) / oldScale
+      const newScale = Math.max(7.5, Math.min(20, cs.scale * zoomFactor))
+      const physX = (pointer.x - cs.offsetX) / cs.scale
+      const physY = (pointer.y - cs.offsetY) / cs.scale
       const newOffsetX = pointer.x - physX * newScale
       const newOffsetY = pointer.y - physY * newScale
 
       dispatch({ type: 'SET_CANVAS_SCALE', scale: newScale })
       dispatch({ type: 'SET_CANVAS_OFFSET', x: newOffsetX, y: newOffsetY })
     } else {
-      // Normal scroll = Pan (vertical by default, horizontal with Shift)
-      if (e.evt.shiftKey) {
-        dispatch({ type: 'PAN_CANVAS', dx: -e.evt.deltaY, dy: 0 })
-      } else {
-        dispatch({ type: 'PAN_CANVAS', dx: -e.evt.deltaX, dy: -e.evt.deltaY })
+      // Normal scroll = Pan — skip if already at boundary (avoids needless re-renders)
+      const dx = e.evt.shiftKey ? -e.evt.deltaY : -e.evt.deltaX
+      const dy = e.evt.shiftKey ? 0 : -e.evt.deltaY
+      const newClamped = clampOffset(cs.offsetX + dx, cs.offsetY + dy, cs.dimW, cs.dimH, cs.scale)
+      if (Math.abs(newClamped.x - cs.offsetX) > 0.1 || Math.abs(newClamped.y - cs.offsetY) > 0.1) {
+        dispatch({ type: 'SET_CANVAS_OFFSET', x: newClamped.x, y: newClamped.y })
       }
     }
-  }, [state.canvasScale, state.canvasOffsetX, state.canvasOffsetY, dispatch])
+  }, [dispatch, clampOffset])
 
   // Middle-mouse or right-click for panning
   const handleMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
@@ -387,9 +381,13 @@ export default function EditorCanvas() {
       const dx = e.evt.clientX - lastPointerPos.current.x
       const dy = e.evt.clientY - lastPointerPos.current.y
       lastPointerPos.current = { x: e.evt.clientX, y: e.evt.clientY }
-      dispatch({ type: 'PAN_CANVAS', dx, dy })
+      const cs = canvasStateRef.current
+      const newClamped = clampOffset(cs.offsetX + dx, cs.offsetY + dy, cs.dimW, cs.dimH, cs.scale)
+      if (Math.abs(newClamped.x - cs.offsetX) > 0.1 || Math.abs(newClamped.y - cs.offsetY) > 0.1) {
+        dispatch({ type: 'SET_CANVAS_OFFSET', x: newClamped.x, y: newClamped.y })
+      }
     }
-  }, [isDraggingCanvas, dispatch])
+  }, [isDraggingCanvas, dispatch, clampOffset])
 
   const handleMouseUp = useCallback(() => {
     setIsDraggingCanvas(false)
@@ -550,27 +548,26 @@ export default function EditorCanvas() {
     const newCanvasH = node.height() * scaleY
     const newPhysW = newCanvasW / scale
     const newPhysH = newCanvasH / scale
-    const newPhysX = toPhysicalX(node.x())
-    const newPhysY = toPhysicalY(node.y())
+    // Image is inside a Group — get absolute position
+    const absPos = node.getAbsolutePosition()
+    const newPhysX = toPhysicalX(absPos.x)
+    const newPhysY = toPhysicalY(absPos.y)
 
-    // Reset the Konva node's scale (we store size in state)
+    // Reset the Konva node's scale and local position (we store size in state)
     node.scaleX(1)
     node.scaleY(1)
+    node.position({ x: 0, y: 0 })
 
     dispatch({ type: 'MOVE_IMAGE', x: newPhysX, y: newPhysY })
     dispatch({ type: 'SCALE_IMAGE', physicalWidth: newPhysW, physicalHeight: newPhysH })
   }, [dispatch, scale, toPhysicalX, toPhysicalY, state.sourceImage])
 
-  // Render source image
+  // Render source image (wrapped in Group with delete button so they move together)
+  const imgW = state.sourceImage ? state.sourceImage.physicalWidth * scale : 0
   const imageNode = state.sourceImage ? (
-    <KonvaImage
-      ref={imageRef}
-      image={state.sourceImage.element}
+    <Group
       x={toCanvasX(state.sourceImage.physicalX)}
       y={toCanvasY(state.sourceImage.physicalY)}
-      width={state.sourceImage.physicalWidth * scale}
-      height={state.sourceImage.physicalHeight * scale}
-      opacity={0.7}
       draggable
       onClick={() => {
         setImageSelected(true)
@@ -581,8 +578,36 @@ export default function EditorCanvas() {
         dispatch({ type: 'SELECT_MONITOR', id: null })
       }}
       onDragEnd={handleImageDragEnd}
-      onTransformEnd={handleImageTransformEnd}
-    />
+    >
+      <KonvaImage
+        ref={imageRef}
+        image={state.sourceImage.element}
+        width={imgW}
+        height={state.sourceImage.physicalHeight * scale}
+        opacity={0.7}
+        onTransformEnd={handleImageTransformEnd}
+      />
+      {/* Delete button — top-right, only when selected */}
+      {imageSelected && (
+        <Group
+          x={imgW - 22}
+          y={4}
+          onClick={(e) => {
+            e.cancelBubble = true
+            setImageSelected(false)
+            dispatch({ type: 'CLEAR_SOURCE_IMAGE' })
+          }}
+          onTap={(e) => {
+            e.cancelBubble = true
+            setImageSelected(false)
+            dispatch({ type: 'CLEAR_SOURCE_IMAGE' })
+          }}
+        >
+          <Rect width={18} height={18} fill="#ef4444" cornerRadius={3} />
+          <Text x={4} y={1} text="✕" fontSize={12} fill="#ffffff" />
+        </Group>
+      )}
+    </Group>
   ) : null
 
   // Render monitors
@@ -629,53 +654,65 @@ export default function EditorCanvas() {
           cornerRadius={2}
           listening={false}
         />
-        {/* Label background */}
-        <Rect
-          x={4}
-          y={4}
-          width={Math.min(Math.max(cw - 8, 60), 200)}
-          height={cw > 100 ? 44 : 28}
-          fill="rgba(0,0,0,0.75)"
-          cornerRadius={3}
-          listening={false}
-        />
-        {/* Monitor name */}
-        <Text
-          x={8}
-          y={7}
-          text={monitor.preset.name}
-          fontSize={cw > 100 ? 11 : 9}
-          fill="#ffffff"
-          fontStyle="bold"
-          listening={false}
-          width={Math.min(Math.max(cw - 16, 50), 190)}
-          ellipsis
-          wrap="none"
-        />
-        {/* Resolution + physical dimensions */}
-        {cw > 100 && (
-          <Text
-            x={8}
-            y={21}
-            text={`${monitor.preset.resolutionX}x${monitor.preset.resolutionY} · ${formatDimension(monitor.physicalWidth, state.unit)} x ${formatDimension(monitor.physicalHeight, state.unit)}`}
-            fontSize={9}
-            fill="#94a3b8"
-            listening={false}
-            width={Math.min(Math.max(cw - 16, 50), 190)}
-            ellipsis
-            wrap="none"
-          />
-        )}
-        {cw > 100 && (
-          <Text
-            x={8}
-            y={33}
-            text={`${Math.round(monitor.ppi)} PPI`}
-            fontSize={9}
-            fill="#64748b"
-            listening={false}
-          />
-        )}
+        {/* Label background — pinned to bottom */}
+        {(() => {
+          const labelH = cw > 100 ? 44 : 28
+          const labelW = Math.min(Math.max(cw - 8, 60), 200)
+          const labelY = ch - labelH - 4
+          return (
+            <>
+              <Rect
+                x={4}
+                y={labelY}
+                width={labelW}
+                height={labelH}
+                fill="rgba(0,0,0,0.55)"
+                cornerRadius={3}
+                listening={false}
+              />
+              {/* Monitor name */}
+              <Text
+                x={8}
+                y={labelY + 3}
+                text={monitor.preset.name}
+                fontSize={cw > 100 ? 11 : 9}
+                fill="#ffffff"
+                fontStyle="bold"
+                listening={false}
+                width={Math.min(Math.max(cw - 16, 50), 190)}
+                ellipsis
+                wrap="none"
+                opacity={0.9}
+              />
+              {/* Resolution + physical dimensions */}
+              {cw > 100 && (
+                <Text
+                  x={8}
+                  y={labelY + 17}
+                  text={`${monitor.preset.resolutionX}x${monitor.preset.resolutionY} · ${formatDimension(monitor.physicalWidth, state.unit)} x ${formatDimension(monitor.physicalHeight, state.unit)}`}
+                  fontSize={9}
+                  fill="#94a3b8"
+                  listening={false}
+                  width={Math.min(Math.max(cw - 16, 50), 190)}
+                  ellipsis
+                  wrap="none"
+                  opacity={0.8}
+                />
+              )}
+              {cw > 100 && (
+                <Text
+                  x={8}
+                  y={labelY + 29}
+                  text={`${Math.round(monitor.ppi)} PPI`}
+                  fontSize={9}
+                  fill="#64748b"
+                  listening={false}
+                  opacity={0.8}
+                />
+              )}
+            </>
+          )
+        })()}
         {/* Delete button */}
         {isSelected && (
           <Group
