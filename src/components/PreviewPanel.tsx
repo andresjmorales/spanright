@@ -255,11 +255,11 @@ export default function PreviewPanel() {
         </div>
       )}
 
-      {/* Preview canvas */}
-      <div ref={containerRef} className="flex-1 flex items-center justify-center p-8 overflow-auto">
+      {/* Preview canvas — background matches canvas workspace (#0a0a1a) so black bars stand out */}
+      <div ref={containerRef} className="flex-1 flex items-center justify-center p-8 overflow-auto bg-[#12122a]">
         <canvas
           ref={canvasRef}
-          className="border border-gray-800 rounded bg-black"
+          className="border-2 border-gray-600 rounded bg-black"
           style={{ imageRendering: 'auto' }}
         />
       </div>
