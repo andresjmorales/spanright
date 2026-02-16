@@ -106,13 +106,13 @@ export default function ConfigManager() {
             ? 'bg-blue-600/20 text-blue-400 border-blue-500/50'
             : 'bg-gray-800 text-gray-500 border-gray-700 hover:text-gray-300'
         }`}
-        title="Saved Configurations"
+        title="Saved Layouts"
       >
         <span className="flex items-center gap-1.5">
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
           </svg>
-          Configs
+          Saved Layouts
           {configs.length > 0 && (
             <span className="text-[10px] text-gray-500">({configs.length})</span>
           )}
@@ -153,7 +153,7 @@ export default function ConfigManager() {
                   type="text"
                   value={saveName}
                   onChange={(e) => setSaveName(e.target.value)}
-                  placeholder="Config name..."
+                  placeholder="Layout name..."
                   className="flex-1 bg-gray-800 border border-gray-600 focus:border-blue-500 rounded px-2 py-1 text-xs text-gray-100 outline-none"
                   maxLength={40}
                 />
@@ -175,11 +175,11 @@ export default function ConfigManager() {
             )}
           </div>
 
-          {/* Config list */}
+          {/* Layout list */}
           <div className="max-h-64 overflow-y-auto">
             {configs.length === 0 ? (
               <div className="px-3 py-4 text-center text-xs text-gray-600">
-                No saved configurations yet
+                No saved layouts yet
               </div>
             ) : (
               configs.map((config) => (

@@ -31,6 +31,8 @@ export interface SourceImage {
   physicalY: number
   physicalWidth: number
   physicalHeight: number
+  /** Rotation in degrees CW. Omitted = 0. */
+  rotation?: 0 | 90 | 180 | 270
 }
 
 export interface WindowsMonitorPosition {
