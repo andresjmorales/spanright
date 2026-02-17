@@ -25,40 +25,30 @@ export default function Toolbar() {
   }
 
   return (
-    <div className="bg-gray-900 border-b border-gray-800 px-4 py-2 flex items-center gap-4 flex-wrap">
-      {/* Image upload */}
-      <ImageUpload />
-
-      {/* Separator */}
-      <div className="w-px h-6 bg-gray-700" />
-
-      {/* Unit toggle — hidden for now, cm support kept in backend */}
-
-      {/* Saved Layouts */}
+    <div className="bg-gray-900 border-b border-gray-800 px-4 h-11 flex items-center gap-4 flex-wrap">
+      {/* Saved Layouts — always leftmost */}
       <ConfigManager />
 
-      {/* Monitor count */}
+      {/* Separator */}
+      <div className="w-px h-5 bg-gray-700" />
+
+      {/* Image upload / image details */}
+      <ImageUpload />
+
+      {/* Monitor count and recommended (related — em dash, no extra spacer) */}
       {hasMonitors && (
         <>
-          <div className="w-px h-6 bg-gray-700" />
+          <div className="w-px h-5 bg-gray-700" />
           <div className="text-xs text-gray-400">
             {state.monitors.length} monitor{state.monitors.length > 1 ? 's' : ''}{' '}
-            &middot; {formatDimension(bbox.width, state.unit)} x {formatDimension(bbox.height, state.unit)} layout
-          </div>
-        </>
-      )}
-
-      {/* Recommended image size */}
-      {hasMonitors && (
-        <>
-          <div className="w-px h-6 bg-gray-700" />
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Recommended:</span>
-            <span className="text-xs text-gray-300 font-mono">
+            {formatDimension(bbox.width, state.unit)} x {formatDimension(bbox.height, state.unit)} layout
+            {' — '}
+            <span className="text-gray-500">Recommended:</span>{' '}
+            <span className="font-mono text-gray-300">
               {recommended.width} x {recommended.height} px
             </span>
             {hasImage && imageSizeStatus && (
-              <span className={`text-xs font-mono ${
+              <span className={`font-mono ml-1 ${
                 imageSizeStatus === 'ok' ? 'text-green-400' :
                 imageSizeStatus === 'warn' ? 'text-yellow-400' :
                 'text-red-400'
