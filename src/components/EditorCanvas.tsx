@@ -211,6 +211,8 @@ export default function EditorCanvas() {
   const [isDragOverCanvas, setIsDragOverCanvas] = useState(false)
   const lastPointerPos = useRef<{ x: number; y: number } | null>(null)
   const [imageSelected, setImageSelected] = useState(false)
+  /** Delete (X) button position in Group coords during image resize so it tracks top-right; null when not transforming */
+  const [imageDeleteButtonPos, setImageDeleteButtonPos] = useState<{ x: number; y: number } | null>(null)
   const [renameMonitorId, setRenameMonitorId] = useState<string | null>(null)
   const [renameInputValue, setRenameInputValue] = useState('')
   // Refs for values used in hot-path event handlers (avoids callback recreation)
@@ -563,8 +565,10 @@ export default function EditorCanvas() {
     dispatch({ type: 'MOVE_IMAGE', x: newPhysX, y: newPhysY })
   }, [dispatch, toPhysicalX, toPhysicalY, state.sourceImage])
 
-  // Handle image transform (resize via handles)
+  // Handle image transform (resize via handles). Transformer keeps one corner fixed (e.g. top-left
+  // when dragging bottom-right); use that corner (bbox top-left) so the image doesn't jump on release.
   const handleImageTransformEnd = useCallback(() => {
+    setImageDeleteButtonPos(null)
     const node = imageRef.current
     if (!node || !state.sourceImage) return
 
@@ -574,10 +578,10 @@ export default function EditorCanvas() {
     const newCanvasH = node.height() * scaleY
     const newPhysW = newCanvasW / scale
     const newPhysH = newCanvasH / scale
-    // Image is inside a Group — get absolute position
-    const absPos = node.getAbsolutePosition()
-    const newPhysX = toPhysicalX(absPos.x)
-    const newPhysY = toPhysicalY(absPos.y)
+    const box = node.getClientRect({ skipTransform: false })
+    // Use top-left of transformed box so the anchored corner stays put (no jump when mouse released)
+    const newPhysX = toPhysicalX(box.x)
+    const newPhysY = toPhysicalY(box.y)
 
     // Reset the Konva node's scale and local position (we store size in state)
     node.scaleX(1)
@@ -615,13 +619,22 @@ export default function EditorCanvas() {
         width={imgW}
         height={imgH}
         opacity={0.7}
+        onTransform={() => {
+          const n = imageRef.current
+          const group = n?.getParent()
+          if (!n || !group || !state.sourceImage) return
+          const box = n.getClientRect({ skipTransform: false, relativeTo: group })
+          const x = box.x + box.width - 22
+          const y = box.y + 4
+          if (Number.isFinite(x) && Number.isFinite(y)) setImageDeleteButtonPos({ x, y })
+        }}
         onTransformEnd={handleImageTransformEnd}
       />
-      {/* Delete button — top-right, only when selected */}
+      {/* Delete button — top-right, follows visual corner during resize (any handle) */}
       {imageSelected && (
         <Group
-          x={imgW - 22}
-          y={4}
+          x={imageDeleteButtonPos ? imageDeleteButtonPos.x : imgW - 22}
+          y={imageDeleteButtonPos ? imageDeleteButtonPos.y : 4}
           onClick={(e) => {
             e.cancelBubble = true
             setImageSelected(false)
