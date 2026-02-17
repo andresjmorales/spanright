@@ -50,8 +50,9 @@ export default function PreviewPanel() {
     if (!canvas || !container || !output) return
 
     const ctx = canvas.getContext('2d')!
-    const containerWidth = container.clientWidth - 64
-    const containerHeight = container.clientHeight - 32
+    // p-8 = 32px each side (64 total); canvas has border-2 = 4px extra per axis
+    const containerWidth = container.clientWidth - 64 - 4
+    const containerHeight = container.clientHeight - 64 - 4
 
     // Scale to fit container
     const displayScale = Math.min(1, containerWidth / output.width, containerHeight / output.height)

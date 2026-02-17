@@ -232,9 +232,18 @@ export default function EditorCanvas() {
     return () => observer.disconnect()
   }, [])
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts (skip when typing in inputs so we don't delete monitors or nudge)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = document.activeElement
+      const isEditable = target && (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target as HTMLElement).isContentEditable
+      )
+      if (isEditable) return
+
       // Delete selected monitor
       if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedMonitorId && !imageSelected) {
         dispatch({ type: 'REMOVE_MONITOR', id: state.selectedMonitorId })
