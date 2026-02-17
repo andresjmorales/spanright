@@ -1,6 +1,10 @@
 import type { Monitor, SourceImage, WindowsMonitorPosition } from './types'
 
-/** Build a canvas with the image drawn at the given rotation (degrees CW). */
+/**
+ * Build a canvas with the image drawn at the given rotation (degrees CW).
+ * TODO (source image rotation): 90° and 270° can produce wrong/missing crop for some monitors
+ * in the output preview; physical↔pixel mapping or getSourceRect may need revisiting.
+ */
 function rotatedImageCanvas(sourceImage: SourceImage): HTMLCanvasElement {
   const img = sourceImage.element
   const nW = sourceImage.naturalWidth
@@ -20,21 +24,23 @@ function rotatedImageCanvas(sourceImage: SourceImage): HTMLCanvasElement {
   const ctx = canvas.getContext('2d')!
   ctx.save()
   if (rot === 90) {
-    ctx.translate(nH, 0)
-    ctx.rotate(90 * Math.PI / 180)
+    // 90 CW: canvas (dx,dy) = image (dy, nH - dx). setTransform(a,b,c,d,e,f): (x,y)->(a*x+c*y+e, b*x+d*y+f)
+    ctx.setTransform(0, 1, -1, 0, 0, nH)
+    ctx.drawImage(img, 0, 0)
   } else if (rot === 180) {
     ctx.translate(nW, nH)
     ctx.rotate(180 * Math.PI / 180)
-  } else {
-    ctx.translate(0, nW)
-    ctx.rotate(-90 * Math.PI / 180)
+    ctx.drawImage(img, 0, 0)
+  } else if (rot === 270) {
+    // 270 CW: canvas (dx,dy) = image (nW - dy, dx)
+    ctx.setTransform(0, 1, -1, 0, nW, 0)
+    ctx.drawImage(img, 0, 0)
   }
-  ctx.drawImage(img, 0, 0)
   ctx.restore()
   return canvas
 }
 
-/** Get source rect (in the possibly rotated image) for the physical intersection. */
+/** Get source rect (in the possibly rotated image) for the physical intersection. See TODO on rotatedImageCanvas for 90/270° caveats. */
 function getSourceRect(
   sourceImage: SourceImage,
   imgLeft: number, imgTop: number, imgW: number, imgH: number,
@@ -73,10 +79,10 @@ function getSourceRect(
       srcH: (v2 - v1) * nH,
     }
   }
-  // 270 CW: physical (u,v) -> image (v, 1-u)
+  // 270 CW: rotated.x = original.y, rotated.y = nW - original.x; so srcX = nH*u1, srcY = nW*v1
   return {
-    srcX: (1 - u2) * nH,
-    srcY: (1 - v2) * nW,
+    srcX: u1 * nH,
+    srcY: v1 * nW,
     srcW: (u2 - u1) * nH,
     srcH: (v2 - v1) * nW,
   }
