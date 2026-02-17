@@ -141,8 +141,8 @@ export default function PreviewPanel() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-800 bg-gray-900 shrink-0">
+      {/* Header — fixed height to match other tab banners (h-11) */}
+      <div className="flex items-center justify-between px-4 h-11 border-b border-gray-800 bg-gray-900 shrink-0">
         <div className="flex items-center gap-3">
           <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
             Output Preview
@@ -195,9 +195,9 @@ export default function PreviewPanel() {
               <button
                 onClick={openDownloadDialog}
                 disabled={!state.sourceImage}
-                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm font-medium py-1.5 px-4 rounded transition-colors flex items-center gap-1.5"
+                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white text-xs py-1 px-2.5 rounded border border-gray-600 disabled:border-gray-700 transition-colors flex items-center gap-1.5"
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
                 Download

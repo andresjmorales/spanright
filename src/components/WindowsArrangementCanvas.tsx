@@ -386,7 +386,7 @@ export default function WindowsArrangementCanvas() {
         // Convert physical offset to approximate pixels for comparison
         const physRelPx = physRelY * phys.ppi
         if (Math.abs(physRelPx - winRelY) > 200) {
-          warns.push('Your Windows vertical alignment differs significantly from your physical layout. The wallpaper will match your Windows arrangement, which may not look physically seamless.')
+          warns.push('Your Windows vertical alignment differs from your physical layout. The wallpaper will match your Windows arrangement, which may not look physically seamless.')
           break
         }
       }
@@ -409,7 +409,7 @@ export default function WindowsArrangementCanvas() {
   return (
     <div className="flex flex-col h-full">
       {/* Top bar */}
-      <div className="bg-gray-900 border-b border-gray-800 px-4 py-2.5 flex items-center gap-4 shrink-0 flex-wrap">
+      <div className="bg-gray-900 border-b border-gray-800 px-4 h-11 flex items-center gap-4 shrink-0 flex-wrap">
         <label className="flex items-center gap-2 cursor-pointer select-none">
           <input
             type="checkbox"
