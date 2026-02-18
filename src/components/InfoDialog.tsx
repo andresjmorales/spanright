@@ -155,6 +155,10 @@ export default function InfoDialog({ onClose }: InfoDialogProps) {
             </div>
           </div>
 
+          <p className="text-[11px] text-gray-500 text-center">
+            Having trouble with your wallpaper? Check the <strong className="text-gray-400">Troubleshooting</strong> guide in the header bar.
+          </p>
+
           {/* Close button */}
           <button
             onClick={onClose}

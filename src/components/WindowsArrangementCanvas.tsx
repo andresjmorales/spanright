@@ -2,7 +2,6 @@ import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { useStore } from '../store'
 import type { Monitor } from '../types'
 import { getMonitorDisplayName } from '../utils'
-import InfoDialog from './InfoDialog'
 
 const MONITOR_COLORS = [
   '#3b82f6', '#8b5cf6', '#06b6d4', '#10b981',
@@ -130,7 +129,6 @@ export default function WindowsArrangementCanvas() {
   const [dimensions, setDimensions] = useState({ width: 800, height: 500 })
   const [dragging, setDragging] = useState<string | null>(null)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
-  const [showInfoDialog, setShowInfoDialog] = useState(false)
   const [frozenLayout, setFrozenLayout] = useState<{ displayScale: number; offsetX: number; offsetY: number } | null>(null)
 
   // Resize observer
@@ -448,17 +446,6 @@ export default function WindowsArrangementCanvas() {
           </>
         )}
 
-        <div className="flex-1" />
-
-        <button
-          onClick={() => setShowInfoDialog(true)}
-          className="text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
-        >
-          <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor">
-            <path fillRule="evenodd" d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM0 8a8 8 0 1116 0A8 8 0 010 8zm6.5-.25A.75.75 0 017.25 7h1a.75.75 0 01.75.75v2.75h.25a.75.75 0 010 1.5h-2a.75.75 0 010-1.5h.25v-2h-.25a.75.75 0 01-.75-.75zM8 6a1 1 0 100-2 1 1 0 000 2z" />
-          </svg>
-          How does this work?
-        </button>
       </div>
 
       {/* Baseline warning when customizing — in flow so it’s always visible */}
@@ -468,7 +455,7 @@ export default function WindowsArrangementCanvas() {
             <strong>Note:</strong> Changing your OS display settings (position, order, resolution) can get messy.
             For best results, align monitor edges (e.g. top-aligned side-by-side, or stacked vertically with left/right edges aligned).
             Black bars are normal in some setups, but misaligned arrangements may produce visible black bars in the spanned wallpaper.
-            For more info, see “How does this work?” in the top bar.
+            {' '}<button onClick={() => dispatch({ type: 'SET_SHOW_HOW_IT_WORKS', value: true })} className="text-amber-300 underline underline-offset-2 hover:text-amber-100 transition-colors">Learn more</button>
           </p>
         </div>
       )}
@@ -520,8 +507,6 @@ export default function WindowsArrangementCanvas() {
         )}
       </div>
 
-      {/* Info dialog */}
-      {showInfoDialog && <InfoDialog onClose={() => setShowInfoDialog(false)} />}
     </div>
   )
 }
