@@ -46,6 +46,17 @@ function AboutDialog({ onClose }: { onClose: () => void }) {
             Multi-Monitor Wallpaper Alignment Tool
           </p>
           <p className="text-sm text-gray-300">
+            Source code on{' '}
+            <a
+              href="https://github.com/andresjmorales/spanright"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:text-blue-300 underline underline-offset-2 transition-colors"
+            >
+              GitHub
+            </a>
+          </p>
+          <p className="text-sm text-gray-300">
             Created by{' '}
             <a
               href="https://andresmorales.xyz"
