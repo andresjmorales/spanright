@@ -18,7 +18,7 @@ Spanright operates in **physical space** (inches/cm), so you arrange monitors as
 - **Smart image recommendations** — Calculates the minimum source image resolution needed based on your layout's physical size and the highest-PPI monitor.
 - **Accurate output generation** — Crops and scales the source image per-monitor at each screen's native PPI, then stitches at each monitor's Windows arrangement position (side-by-side, stacked, or mixed). Fills any gaps in the layout with black.
 - **Preview & download** — Live preview of the final stitched wallpaper with one-click PNG/JPEG export.
-- **Canvas controls** — Scroll to pan, Ctrl+Scroll to zoom (up to 300%), right-click drag to pan. Custom scrollbars, snap-to-grid, and fit-to-view.
+- **Canvas controls** — Scroll to pan, Ctrl+Scroll to zoom (up to 300%), right-click drag to pan. Custom scrollbars, Align Assist guides/snapping, and fit-to-view.
 - **Saved Layouts** — Save and load monitor layouts (names, positions, rotation, Windows arrangement). Layouts are stored in your browser (localStorage); you can keep several setups (e.g. desk vs laptop-only) and switch between them. Basic but very useful for multi-setup workflows.
 
 ## Example
@@ -60,7 +60,7 @@ Drag monitors on the canvas to match your physical desk arrangement:
 
 - Position your laptop screen lower-left, your main monitor centered, etc.
 - The canvas uses physical dimensions — a 27" monitor will appear larger than a 13" laptop
-- Enable **Snap to Grid** in the toolbar for precise alignment
+- Use **Align Assist** (canvas menu) for dynamic edge/center alignment guides while dragging monitors
 - Use the **↻** (rotate) button on a monitor to switch it between landscape and portrait
 - Click a monitor and press **Delete** to remove it
 - Press **F** to fit all monitors in view
@@ -72,6 +72,8 @@ Drag monitors on the canvas to match your physical desk arrangement:
 - The image appears behind the monitors with 70% opacity
 - **Drag** the image to reposition it
 - **Click** the image and use the corner handles to resize it
+- Use **Size image to fit** (canvas menu) to automatically cover your monitor layout bounding box while preserving aspect ratio (overflow is centered)
+- With **Align Assist** enabled, image drag/resize shows green alignment guides against monitor edges/centers
 - Check the **recommended image size** banner in the toolbar — green means your image is large enough, yellow/red means it may appear pixelated
 
 ### 4. Preview & Export
