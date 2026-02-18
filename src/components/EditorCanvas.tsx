@@ -22,6 +22,127 @@ function getMonitorColor(index: number): string {
 
 const RULER_SIZE = 24
 const DEFAULT_SCALE = 10
+const SMART_ALIGN_THRESHOLD_PX = 8
+const SMART_ALIGN_RESIZE_THRESHOLD_PX = 0.5
+
+interface AlignGuide {
+  orientation: 'horizontal' | 'vertical'
+  position: number // physical inches
+  source: 'monitor' | 'image'
+}
+
+interface AlignRect {
+  x: number; y: number; w: number; h: number
+  source: 'monitor' | 'image'
+}
+
+function computeAlignmentGuides(
+  dragPhysX: number,
+  dragPhysY: number,
+  dragPhysW: number,
+  dragPhysH: number,
+  targets: AlignRect[],
+  threshold: number,
+): { snapDeltaX: number | null; snapDeltaY: number | null; guides: AlignGuide[] } {
+  let bestAbsDx = Infinity
+  let bestAbsDy = Infinity
+  let snapDx: number | null = null
+  let snapDy: number | null = null
+
+  const dragLeft = dragPhysX
+  const dragRight = dragPhysX + dragPhysW
+  const dragCenterX = dragPhysX + dragPhysW / 2
+  const dragTop = dragPhysY
+  const dragBottom = dragPhysY + dragPhysH
+  const dragCenterY = dragPhysY + dragPhysH / 2
+
+  for (const t of targets) {
+    const tLeft = t.x
+    const tRight = t.x + t.w
+    const tCenterX = t.x + t.w / 2
+    const tTop = t.y
+    const tBottom = t.y + t.h
+    const tCenterY = t.y + t.h / 2
+
+    const xPairs: [number, number][] = [
+      [dragLeft, tLeft],
+      [dragLeft, tRight],
+      [dragRight, tLeft],
+      [dragRight, tRight],
+      [dragCenterX, tCenterX],
+    ]
+
+    for (const [dragEdge, otherEdge] of xPairs) {
+      const delta = otherEdge - dragEdge
+      const absDelta = Math.abs(delta)
+      if (absDelta < threshold && absDelta < bestAbsDx) {
+        bestAbsDx = absDelta
+        snapDx = delta
+      }
+    }
+
+    const yPairs: [number, number][] = [
+      [dragTop, tTop],
+      [dragTop, tBottom],
+      [dragBottom, tTop],
+      [dragBottom, tBottom],
+      [dragCenterY, tCenterY],
+    ]
+
+    for (const [dragEdge, otherEdge] of yPairs) {
+      const delta = otherEdge - dragEdge
+      const absDelta = Math.abs(delta)
+      if (absDelta < threshold && absDelta < bestAbsDy) {
+        bestAbsDy = absDelta
+        snapDy = delta
+      }
+    }
+  }
+
+  const snappedX = snapDx !== null ? dragPhysX + snapDx : dragPhysX
+  const snappedY = snapDy !== null ? dragPhysY + snapDy : dragPhysY
+
+  const guides: AlignGuide[] = []
+  const EPSILON = 0.01
+
+  const sLeft = snappedX
+  const sRight = snappedX + dragPhysW
+  const sCenterX = snappedX + dragPhysW / 2
+  const sTop = snappedY
+  const sBottom = snappedY + dragPhysH
+  const sCenterY = snappedY + dragPhysH / 2
+
+  for (const t of targets) {
+    const xPositions = [t.x, t.x + t.w, t.x + t.w / 2]
+    const yPositions = [t.y, t.y + t.h, t.y + t.h / 2]
+
+    for (const pos of xPositions) {
+      if (
+        Math.abs(sLeft - pos) < EPSILON ||
+        Math.abs(sRight - pos) < EPSILON ||
+        Math.abs(sCenterX - pos) < EPSILON
+      ) {
+        if (!guides.some(g => g.orientation === 'vertical' && Math.abs(g.position - pos) < EPSILON)) {
+          guides.push({ orientation: 'vertical', position: pos, source: t.source })
+        }
+      }
+    }
+
+    for (const pos of yPositions) {
+      if (
+        Math.abs(sTop - pos) < EPSILON ||
+        Math.abs(sBottom - pos) < EPSILON ||
+        Math.abs(sCenterY - pos) < EPSILON
+      ) {
+        if (!guides.some(g => g.orientation === 'horizontal' && Math.abs(g.position - pos) < EPSILON)) {
+          guides.push({ orientation: 'horizontal', position: pos, source: t.source })
+        }
+      }
+    }
+  }
+
+  return { snapDeltaX: snapDx, snapDeltaY: snapDy, guides }
+}
 
 // Physical workspace bounds (inches) — ~12ft x 8ft
 const PHYS_MIN_X = 0
@@ -215,6 +336,8 @@ export default function EditorCanvas() {
   const [imageDeleteButtonPos, setImageDeleteButtonPos] = useState<{ x: number; y: number } | null>(null)
   const [renameMonitorId, setRenameMonitorId] = useState<string | null>(null)
   const [renameInputValue, setRenameInputValue] = useState('')
+  const [activeGuides, setActiveGuides] = useState<AlignGuide[]>([])
+  const smartAlignSnappedRef = useRef({ x: false, y: false })
   // Refs for values used in hot-path event handlers (avoids callback recreation)
   const canvasStateRef = useRef({ scale: 10, offsetX: 50, offsetY: 50, dimW: 800, dimH: 500 })
 
@@ -546,16 +669,101 @@ export default function EditorCanvas() {
 
 
   // Handle monitor drag
-  const handleMonitorDragEnd = useCallback((monitor: Monitor, e: Konva.KonvaEventObject<DragEvent>) => {
+  const handleMonitorDragMove = useCallback((monitor: Monitor, e: Konva.KonvaEventObject<DragEvent>) => {
+    if (!state.smartAlign) {
+      smartAlignSnappedRef.current = { x: false, y: false }
+      setActiveGuides([])
+      return
+    }
     const node = e.target
-    const newPhysX = snap(toPhysicalX(node.x()))
-    const newPhysY = snap(toPhysicalY(node.y()))
+    const physX = toPhysicalX(node.x())
+    const physY = toPhysicalY(node.y())
+    const threshold = SMART_ALIGN_THRESHOLD_PX / scale
+
+    const targets: AlignRect[] = state.monitors
+      .filter(m => m.id !== monitor.id)
+      .map(m => ({ x: m.physicalX, y: m.physicalY, w: m.physicalWidth, h: m.physicalHeight, source: 'monitor' as const }))
+    if (state.sourceImage) {
+      const img = state.sourceImage
+      targets.push({ x: img.physicalX, y: img.physicalY, w: img.physicalWidth, h: img.physicalHeight, source: 'image' })
+    }
+
+    const { snapDeltaX, snapDeltaY, guides } = computeAlignmentGuides(
+      physX, physY, monitor.physicalWidth, monitor.physicalHeight,
+      targets, threshold,
+    )
+
+    smartAlignSnappedRef.current = {
+      x: snapDeltaX !== null,
+      y: snapDeltaY !== null,
+    }
+
+    if (snapDeltaX !== null || snapDeltaY !== null) {
+      node.position({
+        x: toCanvasX(snapDeltaX !== null ? physX + snapDeltaX : physX),
+        y: toCanvasY(snapDeltaY !== null ? physY + snapDeltaY : physY),
+      })
+    }
+
+    setActiveGuides(guides)
+  }, [state.smartAlign, state.monitors, state.sourceImage, scale, toPhysicalX, toPhysicalY, toCanvasX, toCanvasY])
+
+  const handleMonitorDragEnd = useCallback((monitor: Monitor, e: Konva.KonvaEventObject<DragEvent>) => {
+    setActiveGuides([])
+    const node = e.target
+    let newPhysX = toPhysicalX(node.x())
+    let newPhysY = toPhysicalY(node.y())
+    if (!smartAlignSnappedRef.current.x) newPhysX = snap(newPhysX)
+    if (!smartAlignSnappedRef.current.y) newPhysY = snap(newPhysY)
+    smartAlignSnappedRef.current = { x: false, y: false }
     dispatch({ type: 'MOVE_MONITOR', id: monitor.id, x: newPhysX, y: newPhysY })
     node.position({ x: toCanvasX(newPhysX), y: toCanvasY(newPhysY) })
   }, [dispatch, snap, toPhysicalX, toPhysicalY, toCanvasX, toCanvasY])
 
   // Handle image drag (Group position is image center)
+  const handleImageDragMove = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
+    if (!state.smartAlign || !state.sourceImage) {
+      smartAlignSnappedRef.current = { x: false, y: false }
+      setActiveGuides([])
+      return
+    }
+    const node = e.target
+    const centerPhysX = toPhysicalX(node.x())
+    const centerPhysY = toPhysicalY(node.y())
+    const physX = centerPhysX - state.sourceImage.physicalWidth / 2
+    const physY = centerPhysY - state.sourceImage.physicalHeight / 2
+    const threshold = SMART_ALIGN_THRESHOLD_PX / scale
+
+    const targets: AlignRect[] = state.monitors.map(m => ({
+      x: m.physicalX, y: m.physicalY, w: m.physicalWidth, h: m.physicalHeight,
+      source: 'image' as const,
+    }))
+
+    const { snapDeltaX, snapDeltaY, guides } = computeAlignmentGuides(
+      physX, physY, state.sourceImage.physicalWidth, state.sourceImage.physicalHeight,
+      targets, threshold,
+    )
+
+    smartAlignSnappedRef.current = {
+      x: snapDeltaX !== null,
+      y: snapDeltaY !== null,
+    }
+
+    if (snapDeltaX !== null || snapDeltaY !== null) {
+      const snappedX = snapDeltaX !== null ? physX + snapDeltaX : physX
+      const snappedY = snapDeltaY !== null ? physY + snapDeltaY : physY
+      node.position({
+        x: toCanvasX(snappedX + state.sourceImage.physicalWidth / 2),
+        y: toCanvasY(snappedY + state.sourceImage.physicalHeight / 2),
+      })
+    }
+
+    setActiveGuides(guides)
+  }, [state.smartAlign, state.sourceImage, state.monitors, scale, toPhysicalX, toPhysicalY, toCanvasX, toCanvasY])
+
   const handleImageDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
+    setActiveGuides([])
+    smartAlignSnappedRef.current = { x: false, y: false }
     const node = e.target
     if (!state.sourceImage) return
     const centerPhysX = toPhysicalX(node.x())
@@ -569,6 +777,7 @@ export default function EditorCanvas() {
   // when dragging bottom-right); use that corner (bbox top-left) so the image doesn't jump on release.
   const handleImageTransformEnd = useCallback(() => {
     setImageDeleteButtonPos(null)
+    setActiveGuides([])
     const node = imageRef.current
     if (!node || !state.sourceImage) return
 
@@ -611,6 +820,7 @@ export default function EditorCanvas() {
         setImageSelected(true)
         dispatch({ type: 'SELECT_MONITOR', id: null })
       }}
+      onDragMove={handleImageDragMove}
       onDragEnd={handleImageDragEnd}
     >
       <KonvaImage
@@ -623,10 +833,29 @@ export default function EditorCanvas() {
           const n = imageRef.current
           const group = n?.getParent()
           if (!n || !group || !state.sourceImage) return
-          const box = n.getClientRect({ skipTransform: false, relativeTo: group })
-          const x = box.x + box.width - 22
-          const y = box.y + 4
-          if (Number.isFinite(x) && Number.isFinite(y)) setImageDeleteButtonPos({ x, y })
+          const relBox = n.getClientRect({ skipTransform: false, relativeTo: group })
+          const bx = relBox.x + relBox.width - 22
+          const by = relBox.y + 4
+          if (Number.isFinite(bx) && Number.isFinite(by)) setImageDeleteButtonPos({ x: bx, y: by })
+
+          if (state.smartAlign) {
+            const absBox = n.getClientRect({ skipTransform: false })
+            const physX = toPhysicalX(absBox.x)
+            const physY = toPhysicalY(absBox.y)
+            const physW = absBox.width / scale
+            const physH = absBox.height / scale
+            const threshold = SMART_ALIGN_RESIZE_THRESHOLD_PX / scale
+
+            const targets: AlignRect[] = state.monitors.map(m => ({
+              x: m.physicalX, y: m.physicalY, w: m.physicalWidth, h: m.physicalHeight,
+              source: 'image' as const,
+            }))
+
+            const { guides } = computeAlignmentGuides(
+              physX, physY, physW, physH, targets, threshold,
+            )
+            setActiveGuides(guides)
+          }
         }}
         onTransformEnd={handleImageTransformEnd}
       />
@@ -668,6 +897,7 @@ export default function EditorCanvas() {
         x={cx}
         y={cy}
         draggable
+        onDragMove={(e) => handleMonitorDragMove(monitor, e)}
         onDragEnd={(e) => handleMonitorDragEnd(monitor, e)}
         onClick={() => {
           dispatch({ type: 'SELECT_MONITOR', id: monitor.id })
@@ -889,6 +1119,19 @@ export default function EditorCanvas() {
             }}
           />
           {monitorNodes}
+          {activeGuides.map((guide, i) => (
+            <Line
+              key={`align-${guide.orientation}-${i}`}
+              points={guide.orientation === 'vertical'
+                ? [toCanvasX(guide.position), 0, toCanvasX(guide.position), dimensions.height]
+                : [0, toCanvasY(guide.position), dimensions.width, toCanvasY(guide.position)]
+              }
+              stroke={guide.source === 'image' ? '#22c55e' : '#ec4899'}
+              strokeWidth={1}
+              dash={[6, 3]}
+              listening={false}
+            />
+          ))}
         </Layer>
       </Stage>
 
@@ -955,7 +1198,7 @@ export default function EditorCanvas() {
       <CanvasMenu
         hasMonitors={state.monitors.length > 0}
         hasImage={!!state.sourceImage}
-        snapToGrid={state.snapToGrid}
+        smartAlign={state.smartAlign}
         dispatch={dispatch}
       />
 
@@ -1041,12 +1284,12 @@ export default function EditorCanvas() {
 function CanvasMenu({
   hasMonitors,
   hasImage,
-  snapToGrid,
+  smartAlign,
   dispatch,
 }: {
   hasMonitors: boolean
   hasImage: boolean
-  snapToGrid: boolean
+  smartAlign: boolean
   dispatch: Dispatch<any>
 }) {
   const [open, setOpen] = useState(false)
@@ -1091,16 +1334,16 @@ function CanvasMenu({
         <div className="absolute right-0 mt-1 w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-xl overflow-hidden">
           <button
             onClick={() => {
-              dispatch({ type: 'TOGGLE_SNAP' })
+              dispatch({ type: 'TOGGLE_SMART_ALIGN' })
               setOpen(false)
             }}
             className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between gap-2 ${
-              snapToGrid ? 'text-blue-400 bg-blue-500/10' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+              smartAlign ? 'text-blue-400 bg-blue-500/10' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
             }`}
           >
-            Snap to Grid
+            Smart Align
             <span className="shrink-0 w-4 h-4 flex items-center justify-center">
-              {snapToGrid ? (
+              {smartAlign ? (
                 <svg className="w-4 h-4" viewBox="0 0 16 16">
                   <rect x="2" y="2" width="12" height="12" rx="2" fill="currentColor" className="text-blue-400" />
                   <path d="M4 8l3 3 5-6" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
