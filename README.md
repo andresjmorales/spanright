@@ -39,6 +39,8 @@ Standard 53:9 crop of dragon picture:
 ![dragonfire-lazy-53-9](https://github.com/user-attachments/assets/a4d9ee67-5bb5-4a6d-9987-703bf339b208)
 Spanright 53:9 crop of dragon picture:
 ![spanright-dragonfire-6400x1080-demo-jpg](https://github.com/user-attachments/assets/17f802e3-b2ae-4afe-ac83-4ad04e4239a1)
+Standard crop set as my wallpaper in my real setup (see the unaligned neck/head):
+![dragonfire-demo-bad-crop](https://github.com/user-attachments/assets/a5e1d428-12da-415c-a5ed-26389b98458f)
 Spanright result working in my real setup:
 ![dragonfire-demo-real](https://github.com/user-attachments/assets/116198b6-087a-49cb-8dd1-8e3de17d6f23)
 
