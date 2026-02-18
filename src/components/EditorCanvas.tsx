@@ -420,6 +420,39 @@ export default function EditorCanvas() {
     dispatch({ type: 'SET_CANVAS_OFFSET', x: newOffsetX, y: newOffsetY })
   }, [state.monitors, dimensions, dispatch])
 
+  const handleSizeImageToFit = useCallback(() => {
+    if (!state.sourceImage || state.monitors.length === 0) return
+
+    const bbox = getMonitorsBoundingBox(state.monitors)
+    if (bbox.width <= 0 || bbox.height <= 0) return
+
+    const rotation = state.sourceImage.rotation ?? 0
+    const imageAspect = (rotation === 90 || rotation === 270)
+      ? state.sourceImage.naturalHeight / state.sourceImage.naturalWidth
+      : state.sourceImage.naturalWidth / state.sourceImage.naturalHeight
+    if (!Number.isFinite(imageAspect) || imageAspect <= 0) return
+
+    const bboxAspect = bbox.width / bbox.height
+    let nextWidth: number
+    let nextHeight: number
+
+    // "Cover" fit: fully cover the monitor bounds, with overflow centered.
+    if (imageAspect > bboxAspect) {
+      nextHeight = bbox.height
+      nextWidth = nextHeight * imageAspect
+    } else {
+      nextWidth = bbox.width
+      nextHeight = nextWidth / imageAspect
+    }
+
+    const nextX = bbox.minX + (bbox.width - nextWidth) / 2
+    const nextY = bbox.minY + (bbox.height - nextHeight) / 2
+
+    setActiveGuides([])
+    dispatch({ type: 'MOVE_IMAGE', x: nextX, y: nextY })
+    dispatch({ type: 'SCALE_IMAGE', physicalWidth: nextWidth, physicalHeight: nextHeight })
+  }, [state.sourceImage, state.monitors, dispatch])
+
   // Attach transformer to image when selected
   useEffect(() => {
     if (imageSelected && imageRef.current && transformerRef.current) {
@@ -1199,6 +1232,8 @@ export default function EditorCanvas() {
         hasMonitors={state.monitors.length > 0}
         hasImage={!!state.sourceImage}
         smartAlign={state.smartAlign}
+        canSizeImageToFit={state.monitors.length > 0 && !!state.sourceImage}
+        onSizeImageToFit={handleSizeImageToFit}
         dispatch={dispatch}
       />
 
@@ -1285,11 +1320,15 @@ function CanvasMenu({
   hasMonitors,
   hasImage,
   smartAlign,
+  canSizeImageToFit,
+  onSizeImageToFit,
   dispatch,
 }: {
   hasMonitors: boolean
   hasImage: boolean
   smartAlign: boolean
+  canSizeImageToFit: boolean
+  onSizeImageToFit: () => void
   dispatch: Dispatch<any>
 }) {
   const [open, setOpen] = useState(false)
@@ -1341,7 +1380,7 @@ function CanvasMenu({
               smartAlign ? 'text-blue-400 bg-blue-500/10' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
             }`}
           >
-            Smart Align
+            Align Assist
             <span className="shrink-0 w-4 h-4 flex items-center justify-center">
               {smartAlign ? (
                 <svg className="w-4 h-4" viewBox="0 0 16 16">
@@ -1354,6 +1393,16 @@ function CanvasMenu({
                 </svg>
               )}
             </span>
+          </button>
+          <button
+            disabled={!canSizeImageToFit}
+            onClick={() => {
+              onSizeImageToFit()
+              setOpen(false)
+            }}
+            className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-300 disabled:cursor-default transition-colors"
+          >
+            Size image to fit
           </button>
           <div className="border-t border-gray-700" />
           <button
