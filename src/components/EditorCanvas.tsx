@@ -23,6 +23,7 @@ function getMonitorColor(index: number): string {
 const RULER_SIZE = 24
 const DEFAULT_SCALE = 10
 const SMART_ALIGN_THRESHOLD_PX = 8
+const SMART_ALIGN_RESIZE_THRESHOLD_PX = 0.5
 
 interface AlignGuide {
   orientation: 'horizontal' | 'vertical'
@@ -776,6 +777,7 @@ export default function EditorCanvas() {
   // when dragging bottom-right); use that corner (bbox top-left) so the image doesn't jump on release.
   const handleImageTransformEnd = useCallback(() => {
     setImageDeleteButtonPos(null)
+    setActiveGuides([])
     const node = imageRef.current
     if (!node || !state.sourceImage) return
 
@@ -831,10 +833,29 @@ export default function EditorCanvas() {
           const n = imageRef.current
           const group = n?.getParent()
           if (!n || !group || !state.sourceImage) return
-          const box = n.getClientRect({ skipTransform: false, relativeTo: group })
-          const x = box.x + box.width - 22
-          const y = box.y + 4
-          if (Number.isFinite(x) && Number.isFinite(y)) setImageDeleteButtonPos({ x, y })
+          const relBox = n.getClientRect({ skipTransform: false, relativeTo: group })
+          const bx = relBox.x + relBox.width - 22
+          const by = relBox.y + 4
+          if (Number.isFinite(bx) && Number.isFinite(by)) setImageDeleteButtonPos({ x: bx, y: by })
+
+          if (state.smartAlign) {
+            const absBox = n.getClientRect({ skipTransform: false })
+            const physX = toPhysicalX(absBox.x)
+            const physY = toPhysicalY(absBox.y)
+            const physW = absBox.width / scale
+            const physH = absBox.height / scale
+            const threshold = SMART_ALIGN_RESIZE_THRESHOLD_PX / scale
+
+            const targets: AlignRect[] = state.monitors.map(m => ({
+              x: m.physicalX, y: m.physicalY, w: m.physicalWidth, h: m.physicalHeight,
+              source: 'image' as const,
+            }))
+
+            const { guides } = computeAlignmentGuides(
+              physX, physY, physW, physH, targets, threshold,
+            )
+            setActiveGuides(guides)
+          }
         }}
         onTransformEnd={handleImageTransformEnd}
       />
