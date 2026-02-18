@@ -33,7 +33,7 @@ Dragon image [source](https://unsplash.com/photos/dragon-effigy-breathes-fire-ov
 <img width="1920" height="1039" alt="dragonfire-preview" src="https://github.com/user-attachments/assets/fb335e52-bd18-4b3f-9083-f53ad9e047cc" />
 
 ### Result
-Spanright's output wallpaper (6400x1080) displayed on a 14" 1080p laptop, a 24" 1080p monitor, and 34" 2560x1080 ultrawide monitor. The total resolution of this setup is (1920 + 1920 + 2560) x (1080) = 6400x1080. And the the total aspect ratio of this setup would be (16 + 16 + 21) / (9) = 53:9. The image will only look good when Spanright modifies the image to take account of the phsyical monitor dimensions and spacing as well. Even though the preview looks disjointed, it actually alignes perfectly when used as the wallpaper.
+Spanright's output wallpaper (6400x1080) displayed on a 14" 1080p laptop, a 24" 1080p monitor, and 34" 2560x1080 ultrawide monitor. The total resolution of this setup is (1920 + 1920 + 2560) x (1080) = 6400x1080. And the the total aspect ratio of this setup would be (16 + 16 + 21) / (9) = 53:9. The image will only look good when Spanright modifies the image to take account of the physical monitor dimensions and spacing as well. Even though the preview looks disjointed, it actually alignes perfectly when used as the wallpaper.
 
 Standard 53:9 crop of dragon picture:
 ![dragonfire-lazy-53-9](https://github.com/user-attachments/assets/a4d9ee67-5bb5-4a6d-9987-703bf339b208)
