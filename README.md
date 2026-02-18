@@ -21,7 +21,7 @@ Spanright operates in **physical space** (inches/cm), so you arrange monitors as
 - **Canvas controls** — Scroll to pan, Ctrl+Scroll to zoom (up to 250%), right-click drag to pan. Custom scrollbars, snap-to-grid, and fit-to-view.
 - **Saved Layouts** — Save and load monitor layouts (names, positions, rotation, Windows arrangement). Layouts are stored in your browser (localStorage); you can keep several setups (e.g. desk vs laptop-only) and switch between them. Basic but very useful for multi-setup workflows.
 
-## Interface
+## Example
 #### Physical Layout & Editor Canvas
 <img width="1920" height="1039" alt="dragonfire-canvas" src="https://github.com/user-attachments/assets/c05c7ccb-3250-4cf1-9c67-8937056bd98e" />
 
@@ -31,7 +31,11 @@ Spanright operates in **physical space** (inches/cm), so you arrange monitors as
 #### Preview & Export
 <img width="1920" height="1039" alt="dragonfire-preview" src="https://github.com/user-attachments/assets/fb335e52-bd18-4b3f-9083-f53ad9e047cc" />
 
-## How to Use
+#### Result
+Spanright's output wallpaper (6400x1080) displayed on a 14" 1080p laptop, a 24" 1080p monitor, and 34" 2560x1080 ultrawide monitor.
+![dragonfire-demo-real](https://github.com/user-attachments/assets/116198b6-087a-49cb-8dd1-8e3de17d6f23)
+
+## Directions
 
 ### 1. Add Monitors
 
