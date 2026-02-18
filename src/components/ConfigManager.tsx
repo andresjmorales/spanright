@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useStore } from '../store'
+import { useToast } from './Toast'
 import type { SavedConfig } from '../types'
 
 const STORAGE_KEY = 'spanright-saved-configs'
@@ -20,6 +21,7 @@ function saveConfigs(configs: SavedConfig[]) {
 
 export default function ConfigManager() {
   const { state, dispatch } = useStore()
+  const toast = useToast()
   const [open, setOpen] = useState(false)
   const [configs, setConfigs] = useState<SavedConfig[]>([])
   const [showSaveInput, setShowSaveInput] = useState(false)
@@ -71,17 +73,17 @@ export default function ConfigManager() {
     const updated = [newConfig, ...configs].slice(0, MAX_CONFIGS)
     setConfigs(updated)
     saveConfigs(updated)
+    toast.success(`Layout saved: ${newConfig.name}`)
     setSaveName('')
     setShowSaveInput(false)
   }
 
   const handleLoad = (config: SavedConfig) => {
-    // Clear current monitors first
     dispatch({ type: 'CLEAR_ALL_MONITORS' })
-    // Add each monitor from the saved config
     for (const m of config.monitors) {
       dispatch({ type: 'ADD_MONITOR', preset: m.preset, x: m.physicalX, y: m.physicalY, rotation: m.rotation ?? 0, displayName: m.displayName })
     }
+    toast.success(`Layout loaded: ${config.name}`)
     setOpen(false)
   }
 
@@ -89,6 +91,7 @@ export default function ConfigManager() {
     const updated = configs.filter(c => c.id !== id)
     setConfigs(updated)
     saveConfigs(updated)
+    toast('Layout deleted')
     setConfirmDeleteId(null)
   }
 

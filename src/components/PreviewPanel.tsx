@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState, useCallback, type FormEvent } from 'react'
 import { useStore } from '../store'
+import { useToast } from './Toast'
 import { generateOutput, type OutputResult } from '../generateOutput'
 import { getMonitorDisplayName } from '../utils'
 
 
 export default function PreviewPanel() {
   const { state, dispatch } = useStore()
+  const toast = useToast()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [output, setOutput] = useState<OutputResult | null>(null)
@@ -125,9 +127,10 @@ export default function PreviewPanel() {
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
+      toast.success('Wallpaper downloaded')
     }, mimeType, quality)
     setShowDownloadDialog(false)
-  }, [output, format, jpegQuality, getDefaultFilename])
+  }, [output, format, jpegQuality, getDefaultFilename, toast])
 
   if (state.monitors.length === 0) {
     return (

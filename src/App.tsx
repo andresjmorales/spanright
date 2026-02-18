@@ -7,6 +7,7 @@ import PreviewPanel from './components/PreviewPanel'
 import WindowsArrangementCanvas from './components/WindowsArrangementCanvas'
 import TroubleshootingGuide from './components/TroubleshootingGuide'
 import InfoDialog from './components/InfoDialog'
+import { ToastProvider } from './components/Toast'
 import type { ActiveTab } from './types'
 
 function TabButton({ tab, label, active, onClick }: { tab: ActiveTab; label: string; active: boolean; onClick: (tab: ActiveTab) => void }) {
@@ -279,7 +280,9 @@ function AppContent() {
 export default function App() {
   return (
     <StoreProvider>
-      <AppContent />
+      <ToastProvider>
+        <AppContent />
+      </ToastProvider>
     </StoreProvider>
   )
 }

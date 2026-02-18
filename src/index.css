@@ -31,3 +31,21 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #6a6a8a;
 }
+
+@keyframes toast-enter {
+  from { opacity: 0; transform: translateY(1rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes toast-exit {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(1rem); }
+}
+
+.animate-toast-enter {
+  animation: toast-enter 0.25s ease-out forwards;
+}
+
+.animate-toast-exit {
+  animation: toast-exit 0.2s ease-in forwards;
+}
