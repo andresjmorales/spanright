@@ -3,6 +3,7 @@ import { Stage, Layer, Rect, Text, Group, Image as KonvaImage, Line, Transformer
 import type Konva from 'konva'
 import { useStore } from '../store'
 import { formatDimension, getMonitorsBoundingBox, getMonitorDisplayName } from '../utils'
+import { useToast } from './Toast'
 import type { Monitor, SourceImage } from '../types'
 
 const MONITOR_COLORS = [
@@ -323,6 +324,7 @@ function RulerOverlay({
 
 export default function EditorCanvas() {
   const { state, dispatch } = useStore()
+  const toast = useToast()
   const containerRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<Konva.Stage>(null)
   const imageRef = useRef<Konva.Image>(null)
@@ -372,6 +374,7 @@ export default function EditorCanvas() {
       // Delete selected monitor
       if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedMonitorId && !imageSelected) {
         dispatch({ type: 'REMOVE_MONITOR', id: state.selectedMonitorId })
+        toast('Monitor removed')
       }
       // Escape to deselect
       if (e.key === 'Escape') {
@@ -418,7 +421,8 @@ export default function EditorCanvas() {
     const newOffsetY = padding - bbox.minY * newScale + (availH - bbox.height * newScale) / 2
     dispatch({ type: 'SET_CANVAS_SCALE', scale: newScale })
     dispatch({ type: 'SET_CANVAS_OFFSET', x: newOffsetX, y: newOffsetY })
-  }, [state.monitors, dimensions, dispatch])
+    toast('Fitted to view')
+  }, [state.monitors, dimensions, dispatch, toast])
 
   const handleSizeImageToFit = useCallback(() => {
     if (!state.sourceImage || state.monitors.length === 0) return
@@ -451,7 +455,8 @@ export default function EditorCanvas() {
     setActiveGuides([])
     dispatch({ type: 'MOVE_IMAGE', x: nextX, y: nextY })
     dispatch({ type: 'SCALE_IMAGE', physicalWidth: nextWidth, physicalHeight: nextHeight })
-  }, [state.sourceImage, state.monitors, dispatch])
+    toast.success('Image sized to fit layout')
+  }, [state.sourceImage, state.monitors, dispatch, toast])
 
   // Attach transformer to image when selected
   useEffect(() => {
@@ -608,6 +613,7 @@ export default function EditorCanvas() {
           const snappedX = state.snapToGrid ? Math.round(physX / state.gridSize) * state.gridSize : physX
           const snappedY = state.snapToGrid ? Math.round(physY / state.gridSize) * state.gridSize : physY
           dispatch({ type: 'ADD_MONITOR', preset, x: snappedX, y: snappedY })
+          toast.success(`Added ${preset.name}`)
         }
       } catch {
         // Ignore invalid preset data
@@ -646,11 +652,12 @@ export default function EditorCanvas() {
           physicalHeight: physHeight,
         }
         dispatch({ type: 'SET_SOURCE_IMAGE', image: sourceImage })
+        toast.success(`Image loaded: ${file.name}`)
       }
       img.src = ev.target?.result as string
     }
     reader.readAsDataURL(file)
-  }, [state.canvasOffsetX, state.canvasOffsetY, state.canvasScale, state.snapToGrid, state.gridSize, dispatch])
+  }, [state.canvasOffsetX, state.canvasOffsetY, state.canvasScale, state.snapToGrid, state.gridSize, dispatch, toast])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -901,11 +908,13 @@ export default function EditorCanvas() {
             e.cancelBubble = true
             setImageSelected(false)
             dispatch({ type: 'CLEAR_SOURCE_IMAGE' })
+            toast('Image removed')
           }}
           onTap={(e) => {
             e.cancelBubble = true
             setImageSelected(false)
             dispatch({ type: 'CLEAR_SOURCE_IMAGE' })
+            toast('Image removed')
           }}
         >
           <Rect width={18} height={18} fill="#ef4444" cornerRadius={3} />
@@ -1027,10 +1036,12 @@ export default function EditorCanvas() {
             onClick={(e) => {
               e.cancelBubble = true
               dispatch({ type: 'REMOVE_MONITOR', id: monitor.id })
+              toast('Monitor removed')
             }}
             onTap={(e) => {
               e.cancelBubble = true
               dispatch({ type: 'REMOVE_MONITOR', id: monitor.id })
+              toast('Monitor removed')
             }}
           >
             <Rect width={18} height={18} fill="#ef4444" cornerRadius={3} />
@@ -1063,11 +1074,15 @@ export default function EditorCanvas() {
           y={ch - 22}
           onClick={(e) => {
             e.cancelBubble = true
+            const newRotation = (monitor.rotation ?? 0) === 90 ? 'landscape' : 'portrait'
             dispatch({ type: 'ROTATE_MONITOR', id: monitor.id })
+            toast(`Monitor rotated to ${newRotation}`)
           }}
           onTap={(e) => {
             e.cancelBubble = true
+            const newRotation = (monitor.rotation ?? 0) === 90 ? 'landscape' : 'portrait'
             dispatch({ type: 'ROTATE_MONITOR', id: monitor.id })
+            toast(`Monitor rotated to ${newRotation}`)
           }}
         >
           <Rect width={18} height={18} fill="#475569" cornerRadius={3} />
@@ -1186,6 +1201,7 @@ export default function EditorCanvas() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   dispatch({ type: 'SET_MONITOR_DISPLAY_NAME', id: renameMonitorId, displayName: renameInputValue })
+                  toast(`Monitor renamed to "${renameInputValue}"`)
                   setRenameMonitorId(null)
                 }
                 if (e.key === 'Escape') setRenameMonitorId(null)
@@ -1206,6 +1222,7 @@ export default function EditorCanvas() {
                 type="button"
                 onClick={() => {
                   dispatch({ type: 'SET_MONITOR_DISPLAY_NAME', id: renameMonitorId, displayName: renameInputValue })
+                  toast(`Monitor renamed to "${renameInputValue}"`)
                   setRenameMonitorId(null)
                 }}
                 className="px-3 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
@@ -1331,6 +1348,7 @@ function CanvasMenu({
   onSizeImageToFit: () => void
   dispatch: Dispatch<any>
 }) {
+  const toast = useToast()
   const [open, setOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -1374,6 +1392,7 @@ function CanvasMenu({
           <button
             onClick={() => {
               dispatch({ type: 'TOGGLE_SMART_ALIGN' })
+              toast(smartAlign ? 'Align Assist disabled' : 'Align Assist enabled')
               setOpen(false)
             }}
             className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between gap-2 ${
@@ -1409,6 +1428,7 @@ function CanvasMenu({
             disabled={!hasMonitors}
             onClick={() => {
               dispatch({ type: 'CLEAR_ALL_MONITORS' })
+              toast('All monitors cleared')
               setOpen(false)
             }}
             className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-300 disabled:cursor-default transition-colors"
@@ -1419,6 +1439,7 @@ function CanvasMenu({
             disabled={!hasImage}
             onClick={() => {
               dispatch({ type: 'CLEAR_SOURCE_IMAGE' })
+              toast('Image removed')
               setOpen(false)
             }}
             className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-300 disabled:cursor-default transition-colors"
@@ -1431,6 +1452,7 @@ function CanvasMenu({
             onClick={() => {
               dispatch({ type: 'CLEAR_ALL_MONITORS' })
               dispatch({ type: 'CLEAR_SOURCE_IMAGE' })
+              toast.warning('Canvas reset')
               setOpen(false)
             }}
             className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-gray-800 hover:text-red-300 disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-red-400 disabled:cursor-default transition-colors"

@@ -1,9 +1,11 @@
 import React, { useCallback, useRef } from 'react'
 import { useStore } from '../store'
+import { useToast } from './Toast'
 import type { SourceImage } from '../types'
 
 export default function ImageUpload() {
   const { state, dispatch } = useStore()
+  const toast = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const loadImage = useCallback((file: File) => {
@@ -34,11 +36,12 @@ export default function ImageUpload() {
           physicalHeight: physHeight,
         }
         dispatch({ type: 'SET_SOURCE_IMAGE', image: sourceImage })
+        toast.success(`Image loaded: ${file.name}`)
       }
       img.src = e.target?.result as string
     }
     reader.readAsDataURL(file)
-  }, [state.canvasOffsetX, state.canvasOffsetY, state.canvasScale, dispatch])
+  }, [state.canvasOffsetX, state.canvasOffsetY, state.canvasScale, dispatch, toast])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -107,7 +110,10 @@ export default function ImageUpload() {
             Replace Image
           </button>
           <button
-            onClick={() => dispatch({ type: 'CLEAR_SOURCE_IMAGE' })}
+            onClick={() => {
+              dispatch({ type: 'CLEAR_SOURCE_IMAGE' })
+              toast('Image removed')
+            }}
             className="text-xs text-red-400 hover:text-red-300 transition-colors shrink-0"
           >
             Remove

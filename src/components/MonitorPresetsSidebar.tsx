@@ -2,10 +2,12 @@ import { useState, useMemo } from 'react'
 import { MONITOR_PRESETS, COMMON_ASPECT_RATIOS, COMMON_RESOLUTIONS } from '../presets'
 import type { MonitorPreset } from '../types'
 import { useStore } from '../store'
+import { useToast } from './Toast'
 import { calculatePPI, calculatePhysicalDimensions, formatDimension } from '../utils'
 
 export default function MonitorPresetsSidebar() {
   const { state, dispatch } = useStore()
+  const toast = useToast()
   const [showCustom, setShowCustom] = useState(false)
   const [customDiagonal, setCustomDiagonal] = useState('27')
   const [customAspect, setCustomAspect] = useState<[number, number]>([16, 9])
@@ -66,6 +68,7 @@ export default function MonitorPresetsSidebar() {
     const y = centerPhysY - physH / 2 + jitter
 
     dispatch({ type: 'ADD_MONITOR', preset, x, y })
+    toast.success(`Added ${preset.name}`)
   }
 
   const MAX_ASPECT_RATIO = 10
