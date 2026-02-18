@@ -192,7 +192,7 @@ function RulerOverlay({
         className="absolute top-0 left-0 z-20 flex items-center justify-center pointer-events-none border-b border-r border-[#1e293b]"
         style={{ width: RULER_SIZE, height: RULER_SIZE, background: '#0d1117' }}
       >
-        <span className="text-[8px] text-gray-500 font-medium select-none">
+        <span className="text-[10px] text-gray-500 font-medium select-none">
           {unit === 'cm' ? 'cm' : 'in'}
         </span>
       </div>
@@ -290,7 +290,7 @@ export default function EditorCanvas() {
     const availH = dimensions.height - padding * 2
     const scaleX = availW / bbox.width
     const scaleY = availH / bbox.height
-    const newScale = Math.max(7.5, Math.min(25, Math.min(scaleX, scaleY)))
+    const newScale = Math.max(7.5, Math.min(30, Math.min(scaleX, scaleY)))
     const newOffsetX = padding - bbox.minX * newScale + (availW - bbox.width * newScale) / 2
     const newOffsetY = padding - bbox.minY * newScale + (availH - bbox.height * newScale) / 2
     dispatch({ type: 'SET_CANVAS_SCALE', scale: newScale })
@@ -355,7 +355,7 @@ export default function EditorCanvas() {
     if (e.evt.ctrlKey || e.evt.metaKey) {
       // Ctrl+Scroll = Zoom (toward pointer)
       const zoomFactor = e.evt.deltaY > 0 ? 0.9 : 1.1
-      const newScale = Math.max(7.5, Math.min(25, cs.scale * zoomFactor))
+      const newScale = Math.max(7.5, Math.min(30, cs.scale * zoomFactor))
       const physX = (pointer.x - cs.offsetX) / cs.scale
       const physY = (pointer.y - cs.offsetY) / cs.scale
       const newOffsetX = pointer.x - physX * newScale
@@ -988,7 +988,7 @@ export default function EditorCanvas() {
           <button
             onClick={() => {
               const pct = (state.canvasScale / DEFAULT_SCALE) * 100
-              const newPct = Math.min(250, Math.ceil((pct + 0.5) / 25) * 25)
+              const newPct = Math.min(300, Math.ceil((pct + 0.5) / 25) * 25)
               dispatch({ type: 'SET_CANVAS_SCALE', scale: (newPct / 100) * DEFAULT_SCALE })
             }}
             className="hover:text-white transition-colors px-1"
@@ -1075,7 +1075,7 @@ function CanvasMenu({
   }, [open])
 
   return (
-    <div ref={menuRef} className="absolute top-6 right-3 select-none z-10">
+    <div ref={menuRef} className="absolute top-8 right-3 select-none z-10">
       <button
         onClick={() => setOpen(o => !o)}
         className="bg-gray-900/80 backdrop-blur hover:bg-gray-800/90 text-gray-400 hover:text-gray-200 px-2 py-1.5 rounded transition-colors"

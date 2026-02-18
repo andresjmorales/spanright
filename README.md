@@ -18,7 +18,7 @@ Spanright operates in **physical space** (inches/cm), so you arrange monitors as
 - **Smart image recommendations** — Calculates the minimum source image resolution needed based on your layout's physical size and the highest-PPI monitor.
 - **Accurate output generation** — Crops and scales the source image per-monitor at each screen's native PPI, then stitches at each monitor's Windows arrangement position (side-by-side, stacked, or mixed). Fills any gaps in the layout with black.
 - **Preview & download** — Live preview of the final stitched wallpaper with one-click PNG/JPEG export.
-- **Canvas controls** — Scroll to pan, Ctrl+Scroll to zoom (up to 250%), right-click drag to pan. Custom scrollbars, snap-to-grid, and fit-to-view.
+- **Canvas controls** — Scroll to pan, Ctrl+Scroll to zoom (up to 300%), right-click drag to pan. Custom scrollbars, snap-to-grid, and fit-to-view.
 - **Saved Layouts** — Save and load monitor layouts (names, positions, rotation, Windows arrangement). Layouts are stored in your browser (localStorage); you can keep several setups (e.g. desk vs laptop-only) and switch between them. Basic but very useful for multi-setup workflows.
 
 ## Example
@@ -92,7 +92,7 @@ The **Windows Arrangement** tab (next to Physical Layout) lets you match how Win
 |--------|---------|
 | Pan | Scroll wheel / Right-click drag |
 | Horizontal pan | Shift + Scroll |
-| Zoom | Ctrl + Scroll (up to 250%) |
+| Zoom | Ctrl + Scroll (up to 300%) |
 | Fit view | Press **F** / click **Fit** button |
 | Select monitor | Click on it |
 | Delete monitor | Select + **Delete** or **Backspace** |
