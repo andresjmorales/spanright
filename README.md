@@ -1,32 +1,33 @@
 # Spanright — Multi-Monitor Wallpaper Alignment Tool
 
-Spanright is a single-page web app that lets you create pixel-perfect spanning wallpapers for non-standard multi-monitor setups. Windows' "span" wallpaper mode concatenates monitors by pixel resolution, ignoring physical size differences — Spanright solves this by letting you model your physical desk layout, position a source image across it, and export a stitched wallpaper that looks seamless when spanned.
+Spanright is a single-page web app that lets you create pixel-perfect spanning wallpapers for non-standard multi-monitor setups. Most operating systems concatenate monitors by pixel resolution when spanning wallpapers, ignoring physical size differences — Spanright solves this by letting you model your physical desk layout, position a source image across it, and export a stitched wallpaper that looks seamless across all your screens. Works on Windows, macOS, and Linux.
 
 ## The Problem
 
-If you have monitors of different sizes or resolutions (e.g., a 15.6" laptop next to a 27" QHD desktop), Windows span mode produces misaligned wallpapers. A single wide image gets split based on raw pixel counts, not physical dimensions. A mountain peak that should flow across both screens ends up with a jarring offset.
+If you have monitors of different sizes or resolutions (e.g., a 15.6" laptop next to a 27" QHD desktop), spanning a single wallpaper produces misaligned images. The image gets split based on raw pixel counts, not physical dimensions. A mountain peak that should flow across both screens ends up with a jarring offset.
 
-Spanright operates in **physical space** (inches/cm), so you arrange monitors as they actually sit on your desk. It then renders each monitor's portion of the source image at the correct PPI, producing one output image that Windows can span correctly.
+Spanright operates in **physical space** (inches/cm), so you arrange monitors as they actually sit on your desk. It then renders each monitor's portion of the source image at the correct PPI, producing one output image that your OS can span correctly.
 
 ## Features
 
 - **Physical-space monitor layout** — Arrange monitors on a canvas using real-world dimensions (calculated from diagonal size + resolution). A 27" monitor appears physically larger than a 15.6" laptop, exactly as on your desk.
 - **Drag-and-drop presets** — Choose from 18+ built-in monitor presets (laptops, standard monitors, ultrawides, super ultrawides) and drag them directly onto the canvas.
-- **Custom monitors** — Define any monitor by diagonal size, aspect ratio, and resolution. Supports fully custom resolution entry or filtered presets by aspect ratio. Diagonal is limited to 5"–120"; aspect ratio is limited to 10:1 or less (no ultra-thin “line” monitors). Validation warnings appear when limits are exceeded; Add is disabled until fixed.
-- **Monitor rotation** — Rotate any monitor 90° (portrait/landscape) via the ↻ button on each monitor tile. Resolution is swapped (e.g. 1080×1920 when rotated); rotation is saved in saved layouts and reflected in output and the Windows Arrangement view.
+- **Custom monitors** — Define any monitor by diagonal size, aspect ratio, and resolution. Supports fully custom resolution entry or filtered presets by aspect ratio. Diagonal is limited to 5"–120"; aspect ratio is limited to 10:1 or less (no ultra-thin "line" monitors). Validation warnings appear when limits are exceeded; Add is disabled until fixed.
+- **Monitor rotation** — Rotate any monitor 90° (portrait/landscape) via the ↻ button on each monitor tile. Resolution is swapped (e.g. 1080×1920 when rotated); rotation is saved in saved layouts and reflected in output and the Virtual Layout view.
 - **Image placement** — Upload a source image and drag/scale it behind the monitor layout. Semi-transparent monitor overlays let you see exactly what portion of the image each screen will display. Vertical images (height > width) default to 6 ft tall; horizontal ones default to 6 ft wide.
 - **Smart image recommendations** — Calculates the minimum source image resolution needed based on your layout's physical size and the highest-PPI monitor.
-- **Accurate output generation** — Crops and scales the source image per-monitor at each screen's native PPI, then stitches at each monitor's Windows arrangement position (side-by-side, stacked, or mixed). Fills any gaps in the layout with black.
+- **Accurate output generation** — Crops and scales the source image per-monitor at each screen's native PPI, then stitches at each monitor's virtual layout position (side-by-side, stacked, or mixed). Fills any gaps in the layout with black.
 - **Preview & download** — Live preview of the final stitched wallpaper with one-click PNG/JPEG export.
 - **Canvas controls** — Scroll to pan, Ctrl+Scroll to zoom (up to 300%), right-click drag to pan. Custom scrollbars, Align Assist guides/snapping, and fit-to-view.
-- **Saved Layouts** — Save and load monitor layouts (names, positions, rotation, Windows arrangement). Layouts are stored in your browser (localStorage); you can keep several setups (e.g. desk vs laptop-only) and switch between them. Basic but very useful for multi-setup workflows.
+- **Saved Layouts** — Save and load monitor layouts (names, positions, rotation, virtual layout). Layouts are stored in your browser (localStorage); you can keep several setups (e.g. desk vs laptop-only) and switch between them. Basic but very useful for multi-setup workflows.
+- **Cross-platform** — Works in any modern browser. Output can be applied as a spanned wallpaper on Windows (Span/Tile mode), macOS (per-monitor crop), and Linux (varies by DE — GNOME, KDE, feh, swaybg, etc.).
 
 ## Example
 Dragon image [source](https://unsplash.com/photos/dragon-effigy-breathes-fire-over-a-crowd-at-night-TP7InDDpeRE) from Unsplash.
 ### Physical Layout & Editor Canvas
 <img width="1920" height="1039" alt="dragonfire-canvas-zoomed" src="https://github.com/user-attachments/assets/26e5b87c-73d8-4ce9-af2a-90069d98f721" />
 
-### Windows Arrangement
+### Virtual Layout
 <img width="1920" height="1039" alt="dragonfire-windows" src="https://github.com/user-attachments/assets/564adb2d-9b27-4f4e-8afe-2d7601512303" />
 
 ### Preview & Export
@@ -76,26 +77,69 @@ Drag monitors on the canvas to match your physical desk arrangement:
 - With **Align Assist** enabled, image drag/resize shows green alignment guides against monitor edges/centers
 - Check the **recommended image size** banner in the toolbar — green means your image is large enough, yellow/red means it may appear pixelated
 
-### 4. Preview & Export
+### 4. Virtual Layout (optional)
+
+The **Virtual Layout** tab (next to Physical Layout) lets you match how your OS sees your displays. Use it if your display order or positions don't match a simple left-to-right layout. This concept applies on all platforms — Windows, macOS, and Linux all maintain their own display arrangement.
+
+#### Windows
+Open **Settings > System > Display** to see how Windows arranges your monitors. If the order matches a simple left-to-right layout, you can skip this step.
+
+> **Warning:** Changing Windows Display Settings (position, order, resolution) can get messy. For best results, keep all monitors **top-aligned or bottom-aligned** in Windows; other alignments may produce unwanted (visible) black bars in the spanned wallpaper.
+
+#### macOS
+Open **System Settings > Displays > Arrange** to see your display arrangement. Drag the display rectangles to match your physical layout.
+
+> **Note:** Retina/HiDPI displays report logical pixels (e.g. "looks like 1440×900"), not the actual hardware resolution (e.g. 2880×1800). When adding monitors in Spanright, always use the **actual pixel resolution** — otherwise the output will be undersized and blurry on Retina screens.
+
+#### Linux
+Display arrangement depends on your desktop environment:
+- **GNOME:** Settings > Displays
+- **KDE Plasma:** System Settings > Display and Monitor > Display Configuration
+- **Command line:** `xrandr --query` (X11) or `wlr-randr` (Wayland/wlroots)
+
+### 5. Preview & Export
 
 - The bottom panel shows a live preview of the final stitched wallpaper
 - Click **Download** to save as PNG or JPEG
 - The output dimensions are displayed (e.g., "7280 x 1440")
 
-### 5. Windows Arrangement (optional)
+### 6. Set Your Wallpaper
 
-The **Windows Arrangement** tab (next to Physical Layout) lets you match how Windows sees your displays (Settings > System > Display). Use it if your Windows display order or positions don’t match a simple left-to-right layout.
-
-> **Warning:** Changing Windows Display Settings (position, order, resolution) can get messy. For best results, keep all monitors **top-aligned or bottom-aligned** in Windows; other alignments may produce unwanted (visible) black bars in the spanned wallpaper.
-
-### 6. Set as Windows Wallpaper
-
+#### Windows
 1. Download the generated image
 2. Open **Settings > Personalization > Background**
 3. Set "Choose a fit" to **Span**
 4. Select the downloaded image
 
 > **Important:** Make sure your Windows display arrangement (Settings > Display) matches the physical layout you configured in Spanright.
+
+#### macOS
+macOS has no native "Span" wallpaper mode. To use the Spanright output:
+1. Download the generated image
+2. Open it in **Preview** or an image editor and crop each monitor's region individually
+3. Open **System Settings > Wallpaper** (or right-click desktop > **Change Wallpaper**)
+4. Set each monitor's wallpaper individually using its cropped portion
+
+> **Tip:** Third-party tools like **Multi Monitor Wallpaper** can automate spanning a single image across all displays.
+
+#### Linux
+Linux wallpaper handling varies by desktop environment:
+- **GNOME:** Settings > Background, then select the image. Use `gsettings set org.gnome.desktop.background picture-options 'spanned'` to span across monitors.
+- **KDE Plasma:** Right-click desktop > Configure Desktop > Wallpaper. Some versions support spanning directly.
+- **feh (X11):** `feh --bg-scale /path/to/wallpaper.png`
+- **nitrogen (X11):** Select the image and choose "Scaled" or "Zoomed" fitting.
+- **swaybg (Wayland/Sway):** `swaybg -i /path/to/wallpaper.png -m fill`
+- **Hyprpaper (Hyprland):** Configure in `~/.config/hypr/hyprpaper.conf`
+
+> **Note:** Exact steps vary by distribution and desktop environment. If your tool doesn't support spanning, crop per-monitor regions from the output (like macOS) and set each individually.
+
+## Platform Support
+
+| Platform | Span Mode | Display Settings | Notes |
+|----------|-----------|------------------|-------|
+| **Windows** | Built-in (**Span** or **Tile** fit mode) | Settings > System > Display | Best native support — Span mode applies one image across all monitors automatically |
+| **macOS** | No native span mode | System Settings > Displays > Arrange | Crop per-monitor from the Spanright output and set each individually. Retina displays report logical pixels — use actual hardware resolution in Spanright |
+| **Linux** | Varies by DE | GNOME Settings, KDE System Settings, `xrandr`, etc. | GNOME supports `spanned` picture option. Other DEs/WMs may require per-monitor cropping or tools like `feh`, `nitrogen`, or `swaybg` |
 
 ## Canvas Controls
 
@@ -133,10 +177,10 @@ For example, a 27" QHD (2560x1440) monitor:
 
 ### Output Generation
 
-Output matches the Windows virtual desktop bounding box (Settings > Display). For each monitor:
+Output matches the virtual desktop bounding box of your virtual layout. For each monitor:
 
 1. **Physical layout** determines what portion of the source image that monitor sees.
-2. **Windows arrangement** (pixel positions) determines where the monitor sits in the output image.
+2. **Virtual layout** (pixel positions) determines where the monitor sits in the output image.
 3. The source image is cropped and scaled to the monitor's native resolution (PPI-correct).
 4. Each monitor is drawn at its `(pixelX, pixelY)` position in the output. This supports side-by-side, stacked vertical, and mixed layouts.
 5. Output dimensions = bounding box of all monitors (`maxX − minX` × `maxY − minY`). Any unfilled area (gaps or differing sizes) is filled with black.
@@ -163,7 +207,7 @@ src/
 ├── index.css                  # Tailwind imports
 └── components/
     ├── EditorCanvas.tsx           # Physical layout canvas
-    ├── WindowsArrangementCanvas.tsx  # Windows display-order canvas
+    ├── WindowsArrangementCanvas.tsx  # Virtual layout canvas
     ├── MonitorPresetsSidebar.tsx   # Preset list + custom form
     ├── Toolbar.tsx                 # Top toolbar controls
     ├── PreviewPanel.tsx            # Output preview + download

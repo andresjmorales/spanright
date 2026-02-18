@@ -263,7 +263,7 @@ export default function PreviewPanel() {
       {state.useWindowsArrangement && (
         <div className="px-4 py-2 border-t border-gray-800 bg-gray-900 shrink-0">
           <div className="text-xs text-gray-500">
-            Output uses your custom Windows arrangement for monitor ordering and vertical offsets.
+            Output uses your custom virtual layout for monitor ordering and vertical offsets.
           </div>
         </div>
       )}

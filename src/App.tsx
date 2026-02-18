@@ -46,7 +46,7 @@ function AboutDialog({ onClose }: { onClose: () => void }) {
             Multi-Monitor Wallpaper Alignment Tool
           </p>
           <p className="text-sm text-gray-300">
-            Source code on{' '}
+            Source code and documentation on{' '}
             <a
               href="https://github.com/andresjmorales/spanright"
               target="_blank"
@@ -125,15 +125,15 @@ function WelcomeDialog({ onClose }: { onClose: () => void }) {
             <li className="flex items-start gap-3">
               <span className="shrink-0 w-6 h-6 rounded-full bg-blue-600/20 text-blue-400 text-xs font-bold flex items-center justify-center mt-0.5">3</span>
               <div>
-                <div className="text-sm font-medium text-gray-200">Check your Windows arrangement</div>
-                <div className="text-xs text-gray-400 mt-0.5">The <strong className="text-gray-300">Windows Arrangement</strong> tab lets you match how your displays are set up in Windows Settings, if needed.</div>
+                <div className="text-sm font-medium text-gray-200">Check your virtual layout</div>
+                <div className="text-xs text-gray-400 mt-0.5">The <strong className="text-gray-300">Virtual Layout</strong> tab lets you match how your displays are arranged in your OS display settings, if needed.</div>
               </div>
             </li>
             <li className="flex items-start gap-3">
               <span className="shrink-0 w-6 h-6 rounded-full bg-blue-600/20 text-blue-400 text-xs font-bold flex items-center justify-center mt-0.5">4</span>
               <div>
                 <div className="text-sm font-medium text-gray-200">Preview &amp; export</div>
-                <div className="text-xs text-gray-400 mt-0.5">Head to <strong className="text-gray-300">Preview &amp; Export</strong> to see the stitched result and download it. Set the wallpaper in Windows using <strong className="text-gray-300">Span</strong> mode.</div>
+                <div className="text-xs text-gray-400 mt-0.5">Head to <strong className="text-gray-300">Preview &amp; Export</strong> to see the stitched result and download it. On Windows, use <strong className="text-gray-300">Span</strong> mode; on macOS/Linux, see the troubleshooting guide for setup steps.</div>
               </div>
             </li>
           </ol>
@@ -218,7 +218,7 @@ function AppContent() {
       {/* Tabs */}
       <div className="bg-gray-900 border-b border-gray-700 px-4 flex items-end gap-1 shrink-0">
         <TabButton tab="physical" label="Physical Layout" active={tab === 'physical'} onClick={setTab} />
-        <TabButton tab="windows" label="Windows Arrangement" active={tab === 'windows'} onClick={setTab} />
+        <TabButton tab="windows" label="Virtual Layout" active={tab === 'windows'} onClick={setTab} />
         <TabButton tab="preview" label="Preview & Export" active={tab === 'preview'} onClick={setTab} />
       </div>
 

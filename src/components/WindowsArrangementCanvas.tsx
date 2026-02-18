@@ -367,29 +367,43 @@ export default function WindowsArrangementCanvas() {
     const windowsOrder = [...state.windowsArrangement].sort((a, b) => a.pixelX - b.pixelX || a.pixelY - b.pixelY).map(wp => wp.monitorId)
 
     if (physicalOrder.join(',') !== windowsOrder.join(',')) {
-      warns.push('Your Windows display order doesn\'t match your physical layout. This is fine but make sure it\'s intentional.')
+      warns.push('Your display order doesn\'t match your physical layout. This is fine but make sure it\'s intentional.')
     }
 
-    // Check for large vertical offset differences
+    // Check for large offset differences (vertical and horizontal)
     const physicalSorted = [...state.monitors].sort((a, b) => a.physicalX - b.physicalX)
     const windowsSorted = [...state.windowsArrangement].sort((a, b) => a.pixelX - b.pixelX || a.pixelY - b.pixelY)
+
+    let verticalMismatch = false
+    let horizontalMismatch = false
 
     for (let i = 0; i < Math.min(physicalSorted.length, windowsSorted.length); i++) {
       const phys = physicalSorted[i]
       const win = windowsSorted[i]
-      if (phys.id === win.monitorId) {
-        // Compare relative vertical positioning
-        const physMinY = Math.min(...physicalSorted.map(m => m.physicalY))
-        const winMinY = Math.min(...windowsSorted.map(wp => wp.pixelY))
-        const physRelY = phys.physicalY - physMinY
-        const winRelY = win.pixelY - winMinY
-        // Convert physical offset to approximate pixels for comparison
-        const physRelPx = physRelY * phys.ppi
-        if (Math.abs(physRelPx - winRelY) > 200) {
-          warns.push('Your Windows vertical alignment differs from your physical layout. The wallpaper will match your Windows arrangement, which may not look physically seamless.')
-          break
-        }
-      }
+      if (phys.id !== win.monitorId) continue
+
+      const physMinY = Math.min(...physicalSorted.map(m => m.physicalY))
+      const winMinY = Math.min(...windowsSorted.map(wp => wp.pixelY))
+      const physRelPxY = (phys.physicalY - physMinY) * phys.ppi
+      const winRelY = win.pixelY - winMinY
+      if (Math.abs(physRelPxY - winRelY) > 200) verticalMismatch = true
+
+      const physMinX = Math.min(...physicalSorted.map(m => m.physicalX))
+      const winMinX = Math.min(...windowsSorted.map(wp => wp.pixelX))
+      const physRelPxX = (phys.physicalX - physMinX) * phys.ppi
+      const winRelX = win.pixelX - winMinX
+      if (Math.abs(physRelPxX - winRelX) > 200) horizontalMismatch = true
+
+      if (verticalMismatch && horizontalMismatch) break
+    }
+
+    if (verticalMismatch || horizontalMismatch) {
+      const axis = verticalMismatch && horizontalMismatch
+        ? 'vertical and horizontal alignment differ'
+        : verticalMismatch
+          ? 'vertical alignment differs'
+          : 'horizontal alignment differs'
+      warns.push(`Your ${axis} from your physical layout. The wallpaper will match your virtual layout, which may not look physically seamless.`)
     }
 
     return warns
@@ -418,7 +432,7 @@ export default function WindowsArrangementCanvas() {
             className="accent-blue-500"
           />
           <span className="text-xs text-gray-300">
-            My Windows display arrangement is top-aligned (Display Settings default)
+            My virtual layout is top-aligned (default for most OSes)
           </span>
         </label>
 
@@ -451,8 +465,8 @@ export default function WindowsArrangementCanvas() {
       {state.useWindowsArrangement && (
         <div className="shrink-0 px-4 py-2.5 bg-amber-950/70 border-b border-amber-700/50 space-y-1">
           <p className="text-xs text-amber-200">
-            <strong>Note:</strong> Changing Windows Display Settings (position, order, resolution) can get messy.
-            For best results, align monitor edges in Windows (e.g. top-aligned side-by-side, or stacked vertically with left/right edges aligned.
+            <strong>Note:</strong> Changing your OS display settings (position, order, resolution) can get messy.
+            For best results, align monitor edges (e.g. top-aligned side-by-side, or stacked vertically with left/right edges aligned).
             Black bars are normal in some setups, but misaligned arrangements may produce visible black bars in the spanned wallpaper.
             For more info, see “How does this work?” in the top bar.
           </p>
@@ -501,7 +515,7 @@ export default function WindowsArrangementCanvas() {
         {/* Help text when enabled */}
         {state.useWindowsArrangement && !dragging && (
           <div className="absolute bottom-3 right-3 bg-gray-900/60 backdrop-blur px-2 py-1 rounded text-[10px] text-gray-500 select-none">
-            Drag monitors to match your Windows Display Settings arrangement
+            Drag monitors to match your OS display settings arrangement
           </div>
         )}
       </div>
