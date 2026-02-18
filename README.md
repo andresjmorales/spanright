@@ -22,17 +22,24 @@ Spanright operates in **physical space** (inches/cm), so you arrange monitors as
 - **Saved Layouts** — Save and load monitor layouts (names, positions, rotation, Windows arrangement). Layouts are stored in your browser (localStorage); you can keep several setups (e.g. desk vs laptop-only) and switch between them. Basic but very useful for multi-setup workflows.
 
 ## Example
-#### Physical Layout & Editor Canvas
+Dragon image [source](https://unsplash.com/photos/dragon-effigy-breathes-fire-over-a-crowd-at-night-TP7InDDpeRE) from Unsplash.
+### Physical Layout & Editor Canvas
 <img width="1920" height="1039" alt="dragonfire-canvas-zoomed" src="https://github.com/user-attachments/assets/26e5b87c-73d8-4ce9-af2a-90069d98f721" />
 
-#### Windows Arrangement
+### Windows Arrangement
 <img width="1920" height="1039" alt="dragonfire-windows" src="https://github.com/user-attachments/assets/564adb2d-9b27-4f4e-8afe-2d7601512303" />
 
-#### Preview & Export
+### Preview & Export
 <img width="1920" height="1039" alt="dragonfire-preview" src="https://github.com/user-attachments/assets/fb335e52-bd18-4b3f-9083-f53ad9e047cc" />
 
-#### Result
+### Result
 Spanright's output wallpaper (6400x1080) displayed on a 14" 1080p laptop, a 24" 1080p monitor, and 34" 2560x1080 ultrawide monitor. The total resolution of this setup is (1920 + 1920 + 2560) x (1080) = 6400x1080. And the the total aspect ratio of this setup would be (16 + 16 + 21) / (9) = 53:9. The image will only look good when Spanright modifies the image to take account of the phsyical monitor dimensions and spacing as well. Even though the preview looks disjointed, it actually alignes perfectly when used as the wallpaper.
+
+Standard 53:9 crop of dragon picture:
+![dragonfire-lazy-53-9](https://github.com/user-attachments/assets/a4d9ee67-5bb5-4a6d-9987-703bf339b208)
+Spanright 53:9 crop of dragon picture:
+![spanright-dragonfire-6400x1080-demo-jpg](https://github.com/user-attachments/assets/17f802e3-b2ae-4afe-ac83-4ad04e4239a1)
+Spanright result working in my real setup:
 ![dragonfire-demo-real](https://github.com/user-attachments/assets/116198b6-087a-49cb-8dd1-8e3de17d6f23)
 
 ## Directions
