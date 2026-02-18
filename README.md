@@ -23,7 +23,7 @@ Spanright operates in **physical space** (inches/cm), so you arrange monitors as
 
 ## Example
 #### Physical Layout & Editor Canvas
-<img width="1920" height="1039" alt="dragonfire-canvas" src="https://github.com/user-attachments/assets/c05c7ccb-3250-4cf1-9c67-8937056bd98e" />
+<img width="1920" height="1039" alt="dragonfire-canvas-zoomed" src="https://github.com/user-attachments/assets/26e5b87c-73d8-4ce9-af2a-90069d98f721" />
 
 #### Windows Arrangement
 <img width="1920" height="1039" alt="dragonfire-windows" src="https://github.com/user-attachments/assets/564adb2d-9b27-4f4e-8afe-2d7601512303" />
