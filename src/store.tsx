@@ -12,6 +12,7 @@ interface State {
   selectedMonitorId: string | null
   snapToGrid: boolean
   gridSize: number // in inches
+  smartAlign: boolean
   // Windows arrangement
   windowsArrangement: WindowsMonitorPosition[]
   useWindowsArrangement: boolean
@@ -37,6 +38,7 @@ type Action =
   | { type: 'SET_CANVAS_OFFSET'; x: number; y: number }
   | { type: 'TOGGLE_UNIT' }
   | { type: 'TOGGLE_SNAP' }
+  | { type: 'TOGGLE_SMART_ALIGN' }
   | { type: 'SET_GRID_SIZE'; size: number }
   // Windows arrangement actions
   | { type: 'SET_ACTIVE_TAB'; tab: ActiveTab }
@@ -55,6 +57,7 @@ const initialState: State = {
   selectedMonitorId: null,
   snapToGrid: false,
   gridSize: 1,
+  smartAlign: true,
   windowsArrangement: [],
   useWindowsArrangement: false,
   activeTab: 'physical',
@@ -199,6 +202,8 @@ function reducer(state: State, action: Action): State {
       return { ...state, unit: state.unit === 'inches' ? 'cm' : 'inches' }
     case 'TOGGLE_SNAP':
       return { ...state, snapToGrid: !state.snapToGrid }
+    case 'TOGGLE_SMART_ALIGN':
+      return { ...state, smartAlign: !state.smartAlign }
     case 'SET_GRID_SIZE':
       return { ...state, gridSize: action.size }
     // Windows arrangement
