@@ -18,6 +18,7 @@ interface State {
   useWindowsArrangement: boolean
   activeTab: ActiveTab
   showTroubleshootingGuide: boolean
+  showHowItWorks: boolean
 }
 
 type Action =
@@ -46,6 +47,7 @@ type Action =
   | { type: 'MOVE_WINDOWS_MONITOR'; monitorId: string; pixelX: number; pixelY: number }
   | { type: 'SYNC_WINDOWS_ARRANGEMENT' }
   | { type: 'SET_SHOW_TROUBLESHOOTING_GUIDE'; value: boolean }
+  | { type: 'SET_SHOW_HOW_IT_WORKS'; value: boolean }
 
 const initialState: State = {
   monitors: [],
@@ -62,6 +64,7 @@ const initialState: State = {
   useWindowsArrangement: false,
   activeTab: 'physical',
   showTroubleshootingGuide: false,
+  showHowItWorks: false,
 }
 
 /** Strip width in pixels for output (depends on rotation). */
@@ -236,6 +239,8 @@ function reducer(state: State, action: Action): State {
       }
     case 'SET_SHOW_TROUBLESHOOTING_GUIDE':
       return { ...state, showTroubleshootingGuide: action.value }
+    case 'SET_SHOW_HOW_IT_WORKS':
+      return { ...state, showHowItWorks: action.value }
     default:
       return state
   }
