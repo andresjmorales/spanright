@@ -25,6 +25,7 @@ Spanright operates in **physical space** (inches/cm), so you arrange monitors as
 
 ## Example
 Dragon image [source](https://unsplash.com/photos/dragon-effigy-breathes-fire-over-a-crowd-at-night-TP7InDDpeRE) from Unsplash.
+
 ### Physical Layout & Editor Canvas
 <img width="1920" height="1039" alt="dragonfire-canvas-zoomed" src="https://github.com/user-attachments/assets/26e5b87c-73d8-4ce9-af2a-90069d98f721" />
 
