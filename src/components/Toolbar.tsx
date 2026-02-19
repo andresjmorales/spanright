@@ -27,13 +27,7 @@ export default function Toolbar() {
 
   return (
     <div className="bg-gray-900 border-b border-gray-800 px-4 h-11 flex items-center gap-4 flex-wrap">
-      {/* Saved Layouts — always leftmost */}
-      <ConfigManager />
-
-      {/* Separator */}
-      <div className="w-px h-5 bg-gray-700" />
-
-      {/* Image upload / image details */}
+      {/* Image upload / image details — leftmost */}
       <ImageUpload />
 
       {/* Monitor count and recommended (related — em dash, no extra spacer) */}
@@ -65,6 +59,10 @@ export default function Toolbar() {
 
       {/* Spacer */}
       <div className="flex-1" />
+
+      <div className="w-px h-5 bg-gray-700" />
+      {/* Saved Layouts — right side, left of Share */}
+      <ConfigManager />
 
       {/* Share layout */}
       <ShareButton />

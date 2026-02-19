@@ -401,7 +401,11 @@ export default function WindowsArrangementCanvas() {
         : verticalMismatch
           ? 'vertical alignment differs'
           : 'horizontal alignment differs'
-      warns.push(`Your ${axis} from your physical layout. The wallpaper will match your virtual layout, which may not look physically seamless.`)
+          warns.push(
+            `Your virtual layout's ${axis} from your physical layout. ` +
+            `This affects cursor movement across monitors and where black bars land when monitors have different resolutions — ` +
+            `don't worry, they only fill hidden negative space and won't be visible on your screens.`
+          )
     }
 
     return warns
@@ -452,9 +456,7 @@ export default function WindowsArrangementCanvas() {
       {state.useWindowsArrangement && (
         <div className="shrink-0 px-4 py-2.5 bg-amber-950/70 border-b border-amber-700/50 space-y-1">
           <p className="text-xs text-amber-200">
-            <strong>Note:</strong> Changing your OS display settings (position, order, resolution) can get messy.
-            For best results, align monitor edges (e.g. top-aligned side-by-side, or stacked vertically with left/right edges aligned).
-            Black bars are normal in some setups, but misaligned arrangements may produce visible black bars in the spanned wallpaper.
+            <strong>Tip:</strong> Match this to your OS display arrangement.
             {' '}<button onClick={() => dispatch({ type: 'SET_SHOW_HOW_IT_WORKS', value: true })} className="text-amber-300 underline underline-offset-2 hover:text-amber-100 transition-colors">Learn more</button>
           </p>
         </div>

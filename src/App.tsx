@@ -10,6 +10,7 @@ import InfoDialog from './components/InfoDialog'
 import { ToastProvider } from './components/Toast'
 import type { ActiveTab } from './types'
 import { getLayoutFromHash, clearLayoutHash } from './urlLayout'
+import { IconClose, IconBook, IconLightbulb, IconInfoCircle } from './icons'
 
 function TabButton({ tab, label, active, onClick }: { tab: ActiveTab; label: string; active: boolean; onClick: (tab: ActiveTab) => void }) {
   return (
@@ -38,9 +39,7 @@ function AboutDialog({ onClose }: { onClose: () => void }) {
           onClick={onClose}
           className="absolute top-3 right-3 text-gray-500 hover:text-gray-300 transition-colors"
         >
-          <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-          </svg>
+          <IconClose className="w-5 h-5" />
         </button>
         <div className="p-6 text-center space-y-3">
           <img src="/spanright-logo-large.png" alt="Spanright" className="h-10 w-auto mx-auto" />
@@ -98,9 +97,7 @@ function WelcomeDialog({ onClose }: { onClose: () => void }) {
           onClick={handleClose}
           className="absolute top-3 right-3 text-gray-500 hover:text-gray-300 transition-colors z-10"
         >
-          <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-          </svg>
+          <IconClose className="w-5 h-5" />
         </button>
 
         <div className="p-6 space-y-5">
@@ -194,9 +191,7 @@ function AppContent() {
           className="flex items-center gap-1.5 text-gray-500 hover:text-gray-300 transition-colors px-2 py-1 rounded hover:bg-gray-800"
           title="Quick Start"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-          </svg>
+          <IconBook className="w-4 h-4" />
           <span className="text-xs">Quick Start</span>
         </button>
         <div className="flex-1" />
@@ -205,9 +200,7 @@ function AppContent() {
           className="flex items-center gap-1.5 text-gray-500 hover:text-gray-300 transition-colors px-2 py-1 rounded hover:bg-gray-800"
           title="How It Works"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-          </svg>
+          <IconLightbulb className="w-4 h-4" />
           <span className="text-xs">How It Works</span>
         </button>
         <button
@@ -215,9 +208,7 @@ function AppContent() {
           className="flex items-center gap-1.5 text-gray-500 hover:text-gray-300 transition-colors px-2 py-1 rounded hover:bg-gray-800"
           title="Troubleshooting Guide"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
+          <IconInfoCircle className="w-4 h-4" />
           <span className="text-xs">Troubleshooting</span>
         </button>
         <button
@@ -225,10 +216,7 @@ function AppContent() {
           className="flex items-center gap-1.5 text-gray-500 hover:text-gray-300 transition-colors px-2 py-1 rounded hover:bg-gray-800"
           title="About Spanright"
         >
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-            <circle cx="12" cy="12" r="10" />
-            <path strokeLinecap="round" d="M12 16v-4m0-4h.01" />
-          </svg>
+          <IconInfoCircle className="w-4 h-4" />
           <span className="text-xs">About</span>
         </button>
       </header>

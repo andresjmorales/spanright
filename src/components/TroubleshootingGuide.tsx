@@ -97,7 +97,7 @@ function WindowsContent() {
             Look at the <strong className="text-gray-100">Y</strong> and <strong className="text-gray-100">Height</strong> values. If Y is anything other than 0, or Height is larger than your tallest monitor's vertical resolution, one of your monitors is offset.
           </p>
           <p className="text-sm text-gray-300 leading-relaxed">
-            <strong className="text-gray-100">To fix:</strong> Open Settings &gt; System &gt; Display. Carefully drag your monitors so they're perfectly aligned. The snap behavior can sometimes leave a few pixels of offset — zoom in and adjust carefully. Then re-run the PowerShell command to verify.
+            <strong className="text-gray-100">To fix:</strong> Open Settings &gt; System &gt; Display. Carefully drag your monitors so they're perfectly aligned. One trick: align as best you can, then drag one monitor slightly inside the other; when it snaps back to the edge, it will be aligned perfectly. Re-run the PowerShell command to verify.
           </p>
           <p className="text-xs text-gray-400 leading-relaxed">
             If you'd rather not adjust your display arrangement (since it affects cursor movement between screens), just use <strong className="text-gray-300">Tile</strong> mode instead of Span, which bypasses this issue entirely.
