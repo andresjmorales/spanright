@@ -9,6 +9,7 @@ import TroubleshootingGuide from './components/TroubleshootingGuide'
 import InfoDialog from './components/InfoDialog'
 import { ToastProvider } from './components/Toast'
 import type { ActiveTab } from './types'
+import { getLayoutFromHash, clearLayoutHash } from './urlLayout'
 
 function TabButton({ tab, label, active, onClick }: { tab: ActiveTab; label: string; active: boolean; onClick: (tab: ActiveTab) => void }) {
   return (
@@ -158,9 +159,13 @@ function AppContent() {
   const [showWelcome, setShowWelcome] = useState(false)
   const tab = state.activeTab
 
-  // Show welcome dialog on first visit
+  // On mount: load layout from URL hash if present, otherwise show welcome on first visit
   useEffect(() => {
-    if (!localStorage.getItem(WELCOME_SEEN_KEY)) {
+    const layoutFromHash = getLayoutFromHash()
+    if (layoutFromHash) {
+      dispatch({ type: 'LOAD_LAYOUT', monitors: layoutFromHash })
+      clearLayoutHash()
+    } else if (!localStorage.getItem(WELCOME_SEEN_KEY)) {
       setShowWelcome(true)
     }
   }, [])

@@ -2,6 +2,7 @@ import { useStore } from '../store'
 import { getRecommendedImageSize, getMonitorsBoundingBox, formatDimension } from '../utils'
 import ImageUpload from './ImageUpload'
 import ConfigManager from './ConfigManager'
+import ShareButton from './ShareButton'
 
 export default function Toolbar() {
   const { state } = useStore()
@@ -64,6 +65,9 @@ export default function Toolbar() {
 
       {/* Spacer */}
       <div className="flex-1" />
+
+      {/* Share layout */}
+      <ShareButton />
     </div>
   )
 }
