@@ -68,6 +68,7 @@ export default function ConfigManager() {
         physicalY: m.physicalY,
         rotation: m.rotation,
         displayName: m.displayName,
+        bezels: m.bezels,
       })),
     }
     const updated = [newConfig, ...configs].slice(0, MAX_CONFIGS)

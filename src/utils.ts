@@ -1,4 +1,4 @@
-import type { MonitorPreset, Monitor } from './types'
+import type { MonitorPreset, Monitor, Bezels } from './types'
 import { v4 as uuidv4 } from 'uuid'
 
 /**
@@ -29,6 +29,7 @@ export function createMonitor(
   physicalY: number,
   rotation: 0 | 90 = 0,
   displayName?: string,
+  bezels?: Bezels,
 ): Monitor {
   const ppi = calculatePPI(preset.resolutionX, preset.resolutionY, preset.diagonal)
   let { width, height } = calculatePhysicalDimensions(preset.resolutionX, preset.resolutionY, ppi)
@@ -45,6 +46,7 @@ export function createMonitor(
     physicalHeight: height,
     ppi,
     rotation,
+    bezels,
   }
 }
 
@@ -88,6 +90,24 @@ export function getRecommendedImageSize(monitors: Monitor[]): { width: number; h
   return {
     width: Math.ceil(bbox.width * maxPPI),
     height: Math.ceil(bbox.height * maxPPI),
+  }
+}
+
+const MM_PER_INCH = 25.4
+
+export function mmToInches(mm: number): number {
+  return mm / MM_PER_INCH
+}
+
+/** Returns per-edge bezel thickness in inches (all zero when no bezels set). */
+export function getBezelInches(monitor: Monitor): { top: number; bottom: number; left: number; right: number } {
+  const b = monitor.bezels
+  if (!b) return { top: 0, bottom: 0, left: 0, right: 0 }
+  return {
+    top: mmToInches(b.top),
+    bottom: mmToInches(b.bottom),
+    left: mmToInches(b.left),
+    right: mmToInches(b.right),
   }
 }
 

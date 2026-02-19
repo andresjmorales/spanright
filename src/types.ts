@@ -6,12 +6,20 @@ export interface MonitorPreset {
   resolutionY: number
 }
 
+/** Per-edge bezel thickness in millimeters. */
+export interface Bezels {
+  top: number
+  bottom: number
+  left: number
+  right: number
+}
+
 export interface Monitor {
   id: string
   preset: MonitorPreset
   /** Custom display name (e.g. "Main display"). Falls back to preset.name when unset. */
   displayName?: string
-  // Physical position on canvas in inches (top-left corner)
+  // Physical position on canvas in inches (top-left corner of display area)
   physicalX: number
   physicalY: number
   // Computed physical dimensions in inches
@@ -21,6 +29,8 @@ export interface Monitor {
   ppi: number
   /** 0 = landscape, 90 = portrait (rotated 90° CW). Omitted on older saved configs. */
   rotation?: 0 | 90
+  /** Per-edge bezel thickness in mm. Omitted = no bezels. */
+  bezels?: Bezels
 }
 
 export interface SourceImage {
@@ -55,6 +65,7 @@ export interface SavedConfig {
     physicalY: number
     rotation?: 0 | 90
     displayName?: string
+    bezels?: Bezels
   }[]
 }
 
