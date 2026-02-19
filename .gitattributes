@@ -1,0 +1,3 @@
+# Normalize line endings so Windows/Mac/Linux don't get false "modified" files.
+# LF in repo and in working copy = no CRLF/LF mismatch.
+* text=auto eol=lf
