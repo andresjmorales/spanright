@@ -4,7 +4,14 @@ import type Konva from 'konva'
 import { useStore, CANVAS_SCALE_MIN, CANVAS_SCALE_MAX, DEFAULT_CANVAS_SCALE } from '../store'
 import { formatDimension, getMonitorsBoundingBox, getMonitorDisplayName, getBezelInches } from '../utils'
 import { useToast } from './Toast'
+import { IconUndo, IconRedo, IconCheck, IconKebabVertical } from '../icons'
 import type { Monitor, SourceImage, Bezels } from '../types'
+import {
+  PHYS_MIN_X,
+  PHYS_MAX_X,
+  PHYS_MIN_Y,
+  PHYS_MAX_Y,
+} from '../canvasConstants'
 
 const MONITOR_COLORS = [
   '#3b82f6', // blue
@@ -150,12 +157,6 @@ function computeAlignmentGuides(
 
   return { snapDeltaX: snapDx, snapDeltaY: snapDy, guides }
 }
-
-// Physical workspace bounds (inches) — ~12ft x 8ft
-const PHYS_MIN_X = 0
-const PHYS_MAX_X = 144
-const PHYS_MIN_Y = 0
-const PHYS_MAX_Y = 96
 
 function getNiceInterval(pixelsPerUnit: number, minPixelGap = 60): { major: number; minor: number } {
   if (pixelsPerUnit <= 0) return { major: 10, minor: 2 }
@@ -346,6 +347,7 @@ export default function EditorCanvas() {
   const [renameInputValue, setRenameInputValue] = useState('')
   const [activeGuides, setActiveGuides] = useState<AlignGuide[]>([])
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; monitorId: string } | null>(null)
+  const [imageMenuAt, setImageMenuAt] = useState<{ x: number; y: number } | null>(null)
   const [bezelEditorMonitorId, setBezelEditorMonitorId] = useState<string | null>(null)
   const contextMenuHandledRef = useRef(false)
   const smartAlignSnappedRef = useRef({ x: false, y: false })
@@ -896,10 +898,12 @@ export default function EditorCanvas() {
       onClick={() => {
         setImageSelected(true)
         dispatch({ type: 'SELECT_MONITOR', id: null })
+        setImageMenuAt(null)
       }}
       onTap={() => {
         setImageSelected(true)
         dispatch({ type: 'SELECT_MONITOR', id: null })
+        setImageMenuAt(null)
       }}
       onDragMove={handleImageDragMove}
       onDragEnd={handleImageDragEnd}
@@ -944,6 +948,28 @@ export default function EditorCanvas() {
         }}
         onTransformEnd={handleImageTransformEnd}
       />
+      {/* Kebab menu — left of X when selected; opens Size image to fit / Remove image */}
+      {imageSelected && (
+        <Group
+          x={imageDeleteButtonPos ? imageDeleteButtonPos.x - 22 : imgW - 44}
+          y={imageDeleteButtonPos ? imageDeleteButtonPos.y : 4}
+          onClick={(e) => {
+            e.cancelBubble = true
+            const imgX = toCanvasX(state.sourceImage!.physicalX)
+            const imgY = toCanvasY(state.sourceImage!.physicalY)
+            setImageMenuAt({ x: imgX + imgW - 44, y: imgY + 4 + 22 })
+          }}
+          onTap={(e) => {
+            e.cancelBubble = true
+            const imgX = toCanvasX(state.sourceImage!.physicalX)
+            const imgY = toCanvasY(state.sourceImage!.physicalY)
+            setImageMenuAt({ x: imgX + imgW - 44, y: imgY + 4 + 22 })
+          }}
+        >
+          <Rect width={18} height={18} fill="#475569" cornerRadius={3} />
+          <Text x={3} y={2} text="⋮" fontSize={12} fill="#e2e8f0" />
+        </Group>
+      )}
       {/* Delete button — top-right, follows visual corner during resize (any handle) */}
       {imageSelected && (
         <Group
@@ -952,12 +978,14 @@ export default function EditorCanvas() {
           onClick={(e) => {
             e.cancelBubble = true
             setImageSelected(false)
+            setImageMenuAt(null)
             dispatch({ type: 'CLEAR_SOURCE_IMAGE' })
             toast('Image removed')
           }}
           onTap={(e) => {
             e.cancelBubble = true
             setImageSelected(false)
+            setImageMenuAt(null)
             dispatch({ type: 'CLEAR_SOURCE_IMAGE' })
             toast('Image removed')
           }}
@@ -997,11 +1025,13 @@ export default function EditorCanvas() {
           dispatch({ type: 'SELECT_MONITOR', id: monitor.id })
           setImageSelected(false)
           setContextMenu(null)
+          setImageMenuAt(null)
         }}
         onTap={() => {
           dispatch({ type: 'SELECT_MONITOR', id: monitor.id })
           setImageSelected(false)
           setContextMenu(null)
+          setImageMenuAt(null)
         }}
         onContextMenu={(e) => {
           e.evt.preventDefault()
@@ -1113,6 +1143,24 @@ export default function EditorCanvas() {
             </>
           )
         })()}
+        {/* Kebab menu (same as right-click context menu) — left of X when selected */}
+        {isSelected && (
+          <Group
+            x={cw - 42}
+            y={4}
+            onClick={(e) => {
+              e.cancelBubble = true
+              setContextMenu({ x: cx + cw - 42, y: cy + 4 + 22, monitorId: monitor.id })
+            }}
+            onTap={(e) => {
+              e.cancelBubble = true
+              setContextMenu({ x: cx + cw - 42, y: cy + 4 + 22, monitorId: monitor.id })
+            }}
+          >
+            <Rect width={18} height={18} fill="#475569" cornerRadius={3} />
+            <Text x={3} y={2} text="⋮" fontSize={12} fill="#e2e8f0" />
+          </Group>
+        )}
         {/* Delete button */}
         {isSelected && (
           <Group
@@ -1344,13 +1392,37 @@ export default function EditorCanvas() {
             offsetX={offsetX}
             offsetY={offsetY}
             onClose={() => setBezelEditorMonitorId(null)}
-            onChange={(bezels) => {
+            onPreview={(bezels) => {
               const hasAny = bezels.top > 0 || bezels.bottom > 0 || bezels.left > 0 || bezels.right > 0
               dispatch({ type: 'SET_MONITOR_BEZELS', id: mon.id, bezels: hasAny ? bezels : undefined })
+            }}
+            onConfirm={(bezels) => {
+              const hasAny = bezels.top > 0 || bezels.bottom > 0 || bezels.left > 0 || bezels.right > 0
+              dispatch({ type: 'SET_MONITOR_BEZELS', id: mon.id, bezels: hasAny ? bezels : undefined })
+              toast.success(hasAny ? 'Bezels updated' : 'Bezels removed')
+            }}
+            onCancel={(originalBezels) => {
+              dispatch({ type: 'SET_MONITOR_BEZELS', id: mon.id, bezels: originalBezels })
             }}
           />
         )
       })()}
+
+      {/* Image kebab dropdown — Size image to fit / Remove image */}
+      {imageMenuAt && (
+        <ImageKebabMenu
+          x={imageMenuAt.x}
+          y={imageMenuAt.y}
+          canSizeToFit={state.monitors.length > 0}
+          onSizeImageToFit={() => handleSizeImageToFit()}
+          onRemoveImage={() => {
+            setImageSelected(false)
+            dispatch({ type: 'CLEAR_SOURCE_IMAGE' })
+            toast('Image removed')
+          }}
+          onClose={() => setImageMenuAt(null)}
+        />
+      )}
 
       {/* Rulers */}
       <RulerOverlay
@@ -1375,10 +1447,7 @@ export default function EditorCanvas() {
           className="bg-gray-900/80 backdrop-blur hover:bg-gray-800/90 text-gray-400 hover:text-gray-200 disabled:text-gray-600 disabled:hover:bg-gray-900/80 p-1.5 rounded transition-colors"
           title={canUndo ? `Undo: ${undoLabel} (Ctrl+Z)` : 'Nothing to undo'}
         >
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 10h10a5 5 0 0 1 0 10H9" />
-            <polyline points="7 14 3 10 7 6" />
-          </svg>
+          <IconUndo className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={() => {
@@ -1391,10 +1460,7 @@ export default function EditorCanvas() {
           className="bg-gray-900/80 backdrop-blur hover:bg-gray-800/90 text-gray-400 hover:text-gray-200 disabled:text-gray-600 disabled:hover:bg-gray-900/80 p-1.5 rounded transition-colors"
           title={canRedo ? `Redo: ${redoLabel} (Ctrl+Shift+Z)` : 'Nothing to redo'}
         >
-          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 10H11a5 5 0 0 0 0 10h4" />
-            <polyline points="17 14 21 10 17 6" />
-          </svg>
+          <IconRedo className="w-3.5 h-3.5" />
         </button>
         <CanvasMenuInner
           hasMonitors={state.monitors.length > 0}
@@ -1483,6 +1549,56 @@ export default function EditorCanvas() {
 }
 
 /**
+ * Dropdown for image kebab: Size image to fit, Remove image.
+ */
+function ImageKebabMenu({
+  x, y, canSizeToFit, onSizeImageToFit, onRemoveImage, onClose,
+}: {
+  x: number
+  y: number
+  canSizeToFit: boolean
+  onSizeImageToFit: () => void
+  onRemoveImage: () => void
+  onClose: () => void
+}) {
+  const menuRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose()
+    }
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('mousedown', handleClick)
+    window.addEventListener('keydown', handleKey)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      window.removeEventListener('keydown', handleKey)
+    }
+  }, [onClose])
+  return (
+    <div
+      ref={menuRef}
+      className="absolute z-50 w-44 bg-gray-900 border border-gray-700 rounded-lg shadow-xl overflow-hidden"
+      style={{ left: x, top: y }}
+    >
+      <button
+        onClick={() => { onSizeImageToFit(); onClose() }}
+        disabled={!canSizeToFit}
+        className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-gray-800 hover:text-white disabled:opacity-40 transition-colors"
+      >
+        Size image to fit
+      </button>
+      <div className="border-t border-gray-700" />
+      <button
+        onClick={() => { onRemoveImage(); onClose() }}
+        className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-gray-800 hover:text-red-300 transition-colors"
+      >
+        Remove image
+      </button>
+    </div>
+  )
+}
+
+/**
  * Right-click context menu on a monitor.
  */
 function MonitorContextMenu({
@@ -1547,17 +1663,26 @@ const BEZEL_PRESETS: { label: string; bezels: Bezels }[] = [
 
 /**
  * Popover for editing a monitor's bezel values.
+ * Live preview: changes update the canvas immediately. Only check mark or Remove bezels
+ * persist; closing without confirm reverts to the values from when the popover opened.
  */
 function BezelEditorPopover({
-  monitor, canvasScale, offsetX, offsetY, onClose, onChange,
+  monitor, canvasScale, offsetX, offsetY, onClose, onPreview, onConfirm, onCancel,
 }: {
   monitor: Monitor
   canvasScale: number
   offsetX: number
   offsetY: number
   onClose: () => void
-  onChange: (bezels: Bezels) => void
+  onPreview: (bezels: Bezels) => void
+  onConfirm: (bezels: Bezels) => void
+  onCancel: (originalBezels: Bezels | undefined) => void
 }) {
+  /** Values when popover opened; restored if user closes without confirming */
+  const originalBezelsRef = useRef<Bezels | undefined>(
+    monitor.bezels ? { ...monitor.bezels } : undefined
+  )
+
   const [symmetric, setSymmetric] = useState(() => {
     const b = monitor.bezels
     if (!b) return true
@@ -1570,37 +1695,50 @@ function BezelEditorPopover({
 
   const popoverRef = useRef<HTMLDivElement>(null)
 
+  const handleCancel = useCallback(() => {
+    onCancel(originalBezelsRef.current)
+    onClose()
+  }, [onCancel, onClose])
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) onClose()
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) handleCancel()
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [onClose])
+  }, [handleCancel])
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') handleCancel() }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [onClose])
+  }, [handleCancel])
 
-  const apply = (t: number, b: number, l: number, r: number) => {
+  /** Update local state and push to canvas (live preview); does not show toast. */
+  const applyPreview = (t: number, b: number, l: number, r: number) => {
     setTop(t); setBottom(b); setLeft(l); setRight(r)
-    onChange({ top: t, bottom: b, left: l, right: r })
+    const hasAny = t > 0 || b > 0 || l > 0 || r > 0
+    onPreview(hasAny ? { top: t, bottom: b, left: l, right: r } : { top: 0, bottom: 0, left: 0, right: 0 })
+  }
+
+  /** Confirm and close: persist + toast. */
+  const confirmApply = () => {
+    onConfirm({ top, bottom, left, right })
+    onClose()
   }
 
   const handleChange = (edge: 'top' | 'bottom' | 'left' | 'right', val: number) => {
     const v = Math.max(0, Math.min(30, val))
     if (symmetric) {
-      apply(v, v, v, v)
+      applyPreview(v, v, v, v)
     } else {
       const newVals = { top, bottom, left, right, [edge]: v }
-      apply(newVals.top, newVals.bottom, newVals.left, newVals.right)
+      applyPreview(newVals.top, newVals.bottom, newVals.left, newVals.right)
     }
   }
 
   const handlePreset = (bezels: Bezels) => {
-    apply(bezels.top, bezels.bottom, bezels.left, bezels.right)
+    applyPreview(bezels.top, bezels.bottom, bezels.left, bezels.right)
     const allSame = bezels.top === bezels.bottom && bezels.left === bezels.right && bezels.top === bezels.left
     setSymmetric(allSame)
   }
@@ -1610,7 +1748,7 @@ function BezelEditorPopover({
     setSymmetric(next)
     if (next) {
       const avg = Math.round(Math.max(top, bottom, left, right))
-      apply(avg, avg, avg, avg)
+      applyPreview(avg, avg, avg, avg)
     }
   }
 
@@ -1629,7 +1767,7 @@ function BezelEditorPopover({
     >
       <div className="flex items-center justify-between mb-3">
         <span className="text-xs font-medium text-gray-200">Set Bezels</span>
-        <button onClick={onClose} className="text-gray-500 hover:text-gray-300 transition-colors text-sm">✕</button>
+        <button onClick={handleCancel} className="text-gray-500 hover:text-gray-300 transition-colors text-sm" title="Cancel (revert changes)">✕</button>
       </div>
 
       {/* Preset dropdown */}
@@ -1717,21 +1855,23 @@ function BezelEditorPopover({
         </div>
       </div>
 
-      {/* Footer buttons */}
+      {/* Footer buttons — only the check mark or Remove bezels persist to the store */}
       <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-700">
         <button
-          onClick={() => { apply(0, 0, 0, 0); onClose() }}
+          onClick={() => {
+            onConfirm({ top: 0, bottom: 0, left: 0, right: 0 })
+            onClose()
+          }}
           className="px-3 py-1.5 text-xs text-gray-400 hover:text-gray-200 rounded hover:bg-gray-800 transition-colors"
         >
           Remove bezels
         </button>
         <button
-          onClick={onClose}
+          onClick={confirmApply}
           className="px-2.5 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors flex items-center justify-center"
+          title="Apply bezels"
         >
-          <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="3 8 7 12 13 4" />
-          </svg>
+          <IconCheck className="w-3.5 h-3.5" />
         </button>
       </div>
     </div>
@@ -1789,11 +1929,7 @@ function CanvasMenuInner({
         className="bg-gray-900/80 backdrop-blur hover:bg-gray-800/90 text-gray-400 hover:text-gray-200 px-2 py-1.5 rounded transition-colors"
         title="Canvas options"
       >
-        <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
-          <circle cx="8" cy="3" r="1.5" />
-          <circle cx="8" cy="8" r="1.5" />
-          <circle cx="8" cy="13" r="1.5" />
-        </svg>
+        <IconKebabVertical className="w-4 h-4" />
       </button>
       {open && (
         <div className="absolute right-0 mt-1 w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-xl overflow-hidden">

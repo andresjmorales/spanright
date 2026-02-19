@@ -1,7 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useStore } from '../store'
 import { useToast } from './Toast'
 import type { SavedConfig } from '../types'
+import { PRELOADED_LAYOUTS, decodePreloadedLayout } from '../preloadedLayouts'
+import { IconBookmark, IconPlus, IconTrash } from '../icons'
 
 const STORAGE_KEY = 'spanright-saved-configs'
 const MAX_CONFIGS = 10
@@ -85,6 +87,19 @@ export default function ConfigManager() {
     setOpen(false)
   }
 
+  const preloadedWithMonitors = useMemo(() => {
+    return PRELOADED_LAYOUTS.map(entry => ({
+      entry,
+      monitors: decodePreloadedLayout(entry),
+    })).filter(({ monitors }) => monitors && monitors.length > 0) as { entry: typeof PRELOADED_LAYOUTS[number]; monitors: SavedConfig['monitors'] }[]
+  }, [])
+
+  const handleLoadPreloaded = (monitors: SavedConfig['monitors'], name: string) => {
+    dispatch({ type: 'LOAD_LAYOUT', monitors })
+    toast.success(`Layout loaded: ${name}`)
+    setOpen(false)
+  }
+
   const handleDelete = (id: string) => {
     const updated = configs.filter(c => c.id !== id)
     setConfigs(updated)
@@ -111,9 +126,7 @@ export default function ConfigManager() {
         title="Saved Layouts"
       >
         <span className="flex items-center gap-1.5">
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-          </svg>
+          <IconBookmark className="w-3.5 h-3.5" />
           Saved Layouts
           {configs.length > 0 && (
             <span className="text-[10px] text-gray-500">({configs.length})</span>
@@ -134,9 +147,7 @@ export default function ConfigManager() {
                 disabled={state.monitors.length === 0}
                 className="w-full text-left px-2.5 py-1.5 text-xs text-blue-400 hover:bg-gray-800 rounded transition-colors disabled:opacity-40 disabled:cursor-default flex items-center gap-1.5"
               >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                </svg>
+                <IconPlus className="w-3.5 h-3.5" />
                 Save current layout
                 {state.monitors.length === 0 && (
                   <span className="text-gray-600 ml-auto">No monitors</span>
@@ -177,13 +188,30 @@ export default function ConfigManager() {
             )}
           </div>
 
+          {/* Preloaded layouts (from preloadedLayouts.ts) */}
+          {preloadedWithMonitors.length > 0 && (
+            <div className="p-2 border-b border-gray-800">
+              <div className="text-[10px] uppercase tracking-wider text-gray-500 px-2.5 mb-1.5">Quick layouts</div>
+              {preloadedWithMonitors.map(({ entry, monitors }) => (
+                <button
+                  key={entry.name}
+                  onClick={() => handleLoadPreloaded(monitors, entry.name)}
+                  className="w-full text-left px-2.5 py-1.5 text-xs text-gray-300 hover:bg-gray-800 hover:text-white rounded transition-colors flex items-center gap-1.5"
+                >
+                  <span className="font-medium truncate">{entry.name}</span>
+                  <span className="text-gray-600 shrink-0">{monitors.length} monitor{monitors.length !== 1 ? 's' : ''}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Layout list */}
           <div className="max-h-64 overflow-y-auto">
-            {configs.length === 0 ? (
+            {configs.length === 0 && preloadedWithMonitors.length === 0 ? (
               <div className="px-3 py-4 text-center text-xs text-gray-600">
-                No saved layouts yet
+                No saved layouts yet. Add layouts in <code className="text-gray-500">preloadedLayouts.ts</code> or save your current layout above.
               </div>
-            ) : (
+            ) : configs.length === 0 ? null : (
               configs.map((config) => (
                 <div
                   key={config.id}
@@ -223,9 +251,7 @@ export default function ConfigManager() {
                         className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 transition-all p-0.5"
                         title="Delete"
                       >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
+                        <IconTrash className="w-3.5 h-3.5" />
                       </button>
                     </>
                   )}
@@ -238,3 +264,4 @@ export default function ConfigManager() {
     </div>
   )
 }
+

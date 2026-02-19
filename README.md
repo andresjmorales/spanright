@@ -14,13 +14,13 @@ Spanright operates in **physical space** (inches/cm), so you arrange monitors as
 - **Drag-and-drop presets** — Choose from 18+ built-in monitor presets (laptops, standard monitors, ultrawides, super ultrawides) and drag them directly onto the canvas.
 - **Custom monitors** — Define any monitor by diagonal size, aspect ratio, and resolution. Supports fully custom resolution entry or filtered presets by aspect ratio. Diagonal is limited to 5"–120"; aspect ratio is limited to 10:1 or less (no ultra-thin "line" monitors). Validation warnings appear when limits are exceeded; Add is disabled until fixed.
 - **Monitor rotation** — Rotate any monitor 90° (portrait/landscape) via the ↻ button or **right-click** context menu. Resolution is swapped (e.g. 1080×1920 when rotated); rotation is saved in saved layouts and reflected in output and the Virtual Layout view.
-- **Right-click context menu** — Right-click any monitor for **Set Bezels**, **Rename**, **Rotate 90°**, and **Delete**. Bezels are optional per-edge borders (in mm) that extend outward from the display area; they help with alignment and matching real bezels, and Align Assist snaps to outer bezel edges when set.
+- **Right-click or kebab menu** — Right-click any monitor, or when a monitor is selected click the **⋮** (kebab) button next to the **✕** delete button, for **Set Bezels**, **Rename**, **Rotate 90°**, and **Delete**. Bezels are optional per-edge borders (in mm) that extend outward from the display area; they help with alignment and matching real bezels, and Align Assist snaps to outer bezel edges when set.
 - **Image placement** — Upload a source image and drag/scale it behind the monitor layout. Semi-transparent monitor overlays let you see exactly what portion of the image each screen will display. Vertical images (height > width) default to 6 ft tall; horizontal ones default to 6 ft wide.
 - **Smart image recommendations** — Calculates the minimum source image resolution needed based on your layout's physical size and the highest-PPI monitor.
 - **Accurate output generation** — Crops and scales the source image per-monitor at each screen's native PPI, then stitches at each monitor's virtual layout position (side-by-side, stacked, or mixed). Fills any gaps in the layout with black.
 - **Preview & download** — Live preview of the final stitched wallpaper with one-click PNG/JPEG export.
 - **Canvas controls** — Scroll to pan, Ctrl+Scroll to zoom (up to 400%), right-click drag to pan. Custom scrollbars, Align Assist guides/snapping, and fit-to-view.
-- **Saved Layouts** — Save and load monitor layouts (names, positions, rotation, bezels, virtual layout). Layouts are stored in your browser (localStorage); you can keep several setups (e.g. desk vs laptop-only) and switch between them. Basic but very useful for multi-setup workflows.
+- **Saved Layouts** — Save and load monitor layouts (names, positions, rotation, bezels, virtual layout). Layouts are stored in your browser (localStorage); you can keep several setups (e.g. desk vs laptop-only) and switch between them. Optional **Quick layouts** (preloaded in code) appear at the top of the Saved Layouts dropdown when configured. The Saved Layouts control sits on the right side of the toolbar, to the left of Share Layout.
 - **Cross-platform** — Works in any modern browser. Output can be applied as a spanned wallpaper on Windows (Span/Tile mode), macOS (per-monitor crop), and Linux (varies by DE — GNOME, KDE, feh, swaybg, etc.).
 
 ## Example
@@ -36,7 +36,7 @@ Dragon image [source](https://unsplash.com/photos/dragon-effigy-breathes-fire-ov
 <img width="1920" height="1039" alt="dragonfire-preview" src="https://github.com/user-attachments/assets/fb335e52-bd18-4b3f-9083-f53ad9e047cc" />
 
 ### Result
-Spanright's output wallpaper (6400x1080) displayed on a 14" 1080p laptop, a 24" 1080p monitor, and 34" 2560x1080 ultrawide monitor. The total resolution of this setup is (1920 + 1920 + 2560) x (1080) = 6400x1080. And the the total aspect ratio of this setup would be (16 + 16 + 21) / (9) = 53:9. The image will only look good when Spanright modifies the image to take account of the physical monitor dimensions and spacing as well. Even though the preview looks disjointed, it actually alignes perfectly when used as the wallpaper.
+Spanright's output wallpaper (6400x1080) displayed on a 14" 1080p laptop, a 24" 1080p monitor, and 34" 2560x1080 ultrawide monitor. The total resolution of this setup is (1920 + 1920 + 2560) x (1080) = 6400x1080. And the total aspect ratio of this setup would be (16 + 16 + 21) / (9) = 53:9. The image will only look good when Spanright modifies the image to take account of the physical monitor dimensions and spacing as well. Even though the preview looks disjointed, it actually aligns perfectly when used as the wallpaper.
 
 Standard 53:9 crop of dragon picture:
 ![dragonfire-lazy-53-9](https://github.com/user-attachments/assets/a4d9ee67-5bb5-4a6d-9987-703bf339b208)
@@ -63,12 +63,13 @@ Drag monitors on the canvas to match your physical desk arrangement:
 
 - Position your laptop screen lower-left, your main monitor centered, etc.
 - The canvas uses physical dimensions — a 27" monitor will appear larger than a 13" laptop
-- **Right-click** a monitor for the context menu: **Set Bezels** (optional per-edge borders in mm for alignment and real-world bezel compensation), **Rename**, **Rotate 90°**, or **Delete**. Bezels extend outward from the display area; Align Assist snaps to outer bezel edges when bezels are set.
+- **Right-click** a monitor, or select it and click the **⋮** kebab next to the **✕**, for the context menu: **Set Bezels**, **Rename**, **Rotate 90°**, or **Delete**. Bezels extend outward from the display area; Align Assist snaps to outer bezel edges when bezels are set.
+- When the **source image** is selected, use the **⋮** kebab (next to **✕**) for **Size image to fit** or **Remove image**.
 - Use **Align Assist** (canvas menu) for dynamic edge/center alignment guides while dragging monitors
 - Use the **↻** (rotate) button on a monitor, or **Rotate 90°** from the right-click menu, to switch between landscape and portrait
 - Click a monitor and press **Delete** (or use the context menu) to remove it
 - Press **F** to fit all monitors in view
-- Use **Saved Layouts** in the toolbar to save or load monitor layouts (e.g. desk vs laptop-only); layouts are stored in your browser and include bezel settings
+- Use **Saved Layouts** (right side of toolbar, left of Share Layout) to save or load monitor layouts; layouts are stored in your browser and include bezel settings. Quick layouts can be preloaded in `src/preloadedLayouts.ts`.
 
 ### 3. Upload & Position Your Image
 
@@ -76,7 +77,7 @@ Drag monitors on the canvas to match your physical desk arrangement:
 - The image appears behind the monitors with 70% opacity
 - **Drag** the image to reposition it
 - **Click** the image and use the corner handles to resize it
-- Use **Size image to fit** (canvas menu) to automatically cover your monitor layout bounding box while preserving aspect ratio (overflow is centered)
+- Use **Size image to fit** from the canvas menu (top-right ⋮) or from the **⋮** kebab on the source image when selected
 - With **Align Assist** enabled, image drag/resize shows green alignment guides against monitor edges/centers
 - Check the **recommended image size** banner in the toolbar — green means your image is large enough, yellow/red means it may appear pixelated
 
@@ -153,7 +154,7 @@ Linux wallpaper handling varies by desktop environment:
 | Zoom | Ctrl + Scroll (up to 400%) |
 | Fit view | Press **F** / click **Fit** button |
 | Select monitor | Click on it |
-| Monitor context menu | **Right-click** monitor → Set Bezels, Rename, Rotate 90°, Delete |
+| Monitor context menu | **Right-click** monitor or select + **⋮** kebab → Set Bezels, Rename, Rotate 90°, Delete |
 | Delete monitor | Select + **Delete** or **Backspace**, or right-click → Delete |
 | Deselect | **Escape** or click empty space |
 
@@ -207,6 +208,10 @@ src/
 ├── types.ts                   # TypeScript interfaces
 ├── utils.ts                   # PPI calculations, coordinate math
 ├── presets.ts                 # Monitor preset definitions
+├── canvasConstants.ts         # Canvas bounds (inches) and center for preloaded layouts
+├── urlLayout.ts               # Encode/decode layout for share URL
+├── preloadedLayouts.ts       # Optional quick-layout presets (centered at canvas center)
+├── icons.tsx                  # Shared SVG icon components
 ├── generateOutput.ts          # Wallpaper stitching logic
 ├── index.css                  # Tailwind imports
 └── components/
@@ -216,9 +221,13 @@ src/
     ├── Toolbar.tsx                 # Top toolbar controls
     ├── PreviewPanel.tsx            # Output preview + download
     ├── ImageUpload.tsx             # File upload component
-    ├── ConfigManager.tsx            # Saved layouts (save/load)
+    ├── ConfigManager.tsx            # Saved layouts + quick layouts (save/load)
+    ├── ShareButton.tsx             # Copy share link to clipboard
     ├── InfoDialog.tsx              # App info / keyboard shortcuts
     └── TroubleshootingGuide.tsx     # Wallpaper troubleshooting
+
+scripts/
+└── center-preloaded-layouts.mjs   # Dev script: center layout strings at canvas center (run when adding preloaded layouts)
 ```
 
 ## Running locally
