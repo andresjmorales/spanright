@@ -13,13 +13,14 @@ Spanright operates in **physical space** (inches/cm), so you arrange monitors as
 - **Physical-space monitor layout** — Arrange monitors on a canvas using real-world dimensions (calculated from diagonal size + resolution). A 27" monitor appears physically larger than a 15.6" laptop, exactly as on your desk.
 - **Drag-and-drop presets** — Choose from 18+ built-in monitor presets (laptops, standard monitors, ultrawides, super ultrawides) and drag them directly onto the canvas.
 - **Custom monitors** — Define any monitor by diagonal size, aspect ratio, and resolution. Supports fully custom resolution entry or filtered presets by aspect ratio. Diagonal is limited to 5"–120"; aspect ratio is limited to 10:1 or less (no ultra-thin "line" monitors). Validation warnings appear when limits are exceeded; Add is disabled until fixed.
-- **Monitor rotation** — Rotate any monitor 90° (portrait/landscape) via the ↻ button on each monitor tile. Resolution is swapped (e.g. 1080×1920 when rotated); rotation is saved in saved layouts and reflected in output and the Virtual Layout view.
+- **Monitor rotation** — Rotate any monitor 90° (portrait/landscape) via the ↻ button or **right-click** context menu. Resolution is swapped (e.g. 1080×1920 when rotated); rotation is saved in saved layouts and reflected in output and the Virtual Layout view.
+- **Right-click context menu** — Right-click any monitor for **Set Bezels**, **Rename**, **Rotate 90°**, and **Delete**. Bezels are optional per-edge borders (in mm) that extend outward from the display area; they help with alignment and matching real bezels, and Align Assist snaps to outer bezel edges when set.
 - **Image placement** — Upload a source image and drag/scale it behind the monitor layout. Semi-transparent monitor overlays let you see exactly what portion of the image each screen will display. Vertical images (height > width) default to 6 ft tall; horizontal ones default to 6 ft wide.
 - **Smart image recommendations** — Calculates the minimum source image resolution needed based on your layout's physical size and the highest-PPI monitor.
 - **Accurate output generation** — Crops and scales the source image per-monitor at each screen's native PPI, then stitches at each monitor's virtual layout position (side-by-side, stacked, or mixed). Fills any gaps in the layout with black.
 - **Preview & download** — Live preview of the final stitched wallpaper with one-click PNG/JPEG export.
-- **Canvas controls** — Scroll to pan, Ctrl+Scroll to zoom (up to 300%), right-click drag to pan. Custom scrollbars, Align Assist guides/snapping, and fit-to-view.
-- **Saved Layouts** — Save and load monitor layouts (names, positions, rotation, virtual layout). Layouts are stored in your browser (localStorage); you can keep several setups (e.g. desk vs laptop-only) and switch between them. Basic but very useful for multi-setup workflows.
+- **Canvas controls** — Scroll to pan, Ctrl+Scroll to zoom (up to 400%), right-click drag to pan. Custom scrollbars, Align Assist guides/snapping, and fit-to-view.
+- **Saved Layouts** — Save and load monitor layouts (names, positions, rotation, bezels, virtual layout). Layouts are stored in your browser (localStorage); you can keep several setups (e.g. desk vs laptop-only) and switch between them. Basic but very useful for multi-setup workflows.
 - **Cross-platform** — Works in any modern browser. Output can be applied as a spanned wallpaper on Windows (Span/Tile mode), macOS (per-monitor crop), and Linux (varies by DE — GNOME, KDE, feh, swaybg, etc.).
 
 ## Example
@@ -61,11 +62,12 @@ Drag monitors on the canvas to match your physical desk arrangement:
 
 - Position your laptop screen lower-left, your main monitor centered, etc.
 - The canvas uses physical dimensions — a 27" monitor will appear larger than a 13" laptop
+- **Right-click** a monitor for the context menu: **Set Bezels** (optional per-edge borders in mm for alignment and real-world bezel compensation), **Rename**, **Rotate 90°**, or **Delete**. Bezels extend outward from the display area; Align Assist snaps to outer bezel edges when bezels are set.
 - Use **Align Assist** (canvas menu) for dynamic edge/center alignment guides while dragging monitors
-- Use the **↻** (rotate) button on a monitor to switch it between landscape and portrait
-- Click a monitor and press **Delete** to remove it
+- Use the **↻** (rotate) button on a monitor, or **Rotate 90°** from the right-click menu, to switch between landscape and portrait
+- Click a monitor and press **Delete** (or use the context menu) to remove it
 - Press **F** to fit all monitors in view
-- Use **Saved Layouts** in the toolbar to save or load monitor layouts (e.g. desk vs laptop-only); layouts are stored in your browser
+- Use **Saved Layouts** in the toolbar to save or load monitor layouts (e.g. desk vs laptop-only); layouts are stored in your browser and include bezel settings
 
 ### 3. Upload & Position Your Image
 
@@ -147,10 +149,11 @@ Linux wallpaper handling varies by desktop environment:
 |--------|---------|
 | Pan | Scroll wheel / Right-click drag |
 | Horizontal pan | Shift + Scroll |
-| Zoom | Ctrl + Scroll (up to 300%) |
+| Zoom | Ctrl + Scroll (up to 400%) |
 | Fit view | Press **F** / click **Fit** button |
 | Select monitor | Click on it |
-| Delete monitor | Select + **Delete** or **Backspace** |
+| Monitor context menu | **Right-click** monitor → Set Bezels, Rename, Rotate 90°, Delete |
+| Delete monitor | Select + **Delete** or **Backspace**, or right-click → Delete |
 | Deselect | **Escape** or click empty space |
 
 ## How It Works
