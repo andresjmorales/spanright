@@ -114,7 +114,7 @@ function WelcomeDialog({ onClose }: { onClose: () => void }) {
               <span className="shrink-0 w-6 h-6 rounded-full bg-blue-600/20 text-blue-400 text-xs font-bold flex items-center justify-center mt-0.5">1</span>
               <div>
                 <div className="text-sm font-medium text-gray-200">Add your monitors</div>
-                <div className="text-xs text-gray-400 mt-0.5">Pick presets from the sidebar or add custom ones. Drag them on the canvas to match your desk layout.</div>
+                <div className="text-xs text-gray-400 mt-0.5">Pick presets from the sidebar or add custom ones. Optionally add bezel widths. Drag them on the canvas to match your desk layout.</div>
               </div>
             </li>
             <li className="flex items-start gap-3">

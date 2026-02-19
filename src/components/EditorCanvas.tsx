@@ -27,6 +27,11 @@ const ZOOM_PCT_MAX = (CANVAS_SCALE_MAX / DEFAULT_CANVAS_SCALE) * 100
 const SMART_ALIGN_THRESHOLD_PX = 8
 const SMART_ALIGN_RESIZE_THRESHOLD_PX = 0.5
 
+/** Bezel overlay appearance (physical layout canvas). */
+const BEZEL_FILL = '#2a2a2e'
+const BEZEL_OPACITY = 0.92
+const BEZEL_STROKE = '#3a3a3e'
+
 interface AlignGuide {
   orientation: 'horizontal' | 'vertical'
   position: number // physical inches
@@ -1016,15 +1021,15 @@ export default function EditorCanvas() {
         {/* Bezel overlay — extends outward from display edges */}
         {hasBezels && (
           <>
-            {bTop > 0 && <Rect x={-bLeft} y={-bTop} width={cw + bLeft + bRight} height={bTop} fill="#2a2a2e" listening={false} />}
-            {bBottom > 0 && <Rect x={-bLeft} y={ch} width={cw + bLeft + bRight} height={bBottom} fill="#2a2a2e" listening={false} />}
-            {bLeft > 0 && <Rect x={-bLeft} y={0} width={bLeft} height={ch} fill="#2a2a2e" listening={false} />}
-            {bRight > 0 && <Rect x={cw} y={0} width={bRight} height={ch} fill="#2a2a2e" listening={false} />}
+            {bTop > 0 && <Rect x={-bLeft} y={-bTop} width={cw + bLeft + bRight} height={bTop} fill={BEZEL_FILL} opacity={BEZEL_OPACITY} listening={false} />}
+            {bBottom > 0 && <Rect x={-bLeft} y={ch} width={cw + bLeft + bRight} height={bBottom} fill={BEZEL_FILL} opacity={BEZEL_OPACITY} listening={false} />}
+            {bLeft > 0 && <Rect x={-bLeft} y={0} width={bLeft} height={ch} fill={BEZEL_FILL} opacity={BEZEL_OPACITY} listening={false} />}
+            {bRight > 0 && <Rect x={cw} y={0} width={bRight} height={ch} fill={BEZEL_FILL} opacity={BEZEL_OPACITY} listening={false} />}
             {/* Outer border of bezel */}
             <Rect
               x={-bLeft} y={-bTop}
               width={cw + bLeft + bRight} height={ch + bTop + bBottom}
-              stroke="#3a3a3e"
+              stroke={BEZEL_STROKE}
               strokeWidth={0.5}
               listening={false}
             />
@@ -1481,7 +1486,7 @@ export default function EditorCanvas() {
  * Right-click context menu on a monitor.
  */
 function MonitorContextMenu({
-  x, y, monitor, onClose, onRename, onRotate, onDelete, onSetBezels,
+  x, y, monitor: _monitor, onClose, onRename, onRotate, onDelete, onSetBezels,
 }: {
   x: number; y: number; monitor: Monitor
   onClose: () => void
@@ -1515,7 +1520,7 @@ function MonitorContextMenu({
       style={{ left: x, top: y }}
     >
       <button onClick={onSetBezels} className={itemClass}>
-        Set Bezels{monitor.bezels ? '...' : '...'}
+        Set Bezels
       </button>
       <button onClick={onRename} className={itemClass}>
         Rename
