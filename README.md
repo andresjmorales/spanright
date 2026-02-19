@@ -1,6 +1,6 @@
 # Spanright — Multi-Monitor Wallpaper Alignment Tool
 
-Spanright is a single-page web app that lets you create pixel-perfect spanning wallpapers for non-standard multi-monitor setups. Most operating systems concatenate monitors by pixel resolution when spanning wallpapers, ignoring physical size differences — Spanright solves this by letting you model your physical desk layout, position a source image across it, and export a stitched wallpaper that looks seamless across all your screens. Works on Windows, macOS, and Linux.
+Spanright is a single-page web app that lets you create pixel-perfect spanning wallpapers for non-standard multi-monitor setups. Most operating systems concatenate monitors by pixel resolution when spanning wallpapers, ignoring physical size differences — Spanright solves this by letting you model your physical desk layout, position a source image across it, and export a stitched wallpaper that looks seamless across all your screens. Works for Windows, macOS, and Linux.
 
 ## The Problem
 
