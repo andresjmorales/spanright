@@ -2,6 +2,17 @@ import React, { createContext, useContext, useReducer, type ReactNode } from 're
 import type { Monitor, SourceImage, MonitorPreset, WindowsMonitorPosition, ActiveTab } from './types'
 import { createMonitor } from './utils'
 
+const MAX_HISTORY = 50
+
+interface UndoableSnapshot {
+  monitors: Monitor[]
+  sourceImage: SourceImage | null
+  windowsArrangement: WindowsMonitorPosition[]
+  useWindowsArrangement: boolean
+  selectedMonitorId: string | null
+  label: string
+}
+
 interface State {
   monitors: Monitor[]
   sourceImage: SourceImage | null
@@ -19,6 +30,10 @@ interface State {
   activeTab: ActiveTab
   showTroubleshootingGuide: boolean
   showHowItWorks: boolean
+  // Undo/redo (internal)
+  _undoStack: UndoableSnapshot[]
+  _redoStack: UndoableSnapshot[]
+  _continuousKey: string | null
 }
 
 type Action =
@@ -34,6 +49,7 @@ type Action =
   | { type: 'ROTATE_SOURCE_IMAGE' }
   | { type: 'MOVE_IMAGE'; x: number; y: number }
   | { type: 'SCALE_IMAGE'; physicalWidth: number; physicalHeight: number }
+  | { type: 'SET_IMAGE_TRANSFORM'; x: number; y: number; physicalWidth: number; physicalHeight: number }
   | { type: 'SET_CANVAS_SCALE'; scale: number }
   | { type: 'PAN_CANVAS'; dx: number; dy: number }
   | { type: 'SET_CANVAS_OFFSET'; x: number; y: number }
@@ -48,6 +64,10 @@ type Action =
   | { type: 'SYNC_WINDOWS_ARRANGEMENT' }
   | { type: 'SET_SHOW_TROUBLESHOOTING_GUIDE'; value: boolean }
   | { type: 'SET_SHOW_HOW_IT_WORKS'; value: boolean }
+  // Composite / undo-redo
+  | { type: 'LOAD_LAYOUT'; monitors: { preset: MonitorPreset; physicalX: number; physicalY: number; rotation?: 0 | 90; displayName?: string }[] }
+  | { type: 'UNDO' }
+  | { type: 'REDO' }
 
 const initialState: State = {
   monitors: [],
@@ -65,6 +85,9 @@ const initialState: State = {
   activeTab: 'physical',
   showTroubleshootingGuide: false,
   showHowItWorks: false,
+  _undoStack: [],
+  _redoStack: [],
+  _continuousKey: null,
 }
 
 /** Strip width in pixels for output (depends on rotation). */
@@ -191,6 +214,30 @@ function reducer(state: State, action: Action): State {
             },
           }
         : state
+    case 'SET_IMAGE_TRANSFORM':
+      return state.sourceImage
+        ? {
+            ...state,
+            sourceImage: {
+              ...state.sourceImage,
+              physicalX: action.x,
+              physicalY: action.y,
+              physicalWidth: action.physicalWidth,
+              physicalHeight: action.physicalHeight,
+            },
+          }
+        : state
+    case 'LOAD_LAYOUT': {
+      const monitors = action.monitors.map(m =>
+        createMonitor(m.preset, m.physicalX, m.physicalY, m.rotation ?? 0, m.displayName)
+      )
+      return {
+        ...state,
+        monitors,
+        selectedMonitorId: null,
+        windowsArrangement: generateDefaultWindowsArrangement(monitors),
+      }
+    }
     case 'SET_CANVAS_SCALE':
       return { ...state, canvasScale: Math.max(7.5, Math.min(30, action.scale)) }
     case 'PAN_CANVAS':
@@ -246,15 +293,130 @@ function reducer(state: State, action: Action): State {
   }
 }
 
+// --- Undo/redo machinery ---
+
+const DISCRETE_UNDOABLE: Record<string, string> = {
+  'ADD_MONITOR': 'Add monitor',
+  'REMOVE_MONITOR': 'Remove monitor',
+  'ROTATE_MONITOR': 'Rotate monitor',
+  'CLEAR_ALL_MONITORS': 'Clear all monitors',
+  'SET_SOURCE_IMAGE': 'Load image',
+  'CLEAR_SOURCE_IMAGE': 'Remove image',
+  'SET_MONITOR_DISPLAY_NAME': 'Rename monitor',
+  'LOAD_LAYOUT': 'Load layout',
+  'SET_IMAGE_TRANSFORM': 'Resize image',
+}
+
+const CONTINUOUS_UNDOABLE: Record<string, string> = {
+  'MOVE_MONITOR': 'Move monitor',
+  'MOVE_IMAGE': 'Move image',
+  'SCALE_IMAGE': 'Resize image',
+}
+
+function getContinuousKey(action: Action): string {
+  if (action.type === 'MOVE_MONITOR') return `MOVE_MONITOR:${action.id}`
+  return action.type
+}
+
+function takeSnapshot(state: State, label: string): UndoableSnapshot {
+  return {
+    monitors: state.monitors,
+    sourceImage: state.sourceImage,
+    windowsArrangement: state.windowsArrangement,
+    useWindowsArrangement: state.useWindowsArrangement,
+    selectedMonitorId: state.selectedMonitorId,
+    label,
+  }
+}
+
+function restoreSnapshot(state: State, snapshot: UndoableSnapshot): State {
+  return {
+    ...state,
+    monitors: snapshot.monitors,
+    sourceImage: snapshot.sourceImage,
+    windowsArrangement: snapshot.windowsArrangement,
+    useWindowsArrangement: snapshot.useWindowsArrangement,
+    selectedMonitorId: snapshot.selectedMonitorId,
+  }
+}
+
+function undoableReducer(state: State, action: Action): State {
+  if (action.type === 'UNDO') {
+    if (state._undoStack.length === 0) return state
+    const snapshot = state._undoStack[state._undoStack.length - 1]
+    const currentSnapshot = takeSnapshot(state, snapshot.label)
+    return {
+      ...restoreSnapshot(state, snapshot),
+      _undoStack: state._undoStack.slice(0, -1),
+      _redoStack: [...state._redoStack, currentSnapshot],
+      _continuousKey: null,
+    }
+  }
+
+  if (action.type === 'REDO') {
+    if (state._redoStack.length === 0) return state
+    const snapshot = state._redoStack[state._redoStack.length - 1]
+    const currentSnapshot = takeSnapshot(state, snapshot.label)
+    return {
+      ...restoreSnapshot(state, snapshot),
+      _undoStack: [...state._undoStack, currentSnapshot],
+      _redoStack: state._redoStack.slice(0, -1),
+      _continuousKey: null,
+    }
+  }
+
+  let newUndoStack = state._undoStack
+  let newRedoStack = state._redoStack
+  let newContinuousKey = state._continuousKey
+
+  const discreteLabel = DISCRETE_UNDOABLE[action.type]
+  const continuousLabel = CONTINUOUS_UNDOABLE[action.type]
+
+  if (discreteLabel) {
+    const snapshot = takeSnapshot(state, discreteLabel)
+    newUndoStack = [...state._undoStack, snapshot].slice(-MAX_HISTORY)
+    newRedoStack = []
+    newContinuousKey = null
+  } else if (continuousLabel) {
+    const key = getContinuousKey(action)
+    if (key !== state._continuousKey) {
+      const snapshot = takeSnapshot(state, continuousLabel)
+      newUndoStack = [...state._undoStack, snapshot].slice(-MAX_HISTORY)
+      newRedoStack = []
+      newContinuousKey = key
+    }
+  } else {
+    newContinuousKey = null
+  }
+
+  const newState = reducer(state, action)
+
+  return {
+    ...newState,
+    _undoStack: newUndoStack,
+    _redoStack: newRedoStack,
+    _continuousKey: newContinuousKey,
+  }
+}
+
 const StoreContext = createContext<{
   state: State
   dispatch: React.Dispatch<Action>
+  canUndo: boolean
+  canRedo: boolean
+  undoLabel: string | null
+  redoLabel: string | null
 } | null>(null)
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, initialState)
+  const [state, dispatch] = useReducer(undoableReducer, initialState)
+  const canUndo = state._undoStack.length > 0
+  const canRedo = state._redoStack.length > 0
+  const undoLabel = canUndo ? state._undoStack[state._undoStack.length - 1].label : null
+  const redoLabel = canRedo ? state._redoStack[state._redoStack.length - 1].label : null
+
   return (
-    <StoreContext.Provider value={{ state, dispatch }}>
+    <StoreContext.Provider value={{ state, dispatch, canUndo, canRedo, undoLabel, redoLabel }}>
       {children}
     </StoreContext.Provider>
   )
