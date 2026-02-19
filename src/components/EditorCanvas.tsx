@@ -323,7 +323,7 @@ function RulerOverlay({
 }
 
 export default function EditorCanvas() {
-  const { state, dispatch } = useStore()
+  const { state, dispatch, canUndo, canRedo, undoLabel, redoLabel } = useStore()
   const toast = useToast()
   const containerRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<Konva.Stage>(null)
@@ -370,6 +370,26 @@ export default function EditorCanvas() {
         (target as HTMLElement).isContentEditable
       )
       if (isEditable) return
+
+      // Undo: Ctrl+Z
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+        e.preventDefault()
+        if (canUndo) {
+          toast(`Undo: ${undoLabel}`)
+          dispatch({ type: 'UNDO' })
+        }
+        return
+      }
+      // Redo: Ctrl+Shift+Z or Ctrl+Y
+      if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') ||
+          ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y')) {
+        e.preventDefault()
+        if (canRedo) {
+          toast(`Redo: ${redoLabel}`)
+          dispatch({ type: 'REDO' })
+        }
+        return
+      }
 
       // Delete selected monitor
       if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedMonitorId && !imageSelected) {
@@ -453,8 +473,7 @@ export default function EditorCanvas() {
     const nextY = bbox.minY + (bbox.height - nextHeight) / 2
 
     setActiveGuides([])
-    dispatch({ type: 'MOVE_IMAGE', x: nextX, y: nextY })
-    dispatch({ type: 'SCALE_IMAGE', physicalWidth: nextWidth, physicalHeight: nextHeight })
+    dispatch({ type: 'SET_IMAGE_TRANSFORM', x: nextX, y: nextY, physicalWidth: nextWidth, physicalHeight: nextHeight })
     toast.success('Image sized to fit layout')
   }, [state.sourceImage, state.monitors, dispatch, toast])
 
@@ -837,8 +856,7 @@ export default function EditorCanvas() {
     node.scaleY(1)
     node.position({ x: 0, y: 0 })
 
-    dispatch({ type: 'MOVE_IMAGE', x: newPhysX, y: newPhysY })
-    dispatch({ type: 'SCALE_IMAGE', physicalWidth: newPhysW, physicalHeight: newPhysH })
+    dispatch({ type: 'SET_IMAGE_TRANSFORM', x: newPhysX, y: newPhysY, physicalWidth: newPhysW, physicalHeight: newPhysH })
   }, [dispatch, scale, toPhysicalX, toPhysicalY, state.sourceImage])
 
   // Render source image (wrapped in Group with delete button so they move together)
@@ -1244,15 +1262,49 @@ export default function EditorCanvas() {
         unit={state.unit}
       />
 
-      {/* Canvas menu (top-right) */}
-      <CanvasMenu
-        hasMonitors={state.monitors.length > 0}
-        hasImage={!!state.sourceImage}
-        smartAlign={state.smartAlign}
-        canSizeImageToFit={state.monitors.length > 0 && !!state.sourceImage}
-        onSizeImageToFit={handleSizeImageToFit}
-        dispatch={dispatch}
-      />
+      {/* Undo/Redo + Canvas menu (top-right) */}
+      <div className="absolute top-8 right-3 flex items-center gap-1.5 select-none z-10">
+        <button
+          onClick={() => {
+            if (canUndo) {
+              toast(`Undo: ${undoLabel}`)
+              dispatch({ type: 'UNDO' })
+            }
+          }}
+          disabled={!canUndo}
+          className="bg-gray-900/80 backdrop-blur hover:bg-gray-800/90 text-gray-400 hover:text-gray-200 disabled:text-gray-600 disabled:hover:bg-gray-900/80 p-1.5 rounded transition-colors"
+          title={canUndo ? `Undo: ${undoLabel} (Ctrl+Z)` : 'Nothing to undo'}
+        >
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 10h10a5 5 0 0 1 0 10H9" />
+            <polyline points="7 14 3 10 7 6" />
+          </svg>
+        </button>
+        <button
+          onClick={() => {
+            if (canRedo) {
+              toast(`Redo: ${redoLabel}`)
+              dispatch({ type: 'REDO' })
+            }
+          }}
+          disabled={!canRedo}
+          className="bg-gray-900/80 backdrop-blur hover:bg-gray-800/90 text-gray-400 hover:text-gray-200 disabled:text-gray-600 disabled:hover:bg-gray-900/80 p-1.5 rounded transition-colors"
+          title={canRedo ? `Redo: ${redoLabel} (Ctrl+Shift+Z)` : 'Nothing to redo'}
+        >
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 10H11a5 5 0 0 0 0 10h4" />
+            <polyline points="17 14 21 10 17 6" />
+          </svg>
+        </button>
+        <CanvasMenuInner
+          hasMonitors={state.monitors.length > 0}
+          hasImage={!!state.sourceImage}
+          smartAlign={state.smartAlign}
+          canSizeImageToFit={state.monitors.length > 0 && !!state.sourceImage}
+          onSizeImageToFit={handleSizeImageToFit}
+          dispatch={dispatch}
+        />
+      </div>
 
       {/* Custom scrollbars */}
       <CanvasScrollbars
@@ -1333,7 +1385,7 @@ export default function EditorCanvas() {
 /**
  * Dropdown menu in the top-right corner of the canvas.
  */
-function CanvasMenu({
+function CanvasMenuInner({
   hasMonitors,
   hasImage,
   smartAlign,
@@ -1375,7 +1427,7 @@ function CanvasMenu({
   }, [open])
 
   return (
-    <div ref={menuRef} className="absolute top-8 right-3 select-none z-10">
+    <div ref={menuRef} className="relative">
       <button
         onClick={() => setOpen(o => !o)}
         className="bg-gray-900/80 backdrop-blur hover:bg-gray-800/90 text-gray-400 hover:text-gray-200 px-2 py-1.5 rounded transition-colors"

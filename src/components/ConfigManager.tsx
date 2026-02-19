@@ -79,10 +79,7 @@ export default function ConfigManager() {
   }
 
   const handleLoad = (config: SavedConfig) => {
-    dispatch({ type: 'CLEAR_ALL_MONITORS' })
-    for (const m of config.monitors) {
-      dispatch({ type: 'ADD_MONITOR', preset: m.preset, x: m.physicalX, y: m.physicalY, rotation: m.rotation ?? 0, displayName: m.displayName })
-    }
+    dispatch({ type: 'LOAD_LAYOUT', monitors: config.monitors })
     toast.success(`Layout loaded: ${config.name}`)
     setOpen(false)
   }
