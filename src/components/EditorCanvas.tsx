@@ -2,9 +2,9 @@ import React, { useRef, useEffect, useCallback, useState, useMemo, type Dispatch
 import { Stage, Layer, Rect, Text, Group, Image as KonvaImage, Line, Transformer } from 'react-konva'
 import type Konva from 'konva'
 import { useStore } from '../store'
-import { formatDimension, getMonitorsBoundingBox, getMonitorDisplayName } from '../utils'
+import { formatDimension, getMonitorsBoundingBox, getMonitorDisplayName, getBezelInches } from '../utils'
 import { useToast } from './Toast'
-import type { Monitor, SourceImage } from '../types'
+import type { Monitor, SourceImage, Bezels } from '../types'
 
 const MONITOR_COLORS = [
   '#3b82f6', // blue
@@ -339,6 +339,9 @@ export default function EditorCanvas() {
   const [renameMonitorId, setRenameMonitorId] = useState<string | null>(null)
   const [renameInputValue, setRenameInputValue] = useState('')
   const [activeGuides, setActiveGuides] = useState<AlignGuide[]>([])
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; monitorId: string } | null>(null)
+  const [bezelEditorMonitorId, setBezelEditorMonitorId] = useState<string | null>(null)
+  const contextMenuHandledRef = useRef(false)
   const smartAlignSnappedRef = useRef({ x: false, y: false })
   // Refs for values used in hot-path event handlers (avoids callback recreation)
   const canvasStateRef = useRef({ scale: 10, offsetX: 50, offsetY: 50, dimW: 800, dimH: 500 })
@@ -587,9 +590,14 @@ export default function EditorCanvas() {
     lastPointerPos.current = null
   }, [])
 
-  // Prevent context menu on canvas
+  // Context menu on canvas — suppress native; Konva monitors set their own handler
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
+    if (contextMenuHandledRef.current) {
+      contextMenuHandledRef.current = false
+      return
+    }
+    setContextMenu(null)
   }, [])
 
   // Drop on canvas — handles both image files and monitor presets
@@ -741,14 +749,19 @@ export default function EditorCanvas() {
 
     const targets: AlignRect[] = state.monitors
       .filter(m => m.id !== monitor.id)
-      .map(m => ({ x: m.physicalX, y: m.physicalY, w: m.physicalWidth, h: m.physicalHeight, source: 'monitor' as const }))
+      .map(m => {
+        const b = getBezelInches(m)
+        return { x: m.physicalX - b.left, y: m.physicalY - b.top, w: m.physicalWidth + b.left + b.right, h: m.physicalHeight + b.top + b.bottom, source: 'monitor' as const }
+      })
     if (state.sourceImage) {
       const img = state.sourceImage
       targets.push({ x: img.physicalX, y: img.physicalY, w: img.physicalWidth, h: img.physicalHeight, source: 'image' })
     }
 
+    const db = getBezelInches(monitor)
     const { snapDeltaX, snapDeltaY, guides } = computeAlignmentGuides(
-      physX, physY, monitor.physicalWidth, monitor.physicalHeight,
+      physX - db.left, physY - db.top,
+      monitor.physicalWidth + db.left + db.right, monitor.physicalHeight + db.top + db.bottom,
       targets, threshold,
     )
 
@@ -793,10 +806,14 @@ export default function EditorCanvas() {
     const physY = centerPhysY - state.sourceImage.physicalHeight / 2
     const threshold = SMART_ALIGN_THRESHOLD_PX / scale
 
-    const targets: AlignRect[] = state.monitors.map(m => ({
-      x: m.physicalX, y: m.physicalY, w: m.physicalWidth, h: m.physicalHeight,
-      source: 'image' as const,
-    }))
+    const targets: AlignRect[] = state.monitors.map(m => {
+      const b = getBezelInches(m)
+      return {
+        x: m.physicalX - b.left, y: m.physicalY - b.top,
+        w: m.physicalWidth + b.left + b.right, h: m.physicalHeight + b.top + b.bottom,
+        source: 'image' as const,
+      }
+    })
 
     const { snapDeltaX, snapDeltaY, guides } = computeAlignmentGuides(
       physX, physY, state.sourceImage.physicalWidth, state.sourceImage.physicalHeight,
@@ -904,10 +921,14 @@ export default function EditorCanvas() {
             const physH = absBox.height / scale
             const threshold = SMART_ALIGN_RESIZE_THRESHOLD_PX / scale
 
-            const targets: AlignRect[] = state.monitors.map(m => ({
-              x: m.physicalX, y: m.physicalY, w: m.physicalWidth, h: m.physicalHeight,
-              source: 'image' as const,
-            }))
+            const targets: AlignRect[] = state.monitors.map(m => {
+              const b = getBezelInches(m)
+              return {
+                x: m.physicalX - b.left, y: m.physicalY - b.top,
+                w: m.physicalWidth + b.left + b.right, h: m.physicalHeight + b.top + b.bottom,
+                source: 'image' as const,
+              }
+            })
 
             const { guides } = computeAlignmentGuides(
               physX, physY, physW, physH, targets, threshold,
@@ -951,6 +972,13 @@ export default function EditorCanvas() {
     const isSelected = state.selectedMonitorId === monitor.id
     const color = getMonitorColor(index)
 
+    const bInches = getBezelInches(monitor)
+    const bTop = bInches.top * scale
+    const bBottom = bInches.bottom * scale
+    const bLeft = bInches.left * scale
+    const bRight = bInches.right * scale
+    const hasBezels = bTop > 0 || bBottom > 0 || bLeft > 0 || bRight > 0
+
     return (
       <Group
         key={monitor.id}
@@ -962,12 +990,45 @@ export default function EditorCanvas() {
         onClick={() => {
           dispatch({ type: 'SELECT_MONITOR', id: monitor.id })
           setImageSelected(false)
+          setContextMenu(null)
         }}
         onTap={() => {
           dispatch({ type: 'SELECT_MONITOR', id: monitor.id })
           setImageSelected(false)
+          setContextMenu(null)
+        }}
+        onContextMenu={(e) => {
+          e.evt.preventDefault()
+          contextMenuHandledRef.current = true
+          const stage = stageRef.current
+          if (!stage) return
+          const container = stage.container().getBoundingClientRect()
+          setContextMenu({
+            x: e.evt.clientX - container.left,
+            y: e.evt.clientY - container.top,
+            monitorId: monitor.id,
+          })
+          dispatch({ type: 'SELECT_MONITOR', id: monitor.id })
+          setImageSelected(false)
         }}
       >
+        {/* Bezel overlay — extends outward from display edges */}
+        {hasBezels && (
+          <>
+            {bTop > 0 && <Rect x={-bLeft} y={-bTop} width={cw + bLeft + bRight} height={bTop} fill="#2a2a2e" listening={false} />}
+            {bBottom > 0 && <Rect x={-bLeft} y={ch} width={cw + bLeft + bRight} height={bBottom} fill="#2a2a2e" listening={false} />}
+            {bLeft > 0 && <Rect x={-bLeft} y={0} width={bLeft} height={ch} fill="#2a2a2e" listening={false} />}
+            {bRight > 0 && <Rect x={cw} y={0} width={bRight} height={ch} fill="#2a2a2e" listening={false} />}
+            {/* Outer border of bezel */}
+            <Rect
+              x={-bLeft} y={-bTop}
+              width={cw + bLeft + bRight} height={ch + bTop + bBottom}
+              stroke="#3a3a3e"
+              strokeWidth={0.5}
+              listening={false}
+            />
+          </>
+        )}
         {/* Monitor fill - semi-transparent to see image behind */}
         <Rect
           width={cw}
@@ -1064,26 +1125,6 @@ export default function EditorCanvas() {
           >
             <Rect width={18} height={18} fill="#ef4444" cornerRadius={3} />
             <Text x={4} y={1} text="✕" fontSize={12} fill="#ffffff" />
-          </Group>
-        )}
-        {/* Pencil icon — rename (when selected), left of rotate */}
-        {isSelected && (
-          <Group
-            x={cw - 42}
-            y={ch - 22}
-            onClick={(e) => {
-              e.cancelBubble = true
-              setRenameMonitorId(monitor.id)
-              setRenameInputValue(getMonitorDisplayName(monitor))
-            }}
-            onTap={(e) => {
-              e.cancelBubble = true
-              setRenameMonitorId(monitor.id)
-              setRenameInputValue(getMonitorDisplayName(monitor))
-            }}
-          >
-            <Rect width={16} height={16} fill="#64748b" cornerRadius={2} />
-            <Text x={2} y={1} text="✎" fontSize={11} fill="#e2e8f0" />
           </Group>
         )}
         {/* Rotate 90° button — bottom-right */}
@@ -1252,6 +1293,59 @@ export default function EditorCanvas() {
         </div>
       )}
 
+      {/* Monitor context menu */}
+      {contextMenu && (() => {
+        const mon = state.monitors.find(m => m.id === contextMenu.monitorId)
+        if (!mon) return null
+        return (
+          <MonitorContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            monitor={mon}
+            onClose={() => setContextMenu(null)}
+            onRename={() => {
+              setRenameMonitorId(mon.id)
+              setRenameInputValue(getMonitorDisplayName(mon))
+              setContextMenu(null)
+            }}
+            onRotate={() => {
+              const newRotation = (mon.rotation ?? 0) === 90 ? 'landscape' : 'portrait'
+              dispatch({ type: 'ROTATE_MONITOR', id: mon.id })
+              toast(`Monitor rotated to ${newRotation}`)
+              setContextMenu(null)
+            }}
+            onDelete={() => {
+              dispatch({ type: 'REMOVE_MONITOR', id: mon.id })
+              toast('Monitor removed')
+              setContextMenu(null)
+            }}
+            onSetBezels={() => {
+              setBezelEditorMonitorId(mon.id)
+              setContextMenu(null)
+            }}
+          />
+        )
+      })()}
+
+      {/* Bezel editor popover */}
+      {bezelEditorMonitorId && (() => {
+        const mon = state.monitors.find(m => m.id === bezelEditorMonitorId)
+        if (!mon) return null
+        return (
+          <BezelEditorPopover
+            monitor={mon}
+            canvasScale={scale}
+            offsetX={offsetX}
+            offsetY={offsetY}
+            onClose={() => setBezelEditorMonitorId(null)}
+            onChange={(bezels) => {
+              const hasAny = bezels.top > 0 || bezels.bottom > 0 || bezels.left > 0 || bezels.right > 0
+              dispatch({ type: 'SET_MONITOR_BEZELS', id: mon.id, bezels: hasAny ? bezels : undefined })
+            }}
+          />
+        )
+      })()}
+
       {/* Rulers */}
       <RulerOverlay
         width={dimensions.width}
@@ -1378,6 +1472,262 @@ export default function EditorCanvas() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * Right-click context menu on a monitor.
+ */
+function MonitorContextMenu({
+  x, y, monitor, onClose, onRename, onRotate, onDelete, onSetBezels,
+}: {
+  x: number; y: number; monitor: Monitor
+  onClose: () => void
+  onRename: () => void
+  onRotate: () => void
+  onDelete: () => void
+  onSetBezels: () => void
+}) {
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose()
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [onClose])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  const itemClass = 'w-full text-left px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-800 hover:text-white transition-colors'
+
+  return (
+    <div
+      ref={menuRef}
+      className="absolute z-50 w-44 bg-gray-900 border border-gray-700 rounded-lg shadow-xl overflow-hidden"
+      style={{ left: x, top: y }}
+    >
+      <button onClick={onSetBezels} className={itemClass}>
+        Set Bezels{monitor.bezels ? '...' : '...'}
+      </button>
+      <button onClick={onRename} className={itemClass}>
+        Rename
+      </button>
+      <button onClick={onRotate} className={itemClass}>
+        Rotate 90°
+      </button>
+      <div className="border-t border-gray-700" />
+      <button onClick={onDelete} className={`${itemClass} text-red-400 hover:text-red-300`}>
+        Delete
+      </button>
+    </div>
+  )
+}
+
+const BEZEL_PRESETS: { label: string; bezels: Bezels }[] = [
+  { label: 'None', bezels: { top: 0, bottom: 0, left: 0, right: 0 } },
+  { label: 'Thin (5 mm)', bezels: { top: 5, bottom: 5, left: 5, right: 5 } },
+  { label: 'Standard (8 mm)', bezels: { top: 8, bottom: 8, left: 8, right: 8 } },
+  { label: 'Thick (12 mm)', bezels: { top: 12, bottom: 12, left: 12, right: 12 } },
+  { label: 'Laptop-style', bezels: { top: 8, bottom: 18, left: 5, right: 5 } },
+  { label: 'TV-style', bezels: { top: 15, bottom: 25, left: 15, right: 15 } },
+]
+
+/**
+ * Popover for editing a monitor's bezel values.
+ */
+function BezelEditorPopover({
+  monitor, canvasScale, offsetX, offsetY, onClose, onChange,
+}: {
+  monitor: Monitor
+  canvasScale: number
+  offsetX: number
+  offsetY: number
+  onClose: () => void
+  onChange: (bezels: Bezels) => void
+}) {
+  const [symmetric, setSymmetric] = useState(() => {
+    const b = monitor.bezels
+    if (!b) return true
+    return b.top === b.bottom && b.left === b.right && b.top === b.left
+  })
+  const [top, setTop] = useState(monitor.bezels?.top ?? 0)
+  const [bottom, setBottom] = useState(monitor.bezels?.bottom ?? 0)
+  const [left, setLeft] = useState(monitor.bezels?.left ?? 0)
+  const [right, setRight] = useState(monitor.bezels?.right ?? 0)
+
+  const popoverRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) onClose()
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [onClose])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  const apply = (t: number, b: number, l: number, r: number) => {
+    setTop(t); setBottom(b); setLeft(l); setRight(r)
+    onChange({ top: t, bottom: b, left: l, right: r })
+  }
+
+  const handleChange = (edge: 'top' | 'bottom' | 'left' | 'right', val: number) => {
+    const v = Math.max(0, Math.min(30, val))
+    if (symmetric) {
+      apply(v, v, v, v)
+    } else {
+      const newVals = { top, bottom, left, right, [edge]: v }
+      apply(newVals.top, newVals.bottom, newVals.left, newVals.right)
+    }
+  }
+
+  const handlePreset = (bezels: Bezels) => {
+    apply(bezels.top, bezels.bottom, bezels.left, bezels.right)
+    const allSame = bezels.top === bezels.bottom && bezels.left === bezels.right && bezels.top === bezels.left
+    setSymmetric(allSame)
+  }
+
+  const handleSymmetricToggle = () => {
+    const next = !symmetric
+    setSymmetric(next)
+    if (next) {
+      const avg = Math.round(Math.max(top, bottom, left, right))
+      apply(avg, avg, avg, avg)
+    }
+  }
+
+  const cx = monitor.physicalX * canvasScale + offsetX + (monitor.physicalWidth * canvasScale) / 2
+  const cy = monitor.physicalY * canvasScale + offsetY + (monitor.physicalHeight * canvasScale) / 2
+  const popoverLeft = Math.max(8, Math.min(cx - 128, window.innerWidth - 280))
+  const popoverTop = Math.max(8, cy + (monitor.physicalHeight * canvasScale) / 2 + 8)
+
+  const inputClass = 'w-14 bg-gray-800 border border-gray-600 rounded px-1.5 py-1 text-xs text-gray-100 text-center focus:outline-none focus:border-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none'
+
+  return (
+    <div
+      ref={popoverRef}
+      className="absolute z-50 w-64 bg-gray-900 border border-gray-700 rounded-lg shadow-xl p-3"
+      style={{ left: popoverLeft, top: popoverTop }}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs font-medium text-gray-200">Set Bezels</span>
+        <button onClick={onClose} className="text-gray-500 hover:text-gray-300 transition-colors text-sm">✕</button>
+      </div>
+
+      {/* Preset dropdown */}
+      <div className="mb-3">
+        <select
+          value=""
+          onChange={(e) => {
+            const preset = BEZEL_PRESETS.find(p => p.label === e.target.value)
+            if (preset) handlePreset(preset.bezels)
+          }}
+          className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-300 focus:outline-none focus:border-blue-500"
+        >
+          <option value="" disabled>Presets</option>
+          {BEZEL_PRESETS.map(p => (
+            <option key={p.label} value={p.label}>{p.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Symmetric toggle */}
+      <label className="flex items-center gap-2 mb-3 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={symmetric}
+          onChange={handleSymmetricToggle}
+          className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+        />
+        <span className="text-xs text-gray-300">Symmetric</span>
+      </label>
+
+      {/* Bezel inputs — arranged like a monitor outline */}
+      <div className="flex flex-col items-center gap-1.5">
+        {/* Top */}
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] text-gray-500 w-9 text-right">Top</span>
+          <input
+            type="number"
+            min={0} max={30} step={1}
+            value={top}
+            onChange={(e) => handleChange('top', Number(e.target.value))}
+            className={inputClass}
+          />
+          <span className="text-[10px] text-gray-500">mm</span>
+        </div>
+        {/* Left / Right row */}
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-gray-500 w-9 text-right">Left</span>
+            <input
+              type="number"
+              min={0} max={30} step={1}
+              value={left}
+              onChange={(e) => handleChange('left', Number(e.target.value))}
+              className={inputClass}
+              disabled={symmetric}
+            />
+          </div>
+          <div className="w-6 h-6 border border-gray-600 rounded-sm flex items-center justify-center">
+            <div className="w-3 h-2 bg-gray-600 rounded-[1px]" />
+          </div>
+          <div className="flex items-center gap-1">
+            <input
+              type="number"
+              min={0} max={30} step={1}
+              value={right}
+              onChange={(e) => handleChange('right', Number(e.target.value))}
+              className={inputClass}
+              disabled={symmetric}
+            />
+            <span className="text-[10px] text-gray-500">R</span>
+          </div>
+        </div>
+        {/* Bottom */}
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] text-gray-500 w-9 text-right">Btm</span>
+          <input
+            type="number"
+            min={0} max={30} step={1}
+            value={bottom}
+            onChange={(e) => handleChange('bottom', Number(e.target.value))}
+            className={inputClass}
+            disabled={symmetric}
+          />
+          <span className="text-[10px] text-gray-500">mm</span>
+        </div>
+      </div>
+
+      {/* Footer buttons */}
+      <div className="flex items-center justify-end gap-2 mt-3 pt-2 border-t border-gray-700">
+        <button
+          onClick={() => { apply(0, 0, 0, 0); onClose() }}
+          className="px-3 py-1.5 text-xs text-gray-400 hover:text-gray-200 rounded hover:bg-gray-800 transition-colors"
+        >
+          Clear
+        </button>
+        <button
+          onClick={onClose}
+          className="px-2.5 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors flex items-center justify-center"
+        >
+          <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="3 8 7 12 13 4" />
+          </svg>
+        </button>
+      </div>
     </div>
   )
 }

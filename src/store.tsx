@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, type ReactNode } from 'react'
-import type { Monitor, SourceImage, MonitorPreset, WindowsMonitorPosition, ActiveTab } from './types'
+import type { Monitor, SourceImage, MonitorPreset, WindowsMonitorPosition, ActiveTab, Bezels } from './types'
 import { createMonitor } from './utils'
 
 const MAX_HISTORY = 50
@@ -40,6 +40,7 @@ type Action =
   | { type: 'ADD_MONITOR'; preset: MonitorPreset; x: number; y: number; rotation?: 0 | 90; displayName?: string }
   | { type: 'REMOVE_MONITOR'; id: string }
   | { type: 'SET_MONITOR_DISPLAY_NAME'; id: string; displayName: string }
+  | { type: 'SET_MONITOR_BEZELS'; id: string; bezels: Bezels | undefined }
   | { type: 'ROTATE_MONITOR'; id: string }
   | { type: 'CLEAR_ALL_MONITORS' }
   | { type: 'MOVE_MONITOR'; id: string; x: number; y: number }
@@ -65,7 +66,7 @@ type Action =
   | { type: 'SET_SHOW_TROUBLESHOOTING_GUIDE'; value: boolean }
   | { type: 'SET_SHOW_HOW_IT_WORKS'; value: boolean }
   // Composite / undo-redo
-  | { type: 'LOAD_LAYOUT'; monitors: { preset: MonitorPreset; physicalX: number; physicalY: number; rotation?: 0 | 90; displayName?: string }[] }
+  | { type: 'LOAD_LAYOUT'; monitors: { preset: MonitorPreset; physicalX: number; physicalY: number; rotation?: 0 | 90; displayName?: string; bezels?: Bezels }[] }
   | { type: 'UNDO' }
   | { type: 'REDO' }
 
@@ -132,6 +133,14 @@ function reducer(state: State, action: Action): State {
         ...state,
         monitors: state.monitors.map(m =>
           m.id === action.id ? { ...m, displayName: name || undefined } : m
+        ),
+      }
+    }
+    case 'SET_MONITOR_BEZELS': {
+      return {
+        ...state,
+        monitors: state.monitors.map(m =>
+          m.id === action.id ? { ...m, bezels: action.bezels } : m
         ),
       }
     }
@@ -229,7 +238,7 @@ function reducer(state: State, action: Action): State {
         : state
     case 'LOAD_LAYOUT': {
       const monitors = action.monitors.map(m =>
-        createMonitor(m.preset, m.physicalX, m.physicalY, m.rotation ?? 0, m.displayName)
+        createMonitor(m.preset, m.physicalX, m.physicalY, m.rotation ?? 0, m.displayName, m.bezels)
       )
       return {
         ...state,
@@ -303,6 +312,7 @@ const DISCRETE_UNDOABLE: Record<string, string> = {
   'SET_SOURCE_IMAGE': 'Load image',
   'CLEAR_SOURCE_IMAGE': 'Remove image',
   'SET_MONITOR_DISPLAY_NAME': 'Rename monitor',
+  'SET_MONITOR_BEZELS': 'Set bezels',
   'LOAD_LAYOUT': 'Load layout',
   'SET_IMAGE_TRANSFORM': 'Resize image',
 }
