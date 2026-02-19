@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback, useState, useMemo, type Dispatch } from 'react'
 import { Stage, Layer, Rect, Text, Group, Image as KonvaImage, Line, Transformer } from 'react-konva'
 import type Konva from 'konva'
-import { useStore } from '../store'
+import { useStore, CANVAS_SCALE_MIN, CANVAS_SCALE_MAX, DEFAULT_CANVAS_SCALE } from '../store'
 import { formatDimension, getMonitorsBoundingBox, getMonitorDisplayName, getBezelInches } from '../utils'
 import { useToast } from './Toast'
 import type { Monitor, SourceImage, Bezels } from '../types'
@@ -22,7 +22,8 @@ function getMonitorColor(index: number): string {
 }
 
 const RULER_SIZE = 24
-const DEFAULT_SCALE = 10
+/** Max zoom percentage (derived from scale constants in store). */
+const ZOOM_PCT_MAX = (CANVAS_SCALE_MAX / DEFAULT_CANVAS_SCALE) * 100
 const SMART_ALIGN_THRESHOLD_PX = 8
 const SMART_ALIGN_RESIZE_THRESHOLD_PX = 0.5
 
@@ -439,7 +440,7 @@ export default function EditorCanvas() {
     const availH = dimensions.height - padding * 2
     const scaleX = availW / bbox.width
     const scaleY = availH / bbox.height
-    const newScale = Math.max(7.5, Math.min(30, Math.min(scaleX, scaleY)))
+    const newScale = Math.max(CANVAS_SCALE_MIN, Math.min(CANVAS_SCALE_MAX, Math.min(scaleX, scaleY)))
     const newOffsetX = padding - bbox.minX * newScale + (availW - bbox.width * newScale) / 2
     const newOffsetY = padding - bbox.minY * newScale + (availH - bbox.height * newScale) / 2
     dispatch({ type: 'SET_CANVAS_SCALE', scale: newScale })
@@ -538,7 +539,7 @@ export default function EditorCanvas() {
     if (e.evt.ctrlKey || e.evt.metaKey) {
       // Ctrl+Scroll = Zoom (toward pointer)
       const zoomFactor = e.evt.deltaY > 0 ? 0.9 : 1.1
-      const newScale = Math.max(7.5, Math.min(30, cs.scale * zoomFactor))
+      const newScale = Math.max(CANVAS_SCALE_MIN, Math.min(CANVAS_SCALE_MAX, cs.scale * zoomFactor))
       const physX = (pointer.x - cs.offsetX) / cs.scale
       const physY = (pointer.y - cs.offsetY) / cs.scale
       const newOffsetX = pointer.x - physX * newScale
@@ -1416,21 +1417,21 @@ export default function EditorCanvas() {
         <div className="bg-gray-900/80 backdrop-blur px-3 py-1.5 rounded text-xs text-gray-400 flex items-center gap-2">
           <button
             onClick={() => {
-              const pct = (state.canvasScale / DEFAULT_SCALE) * 100
+              const pct = (state.canvasScale / DEFAULT_CANVAS_SCALE) * 100
               const newPct = Math.max(75, Math.floor((pct - 0.5) / 25) * 25)
-              dispatch({ type: 'SET_CANVAS_SCALE', scale: (newPct / 100) * DEFAULT_SCALE })
+              dispatch({ type: 'SET_CANVAS_SCALE', scale: (newPct / 100) * DEFAULT_CANVAS_SCALE })
             }}
             className="hover:text-white transition-colors px-1"
             title="Zoom out"
           >
             −
           </button>
-          <span>{Math.round((state.canvasScale / DEFAULT_SCALE) * 100)}%</span>
+          <span>{Math.round((state.canvasScale / DEFAULT_CANVAS_SCALE) * 100)}%</span>
           <button
             onClick={() => {
-              const pct = (state.canvasScale / DEFAULT_SCALE) * 100
-              const newPct = Math.min(300, Math.ceil((pct + 0.5) / 25) * 25)
-              dispatch({ type: 'SET_CANVAS_SCALE', scale: (newPct / 100) * DEFAULT_SCALE })
+              const pct = (state.canvasScale / DEFAULT_CANVAS_SCALE) * 100
+              const newPct = Math.min(ZOOM_PCT_MAX, Math.ceil((pct + 0.5) / 25) * 25)
+              dispatch({ type: 'SET_CANVAS_SCALE', scale: (newPct / 100) * DEFAULT_CANVAS_SCALE })
             }}
             className="hover:text-white transition-colors px-1"
             title="Zoom in"
@@ -1712,12 +1713,12 @@ function BezelEditorPopover({
       </div>
 
       {/* Footer buttons */}
-      <div className="flex items-center justify-end gap-2 mt-3 pt-2 border-t border-gray-700">
+      <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-700">
         <button
           onClick={() => { apply(0, 0, 0, 0); onClose() }}
           className="px-3 py-1.5 text-xs text-gray-400 hover:text-gray-200 rounded hover:bg-gray-800 transition-colors"
         >
-          Clear
+          Remove bezels
         </button>
         <button
           onClick={onClose}

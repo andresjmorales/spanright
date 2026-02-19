@@ -4,6 +4,11 @@ import { createMonitor } from './utils'
 
 const MAX_HISTORY = 50
 
+/** Canvas zoom: scale = pixels per inch. 100% = DEFAULT_CANVAS_SCALE. */
+export const CANVAS_SCALE_MIN = 7.5
+export const CANVAS_SCALE_MAX = 40
+export const DEFAULT_CANVAS_SCALE = 10
+
 interface UndoableSnapshot {
   monitors: Monitor[]
   sourceImage: SourceImage | null
@@ -73,7 +78,7 @@ type Action =
 const initialState: State = {
   monitors: [],
   sourceImage: null,
-  canvasScale: 10, // 10 pixels per inch = 100% zoom
+  canvasScale: DEFAULT_CANVAS_SCALE,
   canvasOffsetX: 50,
   canvasOffsetY: 50,
   unit: 'inches',
@@ -248,7 +253,7 @@ function reducer(state: State, action: Action): State {
       }
     }
     case 'SET_CANVAS_SCALE':
-      return { ...state, canvasScale: Math.max(7.5, Math.min(30, action.scale)) }
+      return { ...state, canvasScale: Math.max(CANVAS_SCALE_MIN, Math.min(CANVAS_SCALE_MAX, action.scale)) }
     case 'PAN_CANVAS':
       return {
         ...state,
