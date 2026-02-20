@@ -26,7 +26,7 @@ export default function Toolbar() {
   }
 
   return (
-    <div className="bg-gray-900 border-b border-gray-800 px-4 h-11 flex items-center gap-4 flex-wrap">
+    <div className="bg-gray-900 border-b border-gray-800 px-3 sm:px-4 py-2 sm:py-0 min-h-[4.5rem] sm:min-h-0 sm:h-11 flex items-center gap-2 sm:gap-4 flex-wrap">
       {/* Image upload / image details — leftmost */}
       <ImageUpload />
 
@@ -34,13 +34,14 @@ export default function Toolbar() {
       {hasMonitors && (
         <>
           <div className="w-px h-5 bg-gray-700" />
-          <div className="text-xs text-gray-400">
-            {state.monitors.length} monitor{state.monitors.length > 1 ? 's' : ''}{' '}
-            {formatDimension(bbox.width, state.unit)} x {formatDimension(bbox.height, state.unit)} layout
-            {' — '}
-            <span className="text-gray-500">Recommended:</span>{' '}
+          <div className="text-xs text-gray-400 min-w-0 overflow-hidden text-ellipsis">
+            <span className="hidden md:inline">
+              {state.monitors.length} monitor{state.monitors.length > 1 ? 's' : ''}{' '}
+              {formatDimension(bbox.width, state.unit)}×{formatDimension(bbox.height, state.unit)} layout —{' '}
+            </span>
+            <span className="text-gray-500">Rec:</span>{' '}
             <span className="font-mono text-gray-300">
-              {recommended.width} x {recommended.height} px
+              {recommended.width}×{recommended.height} px
             </span>
             {hasImage && imageSizeStatus && (
               <span className={`font-mono ml-1 ${

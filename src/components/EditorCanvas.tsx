@@ -359,6 +359,15 @@ export default function EditorCanvas() {
   const smartAlignSnappedRef = useRef({ x: false, y: false })
   // Refs for values used in hot-path event handlers (avoids callback recreation)
   const canvasStateRef = useRef({ scale: 10, offsetX: 50, offsetY: 50, dimW: 800, dimH: 500 })
+  // Two-finger touch gesture state (pinch-zoom and pan)
+  const touchGestureRef = useRef<{
+    active: boolean
+    initialPinchDistance: number
+    initialPinchCenter: { x: number; y: number }
+    initialScale: number
+    initialOffsetX: number
+    initialOffsetY: number
+  } | null>(null)
 
   // Close monitor context menu and image menu when eyedropper is activated
   useEffect(() => {
@@ -593,6 +602,71 @@ export default function EditorCanvas() {
       if (Math.abs(newClamped.x - cs.offsetX) > 0.1 || Math.abs(newClamped.y - cs.offsetY) > 0.1) {
         dispatch({ type: 'SET_CANVAS_OFFSET', x: newClamped.x, y: newClamped.y })
       }
+    }
+  }, [dispatch, clampOffset])
+
+  // Two-finger touch: pinch-to-zoom and two-finger pan. Only active when exactly 2 touches; single-touch is left to Konva for dragging.
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const getRect = () => container.getBoundingClientRect()
+    const touchToLocal = (t: Touch, rect: DOMRect) => ({ x: t.clientX - rect.left, y: t.clientY - rect.top })
+    const distance = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+      Math.hypot(b.x - a.x, b.y - a.y)
+    const center = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+      ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 })
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 2) return
+      const rect = getRect()
+      const t0 = touchToLocal(e.touches[0], rect)
+      const t1 = touchToLocal(e.touches[1], rect)
+      const cs = canvasStateRef.current
+      touchGestureRef.current = {
+        active: true,
+        initialPinchDistance: distance(t0, t1),
+        initialPinchCenter: center(t0, t1),
+        initialScale: cs.scale,
+        initialOffsetX: cs.offsetX,
+        initialOffsetY: cs.offsetY,
+      }
+    }
+
+    const onTouchMove = (e: TouchEvent) => {
+      const g = touchGestureRef.current
+      if (!g?.active || e.touches.length !== 2) return
+      e.preventDefault()
+      const rect = getRect()
+      const t0 = touchToLocal(e.touches[0], rect)
+      const t1 = touchToLocal(e.touches[1], rect)
+      const currentDistance = distance(t0, t1)
+      const currentCenter = center(t0, t1)
+      const scaleFactor = currentDistance / g.initialPinchDistance
+      const newScale = Math.max(CANVAS_SCALE_MIN, Math.min(CANVAS_SCALE_MAX, g.initialScale * scaleFactor))
+      const physX = (g.initialPinchCenter.x - g.initialOffsetX) / g.initialScale
+      const physY = (g.initialPinchCenter.y - g.initialOffsetY) / g.initialScale
+      let newOffsetX = currentCenter.x - physX * newScale
+      let newOffsetY = currentCenter.y - physY * newScale
+      const cs = canvasStateRef.current
+      const clamped = clampOffset(newOffsetX, newOffsetY, cs.dimW, cs.dimH, newScale)
+      dispatch({ type: 'SET_CANVAS_SCALE', scale: newScale })
+      dispatch({ type: 'SET_CANVAS_OFFSET', x: clamped.x, y: clamped.y })
+    }
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) touchGestureRef.current = null
+    }
+
+    container.addEventListener('touchstart', onTouchStart, { passive: true })
+    container.addEventListener('touchmove', onTouchMove, { passive: false })
+    container.addEventListener('touchend', onTouchEnd, { passive: true })
+    container.addEventListener('touchcancel', onTouchEnd, { passive: true })
+    return () => {
+      container.removeEventListener('touchstart', onTouchStart)
+      container.removeEventListener('touchmove', onTouchMove)
+      container.removeEventListener('touchend', onTouchEnd)
+      container.removeEventListener('touchcancel', onTouchEnd)
     }
   }, [dispatch, clampOffset])
 

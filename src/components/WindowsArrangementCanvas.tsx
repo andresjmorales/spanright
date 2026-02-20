@@ -355,6 +355,80 @@ export default function WindowsArrangementCanvas() {
     setFrozenLayout(null) // Unfreeze — let auto-fit recalculate
   }, [])
 
+  // Touch handlers — same logic as mouse so dragging works on touch devices
+  const getCanvasCoords = useCallback((clientX: number, clientY: number) => {
+    const rect = canvasRef.current?.getBoundingClientRect()
+    if (!rect) return null
+    return { mx: clientX - rect.left, my: clientY - rect.top }
+  }, [])
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (!state.useWindowsArrangement || e.touches.length !== 1) return
+    const coords = getCanvasCoords(e.touches[0].clientX, e.touches[0].clientY)
+    if (!coords) return
+    const { mx, my } = coords
+
+    for (let i = state.windowsArrangement.length - 1; i >= 0; i--) {
+      const wp = state.windowsArrangement[i]
+      const mon = monitorMap.get(wp.monitorId)
+      if (!mon) continue
+      const x = toDisplayX(wp.pixelX)
+      const y = toDisplayY(wp.pixelY)
+      const w = getStripWidth(mon) * displayScale
+      const h = getStripHeight(mon) * displayScale
+
+      if (mx >= x && mx <= x + w && my >= y && my <= y + h) {
+        setDragging(wp.monitorId)
+        setDragOffset({ x: mx - x, y: my - y })
+        setFrozenLayout({ displayScale, offsetX, offsetY })
+        e.preventDefault()
+        return
+      }
+    }
+  }, [state.windowsArrangement, state.useWindowsArrangement, monitorMap, displayScale, offsetX, offsetY, toDisplayX, toDisplayY, getCanvasCoords])
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!dragging || e.touches.length !== 1) return
+    e.preventDefault()
+    const coords = getCanvasCoords(e.touches[0].clientX, e.touches[0].clientY)
+    if (!coords) return
+    const { mx, my } = coords
+
+    const rawPixelX = Math.round(toPixelX(mx - dragOffset.x))
+    const rawPixelY = Math.round(toPixelY(my - dragOffset.y))
+
+    const snapped = computeSnap(
+      dragging, rawPixelX, rawPixelY,
+      state.windowsArrangement, monitorMap, displayScale
+    )
+
+    const dragMon = monitorMap.get(dragging)
+    if (!dragMon) return
+    const otherRects = state.windowsArrangement
+      .filter(wp => wp.monitorId !== dragging)
+      .map(wp => {
+        const mon = monitorMap.get(wp.monitorId)
+        if (!mon) return null
+        return { x: wp.pixelX, y: wp.pixelY, w: getStripWidth(mon), h: getStripHeight(mon) }
+      })
+      .filter((r): r is { x: number; y: number; w: number; h: number } => r !== null)
+
+    const resolved = resolveOverlaps(
+      snapped.x, snapped.y,
+      getStripWidth(dragMon), getStripHeight(dragMon),
+      otherRects
+    )
+
+    dispatch({ type: 'MOVE_WINDOWS_MONITOR', monitorId: dragging, pixelX: resolved.x, pixelY: resolved.y })
+  }, [dragging, dragOffset, getCanvasCoords, toPixelX, toPixelY, dispatch, state.windowsArrangement, monitorMap, displayScale])
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 0) {
+      setDragging(null)
+      setFrozenLayout(null)
+    }
+  }, [])
+
   // Compute validation warnings
   const warnings = useMemo(() => {
     const warns: string[] = []
@@ -421,7 +495,7 @@ export default function WindowsArrangementCanvas() {
   return (
     <div className="flex flex-col h-full">
       {/* Top bar */}
-      <div className="bg-gray-900 border-b border-gray-800 px-4 h-11 flex items-center gap-4 shrink-0 flex-wrap">
+      <div className="bg-gray-900 border-b border-gray-800 px-4 min-h-[4.5rem] sm:min-h-0 sm:h-11 flex items-center gap-4 shrink-0 flex-wrap py-2 sm:py-0">
         <label className="flex items-center gap-2 cursor-pointer select-none">
           <input
             type="checkbox"
@@ -478,11 +552,19 @@ export default function WindowsArrangementCanvas() {
         )}
         <canvas
           ref={canvasRef}
-          style={{ width: dimensions.width, height: dimensions.height }}
+          style={{
+            width: dimensions.width,
+            height: dimensions.height,
+            touchAction: state.useWindowsArrangement ? 'none' : 'auto',
+          }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
         />
 
         {/* Disabled overlay when checkbox is on */}
