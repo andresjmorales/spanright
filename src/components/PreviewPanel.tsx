@@ -236,7 +236,7 @@ export default function PreviewPanel() {
                 {showEmptyAreaOptions && (
                   <div
                     ref={emptyAreaPopoverRef}
-                    className="absolute right-0 top-full mt-2 w-72 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl z-50 overflow-hidden"
+                    className="absolute right-0 top-full mt-2 w-72 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl z-50 overflow-hidden max-sm:fixed max-sm:left-4 max-sm:right-4 max-sm:top-28 max-sm:w-auto max-sm:mt-0"
                   >
                     {/* Banner first — always on top of color/fill controls */}
                     <div className="px-3 py-2 bg-gray-800/80 border-b border-gray-700/50 space-y-1">
