@@ -1,14 +1,14 @@
 /**
  * Preloaded layout presets. Users can generate a layout in the app, use "Share Layout"
  * to copy the URL, then provide the encoded part (the value of the `layout` hash param)
- * to add here. Each entry is { name, encoded }; encoded is the base64url string from
- * the share URL (e.g. from #layout=ENCODED). Leave encoded empty to hide that slot.
+ * to add here. Each entry is { name, encoded }; encoded is the layout string from the
+ * share URL (#layout=ENCODED), either LZ-compressed (~...) or legacy base64url. Leave encoded empty to hide that slot.
  */
 import { decodeLayout, type LayoutEntry } from './urlLayout'
 
 export interface PreloadedLayout {
   name: string
-  /** Base64url-encoded layout from share URL (#layout=...). Empty = slot unused. */
+  /** Layout param value from share URL (#layout=...): LZ-compressed or legacy base64url. Empty = slot unused. */
   encoded: string
 }
 
