@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useCallback, useState, useMemo, type Dispatch
 import { Stage, Layer, Rect, Text, Group, Image as KonvaImage, Line, Transformer } from 'react-konva'
 import type Konva from 'konva'
 import { useStore, CANVAS_SCALE_MIN, CANVAS_SCALE_MAX, DEFAULT_CANVAS_SCALE } from '../store'
-import { formatDimension, getMonitorsBoundingBox, getMonitorDisplayName, getBezelInches } from '../utils'
+import { formatDimension, getMonitorsBoundingBox, getMonitorDisplayName, getBezelInches, adaptSavedPositionToAspectRatio } from '../utils'
 import { useToast } from './Toast'
 import { IconUndo, IconRedo, IconCheck, IconKebabVertical } from '../icons'
 import type { Monitor, SourceImage, Bezels } from '../types'
@@ -13,6 +13,11 @@ import {
   PHYS_MIN_Y,
   PHYS_MAX_Y,
 } from '../canvasConstants'
+import {
+  getImagePositionBookmark,
+  setImagePositionBookmark,
+  deleteImagePositionBookmark,
+} from '../imagePositionStorage'
 
 const MONITOR_COLORS = [
   '#3b82f6', // blue
@@ -729,38 +734,68 @@ export default function EditorCanvas() {
     if (!file || !file.type.startsWith('image/')) return
 
     const reader = new FileReader()
+    const loadedLayoutImagePosition = state.loadedLayoutImagePosition
+    const bookmarkPosition = loadedLayoutImagePosition
+      ? null
+      : getImagePositionBookmark(state.activeLayoutName ?? '_default')
     reader.onload = (ev) => {
       const img = new Image()
       img.onload = () => {
         const imgAspect = img.naturalWidth / img.naturalHeight
         const sixFeet = 72 // inches
-        const physWidth = img.naturalHeight > img.naturalWidth ? sixFeet * imgAspect : sixFeet
-        const physHeight = img.naturalHeight > img.naturalWidth ? sixFeet : sixFeet / imgAspect
+        let physWidth = img.naturalHeight > img.naturalWidth ? sixFeet * imgAspect : sixFeet
+        let physHeight = img.naturalHeight > img.naturalWidth ? sixFeet : sixFeet / imgAspect
+        let physicalX: number
+        let physicalY: number
+        let usedSavedPosition: 'layout' | 'bookmark' | false = false
 
-        // Center on current viewport
-        const container = containerRef.current
-        const viewW = container?.clientWidth ?? 800
-        const viewH = container?.clientHeight ?? 500
-        const centerPhysX = (viewW / 2 - state.canvasOffsetX) / state.canvasScale
-        const centerPhysY = (viewH / 2 - state.canvasOffsetY) / state.canvasScale
+        if (loadedLayoutImagePosition) {
+          const adapted = adaptSavedPositionToAspectRatio(loadedLayoutImagePosition, imgAspect)
+          physicalX = adapted.x
+          physicalY = adapted.y
+          physWidth = adapted.width
+          physHeight = adapted.height
+          usedSavedPosition = 'layout'
+        } else if (bookmarkPosition) {
+          const adapted = adaptSavedPositionToAspectRatio(bookmarkPosition, imgAspect)
+          physicalX = adapted.x
+          physicalY = adapted.y
+          physWidth = adapted.width
+          physHeight = adapted.height
+          usedSavedPosition = 'bookmark'
+        } else {
+          const container = containerRef.current
+          const viewW = container?.clientWidth ?? 800
+          const viewH = container?.clientHeight ?? 500
+          const centerPhysX = (viewW / 2 - state.canvasOffsetX) / state.canvasScale
+          const centerPhysY = (viewH / 2 - state.canvasOffsetY) / state.canvasScale
+          physicalX = centerPhysX - physWidth / 2
+          physicalY = centerPhysY - physHeight / 2
+        }
 
         const sourceImage: SourceImage = {
           element: img,
           fileName: file.name,
           naturalWidth: img.naturalWidth,
           naturalHeight: img.naturalHeight,
-          physicalX: centerPhysX - physWidth / 2,
-          physicalY: centerPhysY - physHeight / 2,
+          physicalX,
+          physicalY,
           physicalWidth: physWidth,
           physicalHeight: physHeight,
         }
         dispatch({ type: 'SET_SOURCE_IMAGE', image: sourceImage })
-        toast.success(`Image loaded: ${file.name}`)
+        if (usedSavedPosition === 'layout') {
+          toast.success('Image positioned from saved layout')
+        } else if (usedSavedPosition === 'bookmark') {
+          toast.success('Image positioned from bookmark')
+        } else {
+          toast.success(`Image loaded: ${file.name}`)
+        }
       }
       img.src = ev.target?.result as string
     }
     reader.readAsDataURL(file)
-  }, [state.canvasOffsetX, state.canvasOffsetY, state.canvasScale, state.snapToGrid, state.gridSize, dispatch, toast])
+  }, [state.canvasOffsetX, state.canvasOffsetY, state.canvasScale, state.activeLayoutName, state.loadedLayoutImagePosition, state.snapToGrid, state.gridSize, dispatch, toast])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -1490,13 +1525,54 @@ export default function EditorCanvas() {
         )
       })()}
 
-      {/* Image kebab dropdown — Size image to fit / Remove image */}
-      {imageMenuAt && (
+      {/* Image kebab dropdown — Size image to fit, layout position, bookmark (apply/clear), Remove image */}
+      {imageMenuAt && state.sourceImage && (
         <ImageKebabMenu
           x={imageMenuAt.x}
           y={imageMenuAt.y}
           canSizeToFit={state.monitors.length > 0}
+          hasLayoutPosition={!!state.loadedLayoutImagePosition}
+          savedPosition={(() => {
+            const key = state.activeLayoutName ?? '_default'
+            return getImagePositionBookmark(key)
+          })()}
           onSizeImageToFit={() => handleSizeImageToFit()}
+          onSaveImagePosition={() => {
+            const img = state.sourceImage!
+            const key = state.activeLayoutName ?? '_default'
+            setImagePositionBookmark(key, {
+              x: img.physicalX,
+              y: img.physicalY,
+              width: img.physicalWidth,
+              height: img.physicalHeight,
+              aspectRatio: img.naturalWidth / img.naturalHeight,
+            })
+            toast.success(state.activeLayoutName ? `Image position bookmarked for '${state.activeLayoutName}'` : 'Image position bookmarked')
+          }}
+          onApplyLayoutPosition={() => {
+            const img = state.sourceImage!
+            const layoutPos = state.loadedLayoutImagePosition
+            if (!layoutPos) return
+            const ar = img.naturalWidth / img.naturalHeight
+            const { x, y, width, height } = adaptSavedPositionToAspectRatio(layoutPos, ar)
+            dispatch({ type: 'SET_IMAGE_TRANSFORM', x, y, physicalWidth: width, physicalHeight: height })
+            toast.success('Image position from layout applied')
+          }}
+          onApplySavedPosition={() => {
+            const img = state.sourceImage!
+            const key = state.activeLayoutName ?? '_default'
+            const saved = getImagePositionBookmark(key)
+            if (!saved) return
+            const ar = img.naturalWidth / img.naturalHeight
+            const { x, y, width, height } = adaptSavedPositionToAspectRatio(saved, ar)
+            dispatch({ type: 'SET_IMAGE_TRANSFORM', x, y, physicalWidth: width, physicalHeight: height })
+            toast.success('Bookmarked position applied')
+          }}
+          onClearSavedPosition={() => {
+            const key = state.activeLayoutName ?? '_default'
+            deleteImagePositionBookmark(key)
+            toast('Bookmarked position cleared')
+          }}
           onRemoveImage={() => {
             setImageSelected(false)
             dispatch({ type: 'CLEAR_SOURCE_IMAGE' })
@@ -1631,16 +1707,28 @@ export default function EditorCanvas() {
   )
 }
 
+/** Item class for image kebab menu buttons. */
+const imageMenuItemClass = 'w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-gray-800 hover:text-white disabled:opacity-40 transition-colors'
+
 /**
- * Dropdown for image kebab: Size image to fit, Remove image.
+ * Dropdown for image kebab: Size image to fit, layout position (if any), bookmark (bookmark/apply/clear), Remove image.
  */
 function ImageKebabMenu({
-  x, y, canSizeToFit, onSizeImageToFit, onRemoveImage, onClose,
+  x, y, canSizeToFit,
+  hasLayoutPosition, savedPosition,
+  onSizeImageToFit, onSaveImagePosition, onApplyLayoutPosition, onApplySavedPosition, onClearSavedPosition,
+  onRemoveImage, onClose,
 }: {
   x: number
   y: number
   canSizeToFit: boolean
+  hasLayoutPosition: boolean
+  savedPosition: { aspectRatio: number } | null
   onSizeImageToFit: () => void
+  onSaveImagePosition: () => void
+  onApplyLayoutPosition: () => void
+  onApplySavedPosition: () => void
+  onClearSavedPosition: () => void
   onRemoveImage: () => void
   onClose: () => void
 }) {
@@ -1660,16 +1748,35 @@ function ImageKebabMenu({
   return (
     <div
       ref={menuRef}
-      className="absolute z-50 w-44 bg-gray-900 border border-gray-700 rounded-lg shadow-xl overflow-hidden"
+      className="absolute z-50 w-56 bg-gray-900 border border-gray-700 rounded-lg shadow-xl overflow-hidden"
       style={{ left: x, top: y }}
     >
       <button
         onClick={() => { onSizeImageToFit(); onClose() }}
         disabled={!canSizeToFit}
-        className="w-full text-left px-3 py-2 text-xs text-gray-300 hover:bg-gray-800 hover:text-white disabled:opacity-40 transition-colors"
+        className={imageMenuItemClass}
       >
         Size image to fit
       </button>
+      <div className="border-t border-gray-700" />
+      {hasLayoutPosition && (
+        <button onClick={() => { onApplyLayoutPosition(); onClose() }} className={imageMenuItemClass}>
+          Apply image position from layout
+        </button>
+      )}
+      <button onClick={() => { onSaveImagePosition(); onClose() }} className={imageMenuItemClass}>
+        Bookmark image position
+      </button>
+      {savedPosition && (
+        <>
+          <button onClick={() => { onApplySavedPosition(); onClose() }} className={imageMenuItemClass}>
+            Apply bookmarked position
+          </button>
+          <button onClick={() => { onClearSavedPosition(); onClose() }} className={imageMenuItemClass}>
+            Clear bookmarked position
+          </button>
+        </>
+      )}
       <div className="border-t border-gray-700" />
       <button
         onClick={() => { onRemoveImage(); onClose() }}

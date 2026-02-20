@@ -58,6 +58,15 @@ export type ActiveTab = 'physical' | 'windows' | 'preview'
 /** How to fill empty area (output regions not covered by the source image). */
 export type FillMode = 'solid' | 'blur' | 'transparent'
 
+/** Image position in physical/canvas space (for saved layouts and bookmarks). */
+export interface SavedImagePosition {
+  x: number
+  y: number
+  width: number
+  height: number
+  aspectRatio: number // width/height of the image when saved
+}
+
 export interface SavedConfig {
   id: string
   name: string
@@ -70,6 +79,8 @@ export interface SavedConfig {
     displayName?: string
     bezels?: Bezels
   }[]
+  /** Embedded image transform when layout was saved; null if no image. Omitted on older configs. */
+  imagePosition?: SavedImagePosition | null
 }
 
 export interface AppState {

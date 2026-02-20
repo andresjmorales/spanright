@@ -1,5 +1,40 @@
-import type { MonitorPreset, Monitor, Bezels } from './types'
+import type { MonitorPreset, Monitor, Bezels, SavedImagePosition } from './types'
 import { v4 as uuidv4 } from 'uuid'
+
+const ASPECT_RATIO_TOLERANCE = 0.05
+
+/**
+ * Adapt a saved image position to a new aspect ratio.
+ * If aspect ratios match within tolerance, returns saved position; otherwise
+ * matches one dimension and centers on the other.
+ */
+export function adaptSavedPositionToAspectRatio(
+  saved: SavedImagePosition,
+  newAspectRatio: number
+): { x: number; y: number; width: number; height: number } {
+  const savedAR = saved.aspectRatio
+  if (Math.abs(savedAR - newAspectRatio) < ASPECT_RATIO_TOLERANCE) {
+    return { x: saved.x, y: saved.y, width: saved.width, height: saved.height }
+  }
+  if (newAspectRatio > savedAR) {
+    const newWidth = saved.width
+    const newHeight = newWidth / newAspectRatio
+    return {
+      x: saved.x,
+      y: saved.y + (saved.height - newHeight) / 2,
+      width: newWidth,
+      height: newHeight,
+    }
+  }
+  const newHeight = saved.height
+  const newWidth = newHeight * newAspectRatio
+  return {
+    x: saved.x + (saved.width - newWidth) / 2,
+    y: saved.y,
+    width: newWidth,
+    height: newHeight,
+  }
+}
 
 /**
  * Calculate PPI from resolution and diagonal size.
