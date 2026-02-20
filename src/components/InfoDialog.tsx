@@ -133,7 +133,7 @@ export default function InfoDialog({ onClose }: InfoDialogProps) {
               <div>
                 <h3 className="text-sm font-medium text-gray-200">Two layouts, one wallpaper</h3>
                 <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                  The <strong className="text-gray-300">Physical Layout</strong> tab controls what part of your image each monitor shows — based on real-world size and position on your desk. The <strong className="text-gray-300">Virtual Layout</strong> tab controls how the output image is stitched together — matching how your OS will paint it. On the Physical Layout canvas, <strong className="text-gray-300">right-click</strong> any monitor to rename, rotate, delete, or set optional bezel borders (for alignment and real-world bezel compensation).
+                  The <strong className="text-gray-300">Physical Layout</strong> tab controls what part of your image each monitor shows — based on real-world size and position on your desk. The <strong className="text-gray-300">Virtual Layout</strong> tab controls how the output image is stitched together — matching how your OS will paint it. On the Physical Layout canvas, <strong className="text-gray-300">right-click</strong> any monitor to rename, rotate, duplicate, delete, or set optional bezel borders (for alignment and real-world bezel compensation).
                 </p>
               </div>
             </div>

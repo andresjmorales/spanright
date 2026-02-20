@@ -210,24 +210,7 @@ export default function ConfigManager() {
             )}
           </div>
 
-          {/* Preloaded layouts (from preloadedLayouts.ts) */}
-          {preloadedWithMonitors.length > 0 && (
-            <div className="p-2 border-b border-gray-800">
-              <div className="text-[10px] uppercase tracking-wider text-gray-500 px-2.5 mb-1.5">Quick layouts</div>
-              {preloadedWithMonitors.map(({ entry, monitors }) => (
-                <button
-                  key={entry.name}
-                  onClick={() => handleLoadPreloaded(monitors, entry.name)}
-                  className="w-full text-left px-2.5 py-1.5 text-xs text-gray-300 hover:bg-gray-800 hover:text-white rounded transition-colors flex items-center gap-1.5"
-                >
-                  <span className="font-medium truncate">{entry.name}</span>
-                  <span className="text-gray-600 shrink-0">{monitors.length} monitor{monitors.length !== 1 ? 's' : ''}</span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Layout list */}
+          {/* Layout list (saved layouts) */}
           <div className="max-h-64 overflow-y-auto">
             {configs.length === 0 && preloadedWithMonitors.length === 0 ? (
               <div className="px-3 py-4 text-center text-xs text-gray-600">
@@ -240,7 +223,7 @@ export default function ConfigManager() {
                   className="group flex items-center gap-2 px-2.5 py-2 hover:bg-gray-800/60 border-b border-gray-800/50 last:border-b-0"
                 >
                   {confirmDeleteId === config.id ? (
-                    <div className="flex-1 flex items-center gap-2">
+                    <div className="flex-1 flex items-center justify-end gap-2 pr-2">
                       <span className="text-xs text-red-400">Delete?</span>
                       <button
                         onClick={() => handleDelete(config.id)}
@@ -281,6 +264,23 @@ export default function ConfigManager() {
               ))
             )}
           </div>
+
+          {/* Quick layouts (from preloadedLayouts.ts) */}
+          {preloadedWithMonitors.length > 0 && (
+            <div className="p-2 border-t border-gray-800">
+              <div className="text-[10px] uppercase tracking-wider text-gray-500 px-2.5 mb-1.5">Quick layouts</div>
+              {preloadedWithMonitors.map(({ entry, monitors }) => (
+                <button
+                  key={entry.name}
+                  onClick={() => handleLoadPreloaded(monitors, entry.name)}
+                  className="w-full text-left px-2.5 py-1.5 text-xs text-gray-300 hover:bg-gray-800 hover:text-white rounded transition-colors flex items-center gap-1.5"
+                >
+                  <span className="font-medium truncate">{entry.name}</span>
+                  <span className="text-gray-600 shrink-0">{monitors.length} monitor{monitors.length !== 1 ? 's' : ''}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
