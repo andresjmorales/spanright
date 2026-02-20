@@ -1,5 +1,5 @@
 import LZString from 'lz-string'
-import type { SavedConfig } from './types'
+import type { SavedConfig, SavedImagePosition } from './types'
 
 /**
  * Prefix for LZ-compressed layout payloads; legacy base64url never starts with this.
@@ -21,9 +21,19 @@ type UrlMonitor = {
   bz?: [number, number, number, number]  // bezels [top, bottom, left, right] mm
 }
 
+// Compact URL representation of image position (physical inches + aspect ratio)
+type UrlImagePosition = {
+  x: number
+  y: number
+  w: number
+  h: number
+  ar: number  // aspect ratio (width/height)
+}
+
 type UrlLayout = {
   v: 1
   m: UrlMonitor[]
+  img?: UrlImagePosition   // optional; when present, next uploaded image uses this position
 }
 
 const HASH_KEY = 'layout'
@@ -40,7 +50,12 @@ function fromUrlBase64(str: string): string {
 
 export type LayoutEntry = SavedConfig['monitors'][number]
 
-export function encodeLayout(monitors: LayoutEntry[]): string {
+export interface DecodedLayout {
+  monitors: LayoutEntry[]
+  imagePosition: SavedImagePosition | null
+}
+
+export function encodeLayout(monitors: LayoutEntry[], imagePosition?: SavedImagePosition | null): string {
   const m: UrlMonitor[] = monitors.map(mon => {
     const entry: UrlMonitor = {
       n: mon.preset.name,
@@ -63,12 +78,21 @@ export function encodeLayout(monitors: LayoutEntry[]): string {
   })
 
   const layout: UrlLayout = { v: 1, m }
+  if (imagePosition && Number.isFinite(imagePosition.x) && Number.isFinite(imagePosition.y)) {
+    layout.img = {
+      x: Math.round(imagePosition.x * 10000) / 10000,
+      y: Math.round(imagePosition.y * 10000) / 10000,
+      w: Math.round(imagePosition.width * 10000) / 10000,
+      h: Math.round(imagePosition.height * 10000) / 10000,
+      ar: imagePosition.aspectRatio,
+    }
+  }
   const json = JSON.stringify(layout)
   const compressed = LZString.compressToEncodedURIComponent(json)
   return compressed ? LAYOUT_ENCODING_LZ_PREFIX + compressed : toUrlBase64(json)
 }
 
-export function decodeLayout(encoded: string): LayoutEntry[] | null {
+export function decodeLayout(encoded: string): DecodedLayout | null {
   try {
     const json =
       encoded.startsWith(LAYOUT_ENCODING_LZ_PREFIX)
@@ -78,7 +102,7 @@ export function decodeLayout(encoded: string): LayoutEntry[] | null {
     const layout = JSON.parse(json) as UrlLayout
     if (!layout || layout.v !== 1 || !Array.isArray(layout.m)) return null
 
-    return layout.m.map(mon => ({
+    const monitors: LayoutEntry[] = layout.m.map(mon => ({
       preset: {
         name: mon.n,
         diagonal: mon.d,
@@ -94,13 +118,26 @@ export function decodeLayout(encoded: string): LayoutEntry[] | null {
         ? { top: mon.bz[0], bottom: mon.bz[1], left: mon.bz[2], right: mon.bz[3] }
         : undefined,
     }))
+
+    let imagePosition: SavedImagePosition | null = null
+    if (layout.img && Number.isFinite(layout.img.x) && Number.isFinite(layout.img.y) && Number.isFinite(layout.img.ar)) {
+      imagePosition = {
+        x: layout.img.x,
+        y: layout.img.y,
+        width: layout.img.w,
+        height: layout.img.h,
+        aspectRatio: layout.img.ar,
+      }
+    }
+
+    return { monitors, imagePosition }
   } catch {
     return null
   }
 }
 
 /** Read layout from the current URL hash. Returns null if none present or invalid. */
-export function getLayoutFromHash(): LayoutEntry[] | null {
+export function getLayoutFromHash(): DecodedLayout | null {
   const hash = window.location.hash.slice(1)
   const params = new URLSearchParams(hash)
   const encoded = params.get(HASH_KEY)
@@ -108,17 +145,17 @@ export function getLayoutFromHash(): LayoutEntry[] | null {
   return decodeLayout(encoded)
 }
 
-/** Encode the given monitors into the URL hash and return the full URL string. */
-export function buildShareUrl(monitors: LayoutEntry[]): string {
-  const encoded = encodeLayout(monitors)
+/** Encode the given monitors (and optional image position) into the URL hash and return the full URL string. */
+export function buildShareUrl(monitors: LayoutEntry[], imagePosition?: SavedImagePosition | null): string {
+  const encoded = encodeLayout(monitors, imagePosition)
   const url = new URL(window.location.href)
   url.hash = `${HASH_KEY}=${encoded}`
   return url.toString()
 }
 
 /** Write the layout hash to the current URL (pushes a new history entry). */
-export function setLayoutHash(monitors: LayoutEntry[]): string {
-  const encoded = encodeLayout(monitors)
+export function setLayoutHash(monitors: LayoutEntry[], imagePosition?: SavedImagePosition | null): string {
+  const encoded = encodeLayout(monitors, imagePosition)
   window.location.hash = `${HASH_KEY}=${encoded}`
   return window.location.href
 }

@@ -21,7 +21,17 @@ export default function ShareButton() {
       bezels: m.bezels,
     }))
 
-    const url = buildShareUrl(monitors)
+    const imagePosition = state.sourceImage
+      ? {
+          x: state.sourceImage.physicalX,
+          y: state.sourceImage.physicalY,
+          width: state.sourceImage.physicalWidth,
+          height: state.sourceImage.physicalHeight,
+          aspectRatio: state.sourceImage.naturalWidth / state.sourceImage.naturalHeight,
+        }
+      : null
+
+    const url = buildShareUrl(monitors, imagePosition)
 
     try {
       await navigator.clipboard.writeText(url)

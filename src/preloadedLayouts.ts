@@ -24,5 +24,5 @@ export const PRELOADED_LAYOUTS: PreloadedLayout[] = [
  */
 export function decodePreloadedLayout(entry: PreloadedLayout): LayoutEntry[] | null {
   if (!entry.encoded.trim()) return null
-  return decodeLayout(entry.encoded)
+  return decodeLayout(entry.encoded)?.monitors ?? null
 }

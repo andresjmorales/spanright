@@ -18,6 +18,7 @@ import {
   setImagePositionBookmark,
   deleteImagePositionBookmark,
 } from '../imagePositionStorage'
+import EditorShortcutsDialog from './EditorShortcutsDialog'
 
 const MONITOR_COLORS = [
   '#3b82f6', // blue
@@ -39,6 +40,11 @@ const RULER_SIZE = 24
 const ZOOM_PCT_MAX = (CANVAS_SCALE_MAX / DEFAULT_CANVAS_SCALE) * 100
 const SMART_ALIGN_THRESHOLD_PX = 8
 const SMART_ALIGN_RESIZE_THRESHOLD_PX = 0.5
+
+/** Arrow-key nudge steps (physical inches). Default = fine; Shift = 1"; Ctrl = large. */
+const MONITOR_NUDGE_STEP_IN = 0.1
+const MONITOR_NUDGE_STEP_COARSE_IN = 1
+const MONITOR_NUDGE_STEP_LARGE_IN = 5
 
 /** Bezel overlay appearance (physical layout canvas). */
 const BEZEL_FILL = '#2a2a2e'
@@ -349,6 +355,7 @@ export default function EditorCanvas() {
   const [imageSelected, setImageSelected] = useState(false)
   /** Delete (X) button position in Group coords during image resize so it tracks top-right; null when not transforming */
   const [imageDeleteButtonPos, setImageDeleteButtonPos] = useState<{ x: number; y: number } | null>(null)
+  const [showEditorShortcuts, setShowEditorShortcuts] = useState(false)
   const [renameMonitorId, setRenameMonitorId] = useState<string | null>(null)
   const [renameInputValue, setRenameInputValue] = useState('')
   const [activeGuides, setActiveGuides] = useState<AlignGuide[]>([])
@@ -357,6 +364,7 @@ export default function EditorCanvas() {
   const [bezelEditorMonitorId, setBezelEditorMonitorId] = useState<string | null>(null)
   const contextMenuHandledRef = useRef(false)
   const smartAlignSnappedRef = useRef({ x: false, y: false })
+  const sizeImageToFitRef = useRef<() => void>(() => {})
   // Refs for values used in hot-path event handlers (avoids callback recreation)
   const canvasStateRef = useRef({ scale: 10, offsetX: 50, offsetY: 50, dimW: 800, dimH: 500 })
   // Two-finger touch gesture state (pinch-zoom and pan)
@@ -406,6 +414,23 @@ export default function EditorCanvas() {
     return () => observer.disconnect()
   }, [])
 
+  // Fit view to all monitors (defined before keyboard effect so it can be in the effect deps)
+  const fitView = useCallback(() => {
+    if (state.monitors.length === 0) return
+    const bbox = getMonitorsBoundingBox(state.monitors)
+    const padding = 40 // canvas pixels of padding
+    const availW = dimensions.width - padding * 2
+    const availH = dimensions.height - padding * 2
+    const scaleX = availW / bbox.width
+    const scaleY = availH / bbox.height
+    const newScale = Math.max(CANVAS_SCALE_MIN, Math.min(CANVAS_SCALE_MAX, Math.min(scaleX, scaleY)))
+    const newOffsetX = padding - bbox.minX * newScale + (availW - bbox.width * newScale) / 2
+    const newOffsetY = padding - bbox.minY * newScale + (availH - bbox.height * newScale) / 2
+    dispatch({ type: 'SET_CANVAS_SCALE', scale: newScale })
+    dispatch({ type: 'SET_CANVAS_OFFSET', x: newOffsetX, y: newOffsetY })
+    toast('Fitted to view')
+  }, [state.monitors, dimensions, dispatch, toast])
+
   // Keyboard shortcuts (skip when typing in inputs so we don't delete monitors or nudge)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -438,10 +463,17 @@ export default function EditorCanvas() {
         return
       }
 
-      // Delete selected monitor
-      if ((e.key === 'Delete' || e.key === 'Backspace') && state.selectedMonitorId && !imageSelected) {
-        dispatch({ type: 'REMOVE_MONITOR', id: state.selectedMonitorId })
-        toast('Monitor removed')
+      // Delete/Backspace: remove image when image selected, else remove selected monitor
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (imageSelected && state.sourceImage) {
+          e.preventDefault()
+          dispatch({ type: 'CLEAR_SOURCE_IMAGE' })
+          setImageSelected(false)
+          toast('Image removed')
+        } else if (state.selectedMonitorId) {
+          dispatch({ type: 'REMOVE_MONITOR', id: state.selectedMonitorId })
+          toast('Monitor removed')
+        }
       }
       // Escape to cancel eyedropper or deselect
       if (e.key === 'Escape') {
@@ -454,46 +486,100 @@ export default function EditorCanvas() {
       }
       // F key to fit view
       if (e.key === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        fitView()
-      }
-      // Arrow keys to nudge selected monitor
-      if (state.selectedMonitorId && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         e.preventDefault()
-        const mon = state.monitors.find(m => m.id === state.selectedMonitorId)
-        if (mon) {
-          // Shift = fine (0.1"), default = 1", Ctrl = large (5")
-          const step = e.shiftKey ? 0.1 : e.ctrlKey ? 5 : 1
+        fitView()
+        return
+      }
+      // A: Align Assist
+      if (e.key === 'a' && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+        e.preventDefault()
+        dispatch({ type: 'TOGGLE_SMART_ALIGN' })
+        toast(state.smartAlign ? 'Align Assist disabled' : 'Align Assist enabled')
+        return
+      }
+      // S: Size image to fit
+      if (e.key === 's' && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+        e.preventDefault()
+        sizeImageToFitRef.current()
+        return
+      }
+      // Ctrl+Alt+M: Clear all monitors (destructive, matches Ctrl+Alt+I / Ctrl+Alt+R)
+      if ((e.ctrlKey || e.metaKey) && e.altKey && e.key.toLowerCase() === 'm') {
+        if (state.monitors.length > 0) {
+          e.preventDefault()
+          dispatch({ type: 'CLEAR_ALL_MONITORS' })
+          toast('All monitors cleared')
+        }
+        return
+      }
+      // Ctrl+Alt+I: Remove image (Ctrl+I is standard for Italic)
+      if ((e.ctrlKey || e.metaKey) && e.altKey && e.key.toLowerCase() === 'i') {
+        if (state.sourceImage) {
+          e.preventDefault()
+          dispatch({ type: 'CLEAR_SOURCE_IMAGE' })
+          toast('Image removed')
+        }
+        return
+      }
+      // Ctrl+Alt+R: Reset canvas (Ctrl+Shift+R is browser hard reload)
+      if ((e.ctrlKey || e.metaKey) && e.altKey && e.key.toLowerCase() === 'r') {
+        if (state.monitors.length > 0 || state.sourceImage) {
+          e.preventDefault()
+          dispatch({ type: 'CLEAR_ALL_MONITORS' })
+          dispatch({ type: 'CLEAR_SOURCE_IMAGE' })
+          toast.warning('Canvas reset')
+        }
+        return
+      }
+      // Arrow keys: nudge image when selected, else nudge selected monitor
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        const step = e.shiftKey ? MONITOR_NUDGE_STEP_COARSE_IN : e.ctrlKey ? MONITOR_NUDGE_STEP_LARGE_IN : MONITOR_NUDGE_STEP_IN
+        if (imageSelected && state.sourceImage) {
+          e.preventDefault()
           let dx = 0, dy = 0
           if (e.key === 'ArrowLeft') dx = -step
           if (e.key === 'ArrowRight') dx = step
           if (e.key === 'ArrowUp') dy = -step
           if (e.key === 'ArrowDown') dy = step
-          const newX = state.snapToGrid ? Math.round((mon.physicalX + dx) / state.gridSize) * state.gridSize : mon.physicalX + dx
-          const newY = state.snapToGrid ? Math.round((mon.physicalY + dy) / state.gridSize) * state.gridSize : mon.physicalY + dy
-          dispatch({ type: 'MOVE_MONITOR', id: mon.id, x: newX, y: newY })
+          const newX = state.snapToGrid ? Math.round((state.sourceImage.physicalX + dx) / state.gridSize) * state.gridSize : state.sourceImage.physicalX + dx
+          const newY = state.snapToGrid ? Math.round((state.sourceImage.physicalY + dy) / state.gridSize) * state.gridSize : state.sourceImage.physicalY + dy
+          dispatch({ type: 'MOVE_IMAGE', x: newX, y: newY })
+        } else if (state.selectedMonitorId) {
+          e.preventDefault()
+          const mon = state.monitors.find(m => m.id === state.selectedMonitorId)
+          if (mon) {
+            let dx = 0, dy = 0
+            if (e.key === 'ArrowLeft') dx = -step
+            if (e.key === 'ArrowRight') dx = step
+            if (e.key === 'ArrowUp') dy = -step
+            if (e.key === 'ArrowDown') dy = step
+            const newX = state.snapToGrid ? Math.round((mon.physicalX + dx) / state.gridSize) * state.gridSize : mon.physicalX + dx
+            const newY = state.snapToGrid ? Math.round((mon.physicalY + dy) / state.gridSize) * state.gridSize : mon.physicalY + dy
+            dispatch({ type: 'MOVE_MONITOR', id: mon.id, x: newX, y: newY })
+          }
         }
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  })
-
-  // Fit view to all monitors
-  const fitView = useCallback(() => {
-    if (state.monitors.length === 0) return
-    const bbox = getMonitorsBoundingBox(state.monitors)
-    const padding = 40 // canvas pixels of padding
-    const availW = dimensions.width - padding * 2
-    const availH = dimensions.height - padding * 2
-    const scaleX = availW / bbox.width
-    const scaleY = availH / bbox.height
-    const newScale = Math.max(CANVAS_SCALE_MIN, Math.min(CANVAS_SCALE_MAX, Math.min(scaleX, scaleY)))
-    const newOffsetX = padding - bbox.minX * newScale + (availW - bbox.width * newScale) / 2
-    const newOffsetY = padding - bbox.minY * newScale + (availH - bbox.height * newScale) / 2
-    dispatch({ type: 'SET_CANVAS_SCALE', scale: newScale })
-    dispatch({ type: 'SET_CANVAS_OFFSET', x: newOffsetX, y: newOffsetY })
-    toast('Fitted to view')
-  }, [state.monitors, dimensions, dispatch, toast])
+  }, [
+    imageSelected,
+    state.selectedMonitorId,
+    state.monitors,
+    state.sourceImage,
+    state.snapToGrid,
+    state.gridSize,
+    state.eyedropperActive,
+    state.smartAlign,
+    state.sourceImage,
+    canUndo,
+    canRedo,
+    undoLabel,
+    redoLabel,
+    fitView,
+    dispatch,
+    toast,
+  ])
 
   const handleSizeImageToFit = useCallback(() => {
     if (!state.sourceImage || state.monitors.length === 0) return
@@ -527,6 +613,10 @@ export default function EditorCanvas() {
     dispatch({ type: 'SET_IMAGE_TRANSFORM', x: nextX, y: nextY, physicalWidth: nextWidth, physicalHeight: nextHeight })
     toast.success('Image sized to fit layout')
   }, [state.sourceImage, state.monitors, dispatch, toast])
+
+  useEffect(() => {
+    sizeImageToFitRef.current = handleSizeImageToFit
+  }, [handleSizeImageToFit])
 
   // Attach transformer to image when selected
   useEffect(() => {
@@ -1705,10 +1795,15 @@ export default function EditorCanvas() {
           smartAlign={state.smartAlign}
           canSizeImageToFit={state.monitors.length > 0 && !!state.sourceImage}
           onSizeImageToFit={handleSizeImageToFit}
+          onOpenEditorShortcuts={() => setShowEditorShortcuts(true)}
           dispatch={dispatch}
           eyedropperActive={state.eyedropperActive}
         />
       </div>
+
+      {showEditorShortcuts && (
+        <EditorShortcutsDialog onClose={() => setShowEditorShortcuts(false)} />
+      )}
 
       {/* Custom scrollbars */}
       <CanvasScrollbars
@@ -2160,6 +2255,7 @@ function CanvasMenuInner({
   smartAlign,
   canSizeImageToFit,
   onSizeImageToFit,
+  onOpenEditorShortcuts,
   dispatch,
   eyedropperActive,
 }: {
@@ -2168,6 +2264,7 @@ function CanvasMenuInner({
   smartAlign: boolean
   canSizeImageToFit: boolean
   onSizeImageToFit: () => void
+  onOpenEditorShortcuts: () => void
   dispatch: Dispatch<any>
   eyedropperActive: boolean
 }) {
@@ -2214,6 +2311,16 @@ function CanvasMenuInner({
       </button>
       {open && (
         <div className="absolute right-0 mt-1 w-48 bg-gray-900 border border-gray-700 rounded-lg shadow-xl overflow-hidden">
+          <button
+            onClick={() => {
+              onOpenEditorShortcuts()
+              setOpen(false)
+            }}
+            className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+          >
+            Editor shortcuts
+          </button>
+          <div className="border-t border-gray-700" />
           <button
             onClick={() => {
               dispatch({ type: 'TOGGLE_SMART_ALIGN' })
