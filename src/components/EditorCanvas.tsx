@@ -1490,6 +1490,11 @@ export default function EditorCanvas() {
               toast('Monitor removed')
               setContextMenu(null)
             }}
+            onDuplicate={() => {
+              dispatch({ type: 'DUPLICATE_MONITOR', id: mon.id })
+              toast.success('Monitor duplicated')
+              setContextMenu(null)
+            }}
             onSetBezels={() => {
               setBezelEditorMonitorId(mon.id)
               setContextMenu(null)
@@ -1792,13 +1797,14 @@ function ImageKebabMenu({
  * Right-click context menu on a monitor.
  */
 function MonitorContextMenu({
-  x, y, monitor: _monitor, onClose, onRename, onRotate, onDelete, onSetBezels,
+  x, y, monitor: _monitor, onClose, onRename, onRotate, onDelete, onDuplicate, onSetBezels,
 }: {
   x: number; y: number; monitor: Monitor
   onClose: () => void
   onRename: () => void
   onRotate: () => void
   onDelete: () => void
+  onDuplicate: () => void
   onSetBezels: () => void
 }) {
   const menuRef = useRef<HTMLDivElement>(null)
@@ -1833,6 +1839,9 @@ function MonitorContextMenu({
       </button>
       <button onClick={onRotate} className={itemClass}>
         Rotate 90°
+      </button>
+      <button onClick={onDuplicate} className={itemClass}>
+        Duplicate
       </button>
       <div className="border-t border-gray-700" />
       <button onClick={onDelete} className={`${itemClass} text-red-400 hover:text-red-300`}>

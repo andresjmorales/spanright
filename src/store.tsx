@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, type ReactNode } from 'react'
 import type { Monitor, SourceImage, MonitorPreset, WindowsMonitorPosition, ActiveTab, Bezels, FillMode, SavedImagePosition } from './types'
-import { createMonitor } from './utils'
+import { createMonitor, getMonitorDisplayName } from './utils'
 
 const MAX_HISTORY = 50
 
@@ -54,6 +54,7 @@ interface State {
 type Action =
   | { type: 'ADD_MONITOR'; preset: MonitorPreset; x: number; y: number; rotation?: 0 | 90; displayName?: string }
   | { type: 'REMOVE_MONITOR'; id: string }
+  | { type: 'DUPLICATE_MONITOR'; id: string }
   | { type: 'SET_MONITOR_DISPLAY_NAME'; id: string; displayName: string }
   | { type: 'SET_MONITOR_BEZELS'; id: string; bezels: Bezels | undefined }
   | { type: 'ROTATE_MONITOR'; id: string }
@@ -179,6 +180,39 @@ function reducer(state: State, action: Action): State {
         ...state,
         monitors: newMonitors,
         selectedMonitorId: state.selectedMonitorId === action.id ? null : state.selectedMonitorId,
+        windowsArrangement: generateDefaultWindowsArrangement(newMonitors),
+      }
+    }
+    case 'DUPLICATE_MONITOR': {
+      const source = state.monitors.find(m => m.id === action.id)
+      if (!source) return state
+      const baseName = getMonitorDisplayName(source).replace(/\s*-\s*Copy\s+\d+$/i, '').trim()
+      const copyPrefix = `${baseName} - Copy `
+      let maxCopy = 0
+      for (const m of state.monitors) {
+        const name = getMonitorDisplayName(m)
+        if (name === baseName) maxCopy = Math.max(maxCopy, 0)
+        else if (name.startsWith(copyPrefix)) {
+          const suffix = name.slice(copyPrefix.length)
+          if (/^\d+$/.test(suffix)) maxCopy = Math.max(maxCopy, parseInt(suffix, 10))
+        }
+      }
+      const copyName = `${baseName} - Copy ${maxCopy + 1}`
+      const offsetX = source.physicalWidth * 0.2
+      const offsetY = source.physicalHeight * 0.15
+      const newMonitor = createMonitor(
+        source.preset,
+        source.physicalX + offsetX,
+        source.physicalY + offsetY,
+        source.rotation ?? 0,
+        copyName,
+        source.bezels ? { ...source.bezels } : undefined,
+      )
+      const newMonitors = [...state.monitors, newMonitor]
+      return {
+        ...state,
+        monitors: newMonitors,
+        selectedMonitorId: newMonitor.id,
         windowsArrangement: generateDefaultWindowsArrangement(newMonitors),
       }
     }
@@ -357,6 +391,7 @@ function reducer(state: State, action: Action): State {
 const DISCRETE_UNDOABLE: Record<string, string> = {
   'ADD_MONITOR': 'Add monitor',
   'REMOVE_MONITOR': 'Remove monitor',
+  'DUPLICATE_MONITOR': 'Duplicate monitor',
   'ROTATE_MONITOR': 'Rotate monitor',
   'CLEAR_ALL_MONITORS': 'Clear all monitors',
   'SET_SOURCE_IMAGE': 'Load image',
