@@ -453,8 +453,8 @@ export default function WindowsArrangementCanvas() {
         <div className="shrink-0 px-4 py-2.5 bg-amber-950/70 border-b border-amber-700/50">
           <p className="text-xs text-amber-200">
             <strong>Tip:</strong> Match this to your OS display arrangement. Arrangement on this page affects the output image.
-            {' '}For more information on how virtual layout works,{' '}
-            <button onClick={() => dispatch({ type: 'SET_SHOW_HOW_IT_WORKS', value: true })} className="text-amber-300 underline underline-offset-2 hover:text-amber-100 transition-colors">see How It Works</button>.
+            {' '}For more information on how virtual layout works, see{' '}
+            <button onClick={() => dispatch({ type: 'SET_SHOW_HOW_IT_WORKS', value: true })} className="text-amber-300 underline underline-offset-2 hover:text-amber-100 transition-colors">How It Works</button>.
           </p>
         </div>
       )}
