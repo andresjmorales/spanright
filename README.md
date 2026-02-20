@@ -22,6 +22,7 @@ Spanright operates in **physical space** (inches/cm), so you arrange monitors as
 - **Canvas controls** — Scroll to pan, Ctrl+Scroll to zoom (up to 400%), right-click drag to pan. Custom scrollbars, Align Assist guides/snapping, and fit-to-view.
 - **Saved Layouts** — Save and load monitor layouts (names, positions, rotation, bezels, virtual layout). Saving a layout also stores the current image position when an image is loaded; loading a layout and then uploading an image applies that saved position (with aspect-ratio adaptation). Layouts are stored in your browser (localStorage); you can keep several setups (e.g. desk vs laptop-only) and switch between them. **Export** downloads all saved layouts as a JSON file; **Import** uploads a JSON file (same format), validates it (monitor rules: diagonal 5"–120", aspect ratio ≤10:1, etc.), and adds layouts to your list (up to the 24-layout limit). Optional **Quick layouts** (preloaded in code) appear at the bottom of the Saved Layouts dropdown when configured. The Saved Layouts control sits on the right side of the toolbar, to the left of Share Layout.
 - **Image position bookmark** — Right-click the source image for **Bookmark image position**, **Apply bookmarked position**, and **Clear bookmarked position**. The bookmark is stored per layout name (or "_default" when no layout is active) so you can pin a preferred image position independently of saving the full layout.
+- **Share Layout link** — Share encodes the monitor arrangement and, when an image is loaded, its position and size. Opening a shared link restores the layout and image position so the next image you upload is placed where the shared layout had it (with aspect-ratio adaptation).
 - **Cross-platform** — Works in any modern browser. Output can be applied as a spanned wallpaper on Windows (Span/Tile mode), macOS (per-monitor crop), and Linux (varies by DE — GNOME, KDE, feh, swaybg, etc.).
 - **Responsive layout** — On tablet (768px–1024px) the preset sidebar becomes a slide-out drawer (default collapsed) and the header/toolbar wrap or shorten. On phone (&lt;768px) an informational view explains the app and shows a read-only summary of shared layout URLs, with an option to open the full editor.
 
@@ -79,7 +80,7 @@ Drag monitors on the canvas to match your physical desk arrangement:
 - The image appears behind the monitors with 70% opacity. If you loaded a layout that had a saved image position, the next image you upload is automatically positioned from that layout (with aspect-ratio adaptation); a toast confirms "Image positioned from saved layout"
 - **Drag** the image to reposition it
 - **Click** the image and use the corner handles to resize it
-- Use **Size image to fit** from the canvas menu (top-right ⋮) or from the **⋮** kebab / right-click menu on the source image
+- Use **Size image to fit** from the canvas menu (top-right ⋮) or from the **⋮** kebab / right-click menu on the source image. The canvas menu also has **Editor shortcuts** — opens a dialog listing all keyboard shortcuts (nudge, undo/redo, fit, pan/zoom, etc.).
 - **Right-click** the image for **Bookmark image position**, **Apply bookmarked position**, or **Clear bookmarked position**
 - With **Align Assist** enabled, image drag/resize shows green alignment guides against monitor edges/centers
 - Check the **recommended image size** banner in the toolbar — green means your image is large enough, yellow/red means it may appear pixelated
@@ -163,6 +164,7 @@ Linux wallpaper handling varies by desktop environment:
 | Monitor context menu | **Right-click** monitor or select + **⋮** kebab → Set Bezels, Rename, Rotate 90°, Duplicate, Delete |
 | Delete monitor | Select + **Delete** or **Backspace**, or right-click → Delete |
 | Deselect | **Escape** or click empty space |
+| Full shortcuts list | Canvas menu (top-right ⋮) → **Editor shortcuts** |
 
 ## How It Works
 

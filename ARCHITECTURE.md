@@ -106,8 +106,8 @@ flowchart LR
   Store -->|generateOutput| Output["Output image\n(PNG/JPEG)"]
 ```
 
-- **URL → app:** On load, `App` reads `#layout=ENCODED`. `urlLayout.decodeLayout(encoded)` supports LZ-compressed (`~...`) or legacy base64url; result is `LOAD_LAYOUT` then hash is cleared.
-- **Share:** `ShareButton` uses `buildShareUrl(monitors)` → `encodeLayout` (JSON → LZ → `~`-prefixed string) → copy URL to clipboard.
+- **URL → app:** On load, `App` reads `#layout=ENCODED`. `urlLayout.getLayoutFromHash()` → `decodeLayout(encoded)` returns `{ monitors, imagePosition }` (LZ or base64url); `LOAD_LAYOUT` is dispatched with both, then hash is cleared.
+- **Share:** `ShareButton` uses `buildShareUrl(monitors, imagePosition?)` → `encodeLayout` (monitors + optional image position → JSON → LZ → `~`-prefixed string) → copy URL to clipboard. When an image is loaded, its position is included so the recipient’s next upload is placed the same way.
 - **Saved layouts:** `ConfigManager` reads/writes a list of `SavedConfig` to localStorage; loading dispatches `LOAD_LAYOUT` with optional `imagePosition`. Preloaded (quick) layouts live in `preloadedLayouts.ts` and are decoded with the same `decodeLayout`.
 - **Image position bookmarks:** `imagePositionStorage.ts` stores `SavedImagePosition` by layout key (`activeLayoutName` or `_default`). Used when applying a bookmark or when loading a layout that had an image (restore position on next upload).
 
@@ -139,7 +139,7 @@ PPI and physical size: `utils.ts` (and store when creating monitors) use `ppi = 
 | `src/canvasConstants.ts` | Physical canvas bounds (inches) and center (for preloaded layout centering). |
 | `src/generateOutput.ts` | Stitching: rotated image canvas, per-monitor crop at native PPI, placement by `windowsArrangement`, fill for empty area. |
 | **Layout encoding & persistence** | |
-| `src/urlLayout.ts` | Encode/decode layout for share URL (compact JSON → LZ or base64url); `getLayoutFromHash`, `buildShareUrl`, `setLayoutHash`, `clearLayoutHash`. |
+| `src/urlLayout.ts` | Encode/decode layout and optional image position for share URL (compact JSON → LZ or base64url); `getLayoutFromHash` returns `{ monitors, imagePosition }`; `buildShareUrl`, `setLayoutHash`, `clearLayoutHash`. |
 | `src/viewportConstants.ts` | Breakpoints for responsive layout (phone &lt;768px, tablet 768–1024, desktop ≥1024). |
 | `src/useViewport.ts` | Hook returning `{ width, height, isPhone, isTablet, isDesktop }` with resize listener. |
 | `src/preloadedLayouts.ts` | Optional quick-layout list (name + encoded string); `decodePreloadedLayout`. |
@@ -152,7 +152,7 @@ PPI and physical size: `utils.ts` (and store when creating monitors) use `ppi = 
 | `src/components/PreviewPanel.tsx` | Live preview canvas from `generateOutput`; fill mode/color; eyedropper; download PNG/JPEG; troubleshooting link. |
 | `src/components/ImageUpload.tsx` | File input; creates `SourceImage` and dispatches `SET_SOURCE_IMAGE`; applies `loadedLayoutImagePosition` when relevant. |
 | `src/components/ConfigManager.tsx` | Saved layouts: load, save, delete, export JSON, import JSON; quick layouts from preloaded; integrates with store and localStorage. |
-| `src/components/ShareButton.tsx` | Builds share URL from current monitors via `buildShareUrl`, copies to clipboard. |
+| `src/components/ShareButton.tsx` | Builds share URL from current monitors and image position (when present) via `buildShareUrl`, copies to clipboard. |
 | `src/components/MobileShell.tsx` | Phone (&lt;768px) informational view: hero, read-only layout summary from URL hash, “open on desktop” message, “Open full editor” button. |
 | `src/components/Toast.tsx` | Toast provider and trigger (success/error). |
 | `src/components/InfoDialog.tsx` | “How it works” content. |

@@ -166,7 +166,12 @@ function AppContent() {
   useEffect(() => {
     const layoutFromHash = getLayoutFromHash()
     if (layoutFromHash && !viewport.isPhone) {
-      dispatch({ type: 'LOAD_LAYOUT', monitors: layoutFromHash })
+      dispatch({
+        type: 'LOAD_LAYOUT',
+        monitors: layoutFromHash.monitors,
+        imagePosition: layoutFromHash.imagePosition,
+      })
+      dispatch({ type: 'SET_ACTIVE_LAYOUT_NAME', name: null })
       clearLayoutHash()
     } else if (!layoutFromHash && !localStorage.getItem(WELCOME_SEEN_KEY)) {
       setShowWelcome(true)
@@ -187,7 +192,12 @@ function AppContent() {
     if (!forceDesktopView) return
     const layoutFromHash = getLayoutFromHash()
     if (layoutFromHash) {
-      dispatch({ type: 'LOAD_LAYOUT', monitors: layoutFromHash })
+      dispatch({
+        type: 'LOAD_LAYOUT',
+        monitors: layoutFromHash.monitors,
+        imagePosition: layoutFromHash.imagePosition,
+      })
+      dispatch({ type: 'SET_ACTIVE_LAYOUT_NAME', name: null })
       clearLayoutHash()
     }
   }, [forceDesktopView, dispatch])

@@ -30,6 +30,7 @@ export default function MobileShell({
   onOpenFullEditor: () => void
 }) {
   const layoutFromUrl = getLayoutFromHash()
+  const monitorsFromUrl = layoutFromUrl?.monitors ?? null
 
   return (
     <div className="flex flex-col h-full overflow-auto bg-gray-950 text-gray-100">
@@ -48,8 +49,8 @@ export default function MobileShell({
           wallpaper that aligns correctly on Windows, macOS, and Linux.
         </p>
 
-        {layoutFromUrl && layoutFromUrl.length > 0 && (
-          <ReadOnlyLayoutSummary monitors={layoutFromUrl} />
+        {monitorsFromUrl && monitorsFromUrl.length > 0 && (
+          <ReadOnlyLayoutSummary monitors={monitorsFromUrl} />
         )}
 
         <div className="rounded-lg bg-amber-950/40 border border-amber-700/50 p-4 text-sm text-amber-100">
