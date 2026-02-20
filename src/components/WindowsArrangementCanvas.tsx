@@ -401,11 +401,7 @@ export default function WindowsArrangementCanvas() {
         : verticalMismatch
           ? 'vertical alignment differs'
           : 'horizontal alignment differs'
-          warns.push(
-            `Your virtual layout's ${axis} from your physical layout. ` +
-            `This affects cursor movement across monitors and where black bars land when monitors have different resolutions — ` +
-            `don't worry, they only fill hidden negative space and won't be visible on your screens.`
-          )
+      warns.push(`Your virtual layout's ${axis} from your physical layout.`)
     }
 
     return warns
@@ -452,12 +448,13 @@ export default function WindowsArrangementCanvas() {
 
       </div>
 
-      {/* Baseline warning when customizing — in flow so it’s always visible */}
+      {/* Explanation when customizing (purpose of OS arrangement and empty area) — in flow so it’s always visible */}
       {state.useWindowsArrangement && (
-        <div className="shrink-0 px-4 py-2.5 bg-amber-950/70 border-b border-amber-700/50 space-y-1">
+        <div className="shrink-0 px-4 py-2.5 bg-amber-950/70 border-b border-amber-700/50">
           <p className="text-xs text-amber-200">
-            <strong>Tip:</strong> Match this to your OS display arrangement.
-            {' '}<button onClick={() => dispatch({ type: 'SET_SHOW_HOW_IT_WORKS', value: true })} className="text-amber-300 underline underline-offset-2 hover:text-amber-100 transition-colors">Learn more</button>
+            <strong>Tip:</strong> Match this to your OS display arrangement. Arrangement on this page affects the output image.
+            {' '}For more information on how virtual layout works,{' '}
+            <button onClick={() => dispatch({ type: 'SET_SHOW_HOW_IT_WORKS', value: true })} className="text-amber-300 underline underline-offset-2 hover:text-amber-100 transition-colors">see How It Works</button>.
           </p>
         </div>
       )}

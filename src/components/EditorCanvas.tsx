@@ -6,6 +6,7 @@ import { formatDimension, getMonitorsBoundingBox, getMonitorDisplayName, getBeze
 import { useToast } from './Toast'
 import { IconUndo, IconRedo, IconCheck, IconKebabVertical } from '../icons'
 import type { Monitor, SourceImage, Bezels } from '../types'
+import { rotatedImageCanvas } from '../generateOutput'
 import {
   PHYS_MIN_X,
   PHYS_MAX_X,
@@ -354,6 +355,27 @@ export default function EditorCanvas() {
   // Refs for values used in hot-path event handlers (avoids callback recreation)
   const canvasStateRef = useRef({ scale: 10, offsetX: 50, offsetY: 50, dimW: 800, dimH: 500 })
 
+  // Close monitor context menu and image menu when eyedropper is activated
+  useEffect(() => {
+    if (state.eyedropperActive) {
+      setContextMenu(null)
+      setImageMenuAt(null)
+    }
+  }, [state.eyedropperActive])
+
+  // Exit eyedropper when user clicks outside the canvas (tabs, toolbar, sidebar, header, etc.)
+  useEffect(() => {
+    if (!state.eyedropperActive) return
+    const handler = (e: MouseEvent) => {
+      const container = containerRef.current
+      if (container && !container.contains(e.target as Node)) {
+        dispatch({ type: 'SET_EYEDROPPER_ACTIVE', active: false })
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [state.eyedropperActive, dispatch])
+
   // Resize observer
   useEffect(() => {
     const container = containerRef.current
@@ -407,10 +429,14 @@ export default function EditorCanvas() {
         dispatch({ type: 'REMOVE_MONITOR', id: state.selectedMonitorId })
         toast('Monitor removed')
       }
-      // Escape to deselect
+      // Escape to cancel eyedropper or deselect
       if (e.key === 'Escape') {
-        dispatch({ type: 'SELECT_MONITOR', id: null })
-        setImageSelected(false)
+        if (state.eyedropperActive) {
+          dispatch({ type: 'SET_EYEDROPPER_ACTIVE', active: false })
+        } else {
+          dispatch({ type: 'SELECT_MONITOR', id: null })
+          setImageSelected(false)
+        }
       }
       // F key to fit view
       if (e.key === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey) {
@@ -567,6 +593,48 @@ export default function EditorCanvas() {
 
   // Middle-mouse or right-click for panning
   const handleMouseDown = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
+    // Eyedropper: left-click to sample pixel color from source image
+    if (state.eyedropperActive && e.evt.button === 0) {
+      e.evt.preventDefault()
+      const stage = stageRef.current
+      if (!stage || !state.sourceImage) {
+        toast.warning('Upload an image first to sample a color')
+        dispatch({ type: 'SET_EYEDROPPER_ACTIVE', active: false })
+        return
+      }
+      const pointer = stage.getPointerPosition()
+      if (!pointer) return
+      const cs = canvasStateRef.current
+      const physX = (pointer.x - cs.offsetX) / cs.scale
+      const physY = (pointer.y - cs.offsetY) / cs.scale
+      const img = state.sourceImage
+      if (physX >= img.physicalX && physX <= img.physicalX + img.physicalWidth &&
+          physY >= img.physicalY && physY <= img.physicalY + img.physicalHeight) {
+        const u = (physX - img.physicalX) / img.physicalWidth
+        const v = (physY - img.physicalY) / img.physicalHeight
+        const rotated = (img.rotation ?? 0) !== 0
+        const srcElement = rotated ? rotatedImageCanvas(img) : img.element
+        const srcW = rotated && (img.rotation === 90 || img.rotation === 270) ? img.naturalHeight : img.naturalWidth
+        const srcH = rotated && (img.rotation === 90 || img.rotation === 270) ? img.naturalWidth : img.naturalHeight
+        const pixelX = Math.min(Math.floor(u * srcW), srcW - 1)
+        const pixelY = Math.min(Math.floor(v * srcH), srcH - 1)
+        const sampleCanvas = document.createElement('canvas')
+        sampleCanvas.width = 1
+        sampleCanvas.height = 1
+        const sampleCtx = sampleCanvas.getContext('2d')!
+        sampleCtx.drawImage(srcElement, pixelX, pixelY, 1, 1, 0, 0, 1, 1)
+        const pixel = sampleCtx.getImageData(0, 0, 1, 1).data
+        const hex = '#' + [pixel[0], pixel[1], pixel[2]].map(c => c.toString(16).padStart(2, '0')).join('')
+        dispatch({ type: 'SET_FILL_SOLID_COLOR', color: hex })
+        dispatch({ type: 'SET_FILL_MODE', mode: 'solid' })
+        dispatch({ type: 'SET_EYEDROPPER_ACTIVE', active: false })
+        dispatch({ type: 'SET_ACTIVE_TAB', tab: 'preview' })
+        toast.success(`Sampled ${hex}`)
+      } else {
+        toast.warning('Click on the source image to sample a color')
+      }
+      return
+    }
     if (e.evt.button === 1 || e.evt.button === 2) {
       e.evt.preventDefault()
       setIsDraggingCanvas(true)
@@ -578,7 +646,7 @@ export default function EditorCanvas() {
       dispatch({ type: 'SELECT_MONITOR', id: null })
       setImageSelected(false)
     }
-  }, [dispatch])
+  }, [dispatch, state.eyedropperActive, state.sourceImage, toast])
 
   const handleMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     if (isDraggingCanvas && lastPointerPos.current) {
@@ -904,6 +972,20 @@ export default function EditorCanvas() {
         setImageSelected(true)
         dispatch({ type: 'SELECT_MONITOR', id: null })
         setImageMenuAt(null)
+      }}
+      onContextMenu={(e) => {
+        e.evt.preventDefault()
+        contextMenuHandledRef.current = true
+        const stage = stageRef.current
+        if (!stage) return
+        const container = stage.container().getBoundingClientRect()
+        setImageSelected(true)
+        dispatch({ type: 'SELECT_MONITOR', id: null })
+        setContextMenu(null)
+        setImageMenuAt({
+          x: e.evt.clientX - container.left,
+          y: e.evt.clientY - container.top,
+        })
       }}
       onDragMove={handleImageDragMove}
       onDragEnd={handleImageDragEnd}
@@ -1254,7 +1336,7 @@ export default function EditorCanvas() {
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        style={{ cursor: isDraggingCanvas ? 'grabbing' : 'default' }}
+        style={{ cursor: state.eyedropperActive ? 'crosshair' : isDraggingCanvas ? 'grabbing' : 'default' }}
       >
         <Layer>
           <Rect width={dimensions.width} height={dimensions.height} fill="#0a0a1a" listening={false} />
@@ -1262,7 +1344,7 @@ export default function EditorCanvas() {
           {workspaceBorder}
           {originLines}
         </Layer>
-        <Layer>
+        <Layer listening={!state.eyedropperActive}>
           {imageNode}
           {/* Transformer for image resizing */}
           <Transformer
@@ -1443,7 +1525,7 @@ export default function EditorCanvas() {
               dispatch({ type: 'UNDO' })
             }
           }}
-          disabled={!canUndo}
+          disabled={!canUndo || state.eyedropperActive}
           className="bg-gray-900/80 backdrop-blur hover:bg-gray-800/90 text-gray-400 hover:text-gray-200 disabled:text-gray-600 disabled:hover:bg-gray-900/80 p-1.5 rounded transition-colors"
           title={canUndo ? `Undo: ${undoLabel} (Ctrl+Z)` : 'Nothing to undo'}
         >
@@ -1456,7 +1538,7 @@ export default function EditorCanvas() {
               dispatch({ type: 'REDO' })
             }
           }}
-          disabled={!canRedo}
+          disabled={!canRedo || state.eyedropperActive}
           className="bg-gray-900/80 backdrop-blur hover:bg-gray-800/90 text-gray-400 hover:text-gray-200 disabled:text-gray-600 disabled:hover:bg-gray-900/80 p-1.5 rounded transition-colors"
           title={canRedo ? `Redo: ${redoLabel} (Ctrl+Shift+Z)` : 'Nothing to redo'}
         >
@@ -1469,6 +1551,7 @@ export default function EditorCanvas() {
           canSizeImageToFit={state.monitors.length > 0 && !!state.sourceImage}
           onSizeImageToFit={handleSizeImageToFit}
           dispatch={dispatch}
+          eyedropperActive={state.eyedropperActive}
         />
       </div>
 
@@ -1888,6 +1971,7 @@ function CanvasMenuInner({
   canSizeImageToFit,
   onSizeImageToFit,
   dispatch,
+  eyedropperActive,
 }: {
   hasMonitors: boolean
   hasImage: boolean
@@ -1895,6 +1979,7 @@ function CanvasMenuInner({
   canSizeImageToFit: boolean
   onSizeImageToFit: () => void
   dispatch: Dispatch<any>
+  eyedropperActive: boolean
 }) {
   const toast = useToast()
   const [open, setOpen] = useState(false)
@@ -1922,11 +2007,17 @@ function CanvasMenuInner({
     return () => window.removeEventListener('keydown', handleKey)
   }, [open])
 
+  // Close menu when eyedropper is activated so user can't use canvas options while sampling
+  useEffect(() => {
+    if (eyedropperActive) setOpen(false)
+  }, [eyedropperActive])
+
   return (
     <div ref={menuRef} className="relative">
       <button
         onClick={() => setOpen(o => !o)}
-        className="bg-gray-900/80 backdrop-blur hover:bg-gray-800/90 text-gray-400 hover:text-gray-200 px-2 py-1.5 rounded transition-colors"
+        disabled={eyedropperActive}
+        className="bg-gray-900/80 backdrop-blur hover:bg-gray-800/90 text-gray-400 hover:text-gray-200 disabled:text-gray-600 disabled:hover:bg-gray-900/80 px-2 py-1.5 rounded transition-colors"
         title="Canvas options"
       >
         <IconKebabVertical className="w-4 h-4" />

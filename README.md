@@ -17,7 +17,7 @@ Spanright operates in **physical space** (inches/cm), so you arrange monitors as
 - **Right-click or kebab menu** — Right-click any monitor, or when a monitor is selected click the **⋮** (kebab) button next to the **✕** delete button, for **Set Bezels**, **Rename**, **Rotate 90°**, and **Delete**. Bezels are optional per-edge borders (in mm) that extend outward from the display area; they help with alignment and matching real bezels, and Align Assist snaps to outer bezel edges when set.
 - **Image placement** — Upload a source image and drag/scale it behind the monitor layout. Semi-transparent monitor overlays let you see exactly what portion of the image each screen will display. Vertical images (height > width) default to 6 ft tall; horizontal ones default to 6 ft wide.
 - **Smart image recommendations** — Calculates the minimum source image resolution needed based on your layout's physical size and the highest-PPI monitor.
-- **Accurate output generation** — Crops and scales the source image per-monitor at each screen's native PPI, then stitches at each monitor's virtual layout position (side-by-side, stacked, or mixed). Fills any gaps in the layout with black.
+- **Accurate output generation** — Crops and scales the source image per-monitor at each screen's native PPI, then stitches at each monitor's virtual layout position (side-by-side, stacked, or mixed). Gaps in the layout use a configurable fill: solid color (default black), blurred edge extension, or transparent (PNG only).
 - **Preview & download** — Live preview of the final stitched wallpaper with one-click PNG/JPEG export.
 - **Canvas controls** — Scroll to pan, Ctrl+Scroll to zoom (up to 400%), right-click drag to pan. Custom scrollbars, Align Assist guides/snapping, and fit-to-view.
 - **Saved Layouts** — Save and load monitor layouts (names, positions, rotation, bezels, virtual layout). Layouts are stored in your browser (localStorage); you can keep several setups (e.g. desk vs laptop-only) and switch between them. Optional **Quick layouts** (preloaded in code) appear at the top of the Saved Layouts dropdown when configured. The Saved Layouts control sits on the right side of the toolbar, to the left of Share Layout.
@@ -83,12 +83,14 @@ Drag monitors on the canvas to match your physical desk arrangement:
 
 ### 4. Virtual Layout (optional)
 
-The **Virtual Layout** tab (next to Physical Layout) lets you match how your OS sees your displays. Use it if your display order or positions don't match a simple left-to-right layout. This concept applies on all platforms — Windows, macOS, and Linux all maintain their own display arrangement.
+The **Virtual Layout** tab (next to Physical Layout) lets you match how your OS sees your displays. The OS arrangement defines the *virtual desktop*: where the cursor and windows move between monitors (e.g. one display above the other means the cursor crosses at the shared top edge; side-by-side at the vertical edge). Use the Virtual Layout tab if your display order or positions don't match a simple left-to-right layout. This concept applies on all platforms — Windows, macOS, and Linux all maintain their own display arrangement.
+
+The output image has the same bounding box. The OS paints the wallpaper from the top-left; each monitor only displays the rectangle of the image at its position. So any empty area in the image (gaps from different resolutions or offsets) lies outside every monitor's rectangle and is never shown on any screen.
 
 #### Windows
 Open **Settings > System > Display** to see how Windows arranges your monitors. If the order matches a simple left-to-right layout, you can skip this step.
 
-> **Warning:** Changing Windows Display Settings (position, order, resolution) can get messy. For best results, keep all monitors **top-aligned or bottom-aligned** in Windows; other alignments may produce unwanted (visible) black bars in the spanned wallpaper.
+> **Warning:** Changing Windows Display Settings (position, order, resolution) can get messy. For best results, keep all monitors **top-aligned or bottom-aligned** in Windows; other alignments may produce unwanted visible empty area in the spanned wallpaper.
 
 #### macOS
 Open **System Settings > Displays > Arrange** to see your display arrangement. Drag the display rectangles to match your physical layout.
@@ -104,7 +106,8 @@ Display arrangement depends on your desktop environment:
 ### 5. Preview & Export
 
 - The bottom panel shows a live preview of the final stitched wallpaper
-- Click **Download** to save as PNG or JPEG
+- When the output has empty area (e.g. vertical offsets or different strip heights), use **Empty area options** to choose how to fill it: **Solid color** (with color picker and eyedropper to sample from the source image), **Blurred edge extension**, or **Transparent** (PNG only)
+- Click **Download** to save as PNG or JPEG (transparent fill forces PNG)
 - The output dimensions are displayed (e.g., "7280 x 1440")
 
 ### 6. Set Your Wallpaper
@@ -188,7 +191,7 @@ Output matches the virtual desktop bounding box of your virtual layout. For each
 2. **Virtual layout** (pixel positions) determines where the monitor sits in the output image.
 3. The source image is cropped and scaled to the monitor's native resolution (PPI-correct).
 4. Each monitor is drawn at its `(pixelX, pixelY)` position in the output. This supports side-by-side, stacked vertical, and mixed layouts.
-5. Output dimensions = bounding box of all monitors (`maxX − minX` × `maxY − minY`). Any unfilled area (gaps or differing sizes) is filled with black.
+5. Output dimensions = bounding box of all monitors (`maxX − minX` × `maxY − minY`). Any unfilled area uses the chosen fill mode: solid color (default black), blurred edge extension, or transparent (PNG only).
 
 ## Tech Stack
 

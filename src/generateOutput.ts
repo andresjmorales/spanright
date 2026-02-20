@@ -1,11 +1,16 @@
-import type { Monitor, SourceImage, WindowsMonitorPosition } from './types'
+import type { Monitor, SourceImage, WindowsMonitorPosition, FillMode } from './types'
+
+export interface FillSettings {
+  mode: FillMode
+  solidColor: string
+}
 
 /**
  * Build a canvas with the image drawn at the given rotation (degrees CW).
  * TODO (source image rotation): 90° and 270° can produce wrong/missing crop for some monitors
  * in the output preview; physical↔pixel mapping or getSourceRect may need revisiting.
  */
-function rotatedImageCanvas(sourceImage: SourceImage): HTMLCanvasElement {
+export function rotatedImageCanvas(sourceImage: SourceImage): HTMLCanvasElement {
   const img = sourceImage.element
   const nW = sourceImage.naturalWidth
   const nH = sourceImage.naturalHeight
@@ -112,10 +117,14 @@ export interface OutputResult {
  * 2. Output dimensions = (maxX - minX) × (maxY - minY).
  * 3. For each monitor, draw its strip at (pixelX - minX, pixelY - minY).
  */
+/** Blur radius (px) for blurred-edge fill. */
+const FILL_BLUR_RADIUS_PX = 80
+
 export function generateOutput(
   monitors: Monitor[],
   sourceImage: SourceImage | null,
   windowsArrangement: WindowsMonitorPosition[],
+  fill?: FillSettings,
 ): OutputResult | null {
   if (monitors.length === 0) return null
 
@@ -149,9 +158,14 @@ export function generateOutput(
   outputCanvas.height = totalHeight
   const ctx = outputCanvas.getContext('2d')!
 
-  // Fill with black
-  ctx.fillStyle = '#000000'
-  ctx.fillRect(0, 0, totalWidth, totalHeight)
+  const fillMode = fill?.mode ?? 'solid'
+  const solidColor = fill?.solidColor ?? '#000000'
+
+  if (fillMode === 'solid') {
+    ctx.fillStyle = solidColor
+    ctx.fillRect(0, 0, totalWidth, totalHeight)
+  }
+  // 'transparent' and 'blur': canvas stays default (transparent); we composite on top
 
   const monitorStrips: OutputResult['monitors'] = []
 
@@ -206,7 +220,42 @@ export function generateOutput(
     monitorStrips.push({ monitor, stripWidth: sw, stripHeight: sh, stripX: drawX, stripY: drawY })
   }
 
-  // Black bars when the bounding box has empty regions (monitors don't tile the full area)
+  // Blur fill: draw source scaled-to-cover with heavy blur, then composite sharp strips on top
+  if (fillMode === 'blur' && sourceImage && sourceElement) {
+    const blurCanvas = document.createElement('canvas')
+    blurCanvas.width = totalWidth
+    blurCanvas.height = totalHeight
+    const blurCtx = blurCanvas.getContext('2d')!
+    const coverAspect = totalWidth / totalHeight
+    const imgAspect = sourceElement.width / sourceElement.height
+    let drawW: number, drawH: number
+    if (imgAspect > coverAspect) {
+      drawH = totalHeight
+      drawW = drawH * imgAspect
+    } else {
+      drawW = totalWidth
+      drawH = drawW / imgAspect
+    }
+    const bDrawX = (totalWidth - drawW) / 2
+    const bDrawY = (totalHeight - drawH) / 2
+    blurCtx.drawImage(sourceElement, bDrawX, bDrawY, drawW, drawH)
+    const blurredCanvas = document.createElement('canvas')
+    blurredCanvas.width = totalWidth
+    blurredCanvas.height = totalHeight
+    const blurredCtx = blurredCanvas.getContext('2d')!
+    blurredCtx.filter = `blur(${FILL_BLUR_RADIUS_PX}px)`
+    blurredCtx.drawImage(blurCanvas, 0, 0)
+    ctx.globalCompositeOperation = 'destination-over'
+    ctx.drawImage(blurredCanvas, 0, 0)
+    ctx.globalCompositeOperation = 'source-over'
+  } else if (fillMode === 'blur') {
+    ctx.globalCompositeOperation = 'destination-over'
+    ctx.fillStyle = '#000000'
+    ctx.fillRect(0, 0, totalWidth, totalHeight)
+    ctx.globalCompositeOperation = 'source-over'
+  }
+
+  // Empty regions when the bounding box has areas not covered by monitors
   const monitorArea = monitorStrips.reduce((sum, s) => sum + s.stripWidth * s.stripHeight, 0)
   const boundingArea = totalWidth * totalHeight
   const hasBlackBars = monitorArea < boundingArea

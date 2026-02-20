@@ -3,7 +3,15 @@ import { useStore } from '../store'
 import { useToast } from './Toast'
 import { generateOutput, type OutputResult } from '../generateOutput'
 import { getMonitorDisplayName } from '../utils'
+import { IconEyedropper } from '../icons'
+import type { FillMode } from '../types'
 
+/** Solid fill preset colors for quick select. */
+const FILL_PRESET_BLACK = '#000000'
+const FILL_PRESET_WHITE = '#ffffff'
+const FILL_PRESET_DARK_GRAY = '#1a1a1a'
+
+const CHECKERBOARD_CELL_PX = 8
 
 export default function PreviewPanel() {
   const { state, dispatch } = useStore()
@@ -16,7 +24,10 @@ export default function PreviewPanel() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [showDownloadDialog, setShowDownloadDialog] = useState(false)
   const [downloadFilename, setDownloadFilename] = useState('')
+  const [showEmptyAreaOptions, setShowEmptyAreaOptions] = useState(false)
   const downloadPopoverRef = useRef<HTMLDivElement>(null)
+  const emptyAreaPopoverRef = useRef<HTMLDivElement>(null)
+  const emptyAreaTriggerRef = useRef<HTMLButtonElement>(null)
   const debounceRef = useRef<number | null>(null)
 
   // Debounced output generation
@@ -33,7 +44,10 @@ export default function PreviewPanel() {
     }
 
     debounceRef.current = requestAnimationFrame(() => {
-      const result = generateOutput(state.monitors, state.sourceImage, state.windowsArrangement)
+      const result = generateOutput(state.monitors, state.sourceImage, state.windowsArrangement, {
+        mode: state.fillMode,
+        solidColor: state.fillSolidColor,
+      })
       setOutput(result)
       setIsGenerating(false)
     })
@@ -43,7 +57,7 @@ export default function PreviewPanel() {
         cancelAnimationFrame(debounceRef.current)
       }
     }
-  }, [state.monitors, state.sourceImage, state.windowsArrangement])
+  }, [state.monitors, state.sourceImage, state.windowsArrangement, state.fillMode, state.fillSolidColor])
 
   // Draw preview
   useEffect(() => {
@@ -61,8 +75,17 @@ export default function PreviewPanel() {
     canvas.width = Math.round(output.width * displayScale)
     canvas.height = Math.round(output.height * displayScale)
 
-    ctx.fillStyle = '#000000'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    if (state.fillMode === 'transparent') {
+      for (let cy = 0; cy < canvas.height; cy += CHECKERBOARD_CELL_PX) {
+        for (let cx = 0; cx < canvas.width; cx += CHECKERBOARD_CELL_PX) {
+          ctx.fillStyle = (Math.floor(cx / CHECKERBOARD_CELL_PX) + Math.floor(cy / CHECKERBOARD_CELL_PX)) % 2 === 0 ? '#333333' : '#444444'
+          ctx.fillRect(cx, cy, CHECKERBOARD_CELL_PX, CHECKERBOARD_CELL_PX)
+        }
+      }
+    } else {
+      ctx.fillStyle = '#000000'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+    }
     ctx.drawImage(output.canvas, 0, 0, canvas.width, canvas.height)
 
     // Draw monitor strip boundaries and labels (each at its actual position)
@@ -85,7 +108,7 @@ export default function PreviewPanel() {
       const label = `${getMonitorDisplayName(strip.monitor)} (${strip.stripWidth}x${strip.stripHeight})`
       ctx.fillText(label, x + w / 2, y + 12, w - 4)
     }
-  }, [output])
+  }, [output, state.fillMode])
 
   const getDefaultFilename = useCallback(() => {
     if (!output) return 'spanright'
@@ -99,7 +122,7 @@ export default function PreviewPanel() {
     setShowDownloadDialog(true)
   }, [getDefaultFilename])
 
-  // Close popover on outside click
+  // Close download popover on outside click
   useEffect(() => {
     if (!showDownloadDialog) return
     const handler = (e: MouseEvent) => {
@@ -111,10 +134,37 @@ export default function PreviewPanel() {
     return () => document.removeEventListener('mousedown', handler)
   }, [showDownloadDialog])
 
+  // Close empty area popover on outside click
+  useEffect(() => {
+    if (!showEmptyAreaOptions) return
+    const handler = (e: MouseEvent) => {
+      if (emptyAreaPopoverRef.current && !emptyAreaPopoverRef.current.contains(e.target as Node) &&
+          emptyAreaTriggerRef.current && !emptyAreaTriggerRef.current.contains(e.target as Node)) {
+        setShowEmptyAreaOptions(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showEmptyAreaOptions])
+
+  // Auto-switch to PNG when transparent fill is selected
+  useEffect(() => {
+    if (state.fillMode === 'transparent' && format === 'jpeg') {
+      setFormat('png')
+    }
+  }, [state.fillMode, format])
+
+  // Close empty area popover when layout no longer has empty area
+  useEffect(() => {
+    if (output && !output.hasBlackBars) setShowEmptyAreaOptions(false)
+  }, [output?.hasBlackBars])
+
+  const effectiveFormat = state.fillMode === 'transparent' ? 'png' : format
+
   const doDownload = useCallback((filename: string) => {
     if (!output) return
-    const mimeType = format === 'png' ? 'image/png' : 'image/jpeg'
-    const quality = format === 'jpeg' ? jpegQuality / 100 : undefined
+    const mimeType = effectiveFormat === 'png' ? 'image/png' : 'image/jpeg'
+    const quality = effectiveFormat === 'jpeg' ? jpegQuality / 100 : undefined
     const cleanName = filename.trim() || getDefaultFilename()
 
     output.canvas.toBlob((blob) => {
@@ -122,7 +172,7 @@ export default function PreviewPanel() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `${cleanName}.${format}`
+      a.download = `${cleanName}.${effectiveFormat}`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -130,7 +180,7 @@ export default function PreviewPanel() {
       toast.success('Wallpaper downloaded')
     }, mimeType, quality)
     setShowDownloadDialog(false)
-  }, [output, format, jpegQuality, getDefaultFilename, toast])
+  }, [output, effectiveFormat, jpegQuality, getDefaultFilename, toast])
 
   if (state.monitors.length === 0) {
     return (
@@ -171,6 +221,100 @@ export default function PreviewPanel() {
             >
               Wallpaper not looking right?
             </button>
+            {/* Empty area options — always visible; disabled with tooltip when no empty area */}
+            <div className="relative">
+              <button
+                ref={emptyAreaTriggerRef}
+                type="button"
+                onClick={() => output?.hasBlackBars && setShowEmptyAreaOptions((v) => !v)}
+                disabled={!output?.hasBlackBars}
+                className="text-xs bg-gray-800 border border-gray-700 rounded px-2 py-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700"
+                title={output?.hasBlackBars ? 'Options for empty area (regions not covered by the image)' : 'No empty area in this setup'}
+              >
+                Empty area options
+              </button>
+                {showEmptyAreaOptions && (
+                  <div
+                    ref={emptyAreaPopoverRef}
+                    className="absolute right-0 top-full mt-2 w-72 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl z-50 overflow-hidden"
+                  >
+                    {/* Banner first — always on top of color/fill controls */}
+                    <div className="px-3 py-2 bg-gray-800/80 border-b border-gray-700/50 space-y-1">
+                      <p className="text-xs text-gray-400">
+                        Empty area is normal — it fills the space around your displays and won&apos;t be visible on the monitors.
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {state.fillMode === 'solid'
+                          ? 'Fill: Solid color'
+                          : state.fillMode === 'blur'
+                            ? 'Fill: Blurred edge extension'
+                            : 'Fill: Transparent (PNG only)'}
+                      </p>
+                    </div>
+                    <div className="p-3 space-y-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-400 mb-1.5">Fill</label>
+                        <select
+                          value={state.fillMode}
+                          onChange={(e) => dispatch({ type: 'SET_FILL_MODE', mode: e.target.value as FillMode })}
+                          className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
+                          title="Fill mode for empty area (regions not covered by the image)"
+                        >
+                          <option value="solid">Solid color</option>
+                          <option value="blur">Blurred edge extension</option>
+                          <option value="transparent">Transparent (PNG only)</option>
+                        </select>
+                      </div>
+                      {state.fillMode === 'solid' && (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <label className="relative w-7 h-7 rounded border border-gray-600 cursor-pointer overflow-hidden shrink-0" title="Pick fill color">
+                              <span className="block w-full h-full" style={{ backgroundColor: state.fillSolidColor }} />
+                              <input
+                                type="color"
+                                value={state.fillSolidColor}
+                                onChange={(e) => dispatch({ type: 'SET_FILL_SOLID_COLOR', color: e.target.value })}
+                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                              />
+                            </label>
+                            <span className="text-xs text-gray-500">Presets:</span>
+                            {[
+                              { color: FILL_PRESET_BLACK, label: 'Black' },
+                              { color: FILL_PRESET_WHITE, label: 'White' },
+                              { color: FILL_PRESET_DARK_GRAY, label: 'Dark gray' },
+                            ].map(({ color, label }) => (
+                              <button
+                                key={color}
+                                type="button"
+                                onClick={() => dispatch({ type: 'SET_FILL_SOLID_COLOR', color })}
+                                className={`w-6 h-6 rounded border shrink-0 ${state.fillSolidColor === color ? 'border-blue-500 ring-1 ring-blue-500' : 'border-gray-600 hover:border-gray-500'}`}
+                                style={{ backgroundColor: color }}
+                                title={label}
+                              />
+                            ))}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                dispatch({ type: 'SET_EYEDROPPER_ACTIVE', active: !state.eyedropperActive })
+                                if (!state.eyedropperActive) dispatch({ type: 'SET_ACTIVE_TAB', tab: 'physical' })
+                              }}
+                              className={`w-7 h-7 flex items-center justify-center rounded border shrink-0 ${
+                                state.eyedropperActive ? 'border-blue-500 bg-blue-600/30 text-blue-300' : 'border-gray-600 text-gray-400 hover:text-gray-200 hover:border-gray-500'
+                              }`}
+                              title="Eyedropper: click on source image to sample color"
+                            >
+                              <IconEyedropper className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      {state.fillMode === 'transparent' && (
+                        <p className="text-xs text-gray-500">Transparent fill requires PNG format.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             <div className="flex items-center gap-2">
               <select
                 value={format}
@@ -178,7 +322,9 @@ export default function PreviewPanel() {
                 className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
               >
                 <option value="png">PNG (lossless)</option>
-                <option value="jpeg">JPEG</option>
+                <option value="jpeg" disabled={state.fillMode === 'transparent'}>
+                  JPEG{state.fillMode === 'transparent' ? ' (n/a)' : ''}
+                </option>
               </select>
               {format === 'jpeg' && (
                 <div className="flex items-center gap-1">
@@ -220,7 +366,7 @@ export default function PreviewPanel() {
                       className="flex-1 bg-gray-800 border border-gray-600 focus:border-blue-500 rounded px-2.5 py-1.5 text-sm text-gray-100 outline-none transition-colors"
                       placeholder="filename"
                     />
-                    <span className="text-xs text-gray-500 shrink-0">.{format}</span>
+                    <span className="text-xs text-gray-500 shrink-0">.{effectiveFormat}</span>
                   </div>
                   <div className="flex justify-end gap-2 mt-2.5">
                     <button
@@ -244,16 +390,9 @@ export default function PreviewPanel() {
         )}
       </div>
 
-      {/* Black bars note — when output has black fill (vertical offsets / different heights) */}
-      {output?.hasBlackBars && (
-        <div className="shrink-0 px-4 py-2 bg-gray-800/80 border-b border-gray-700/50">
-          <p className="text-xs text-gray-400">
-            Black bars in the preview are normal — they fill the negative space around your displays and shouldn’t be visible on the monitors themselves.
-          </p>
-        </div>
-      )}
 
-      {/* Preview canvas — background matches canvas workspace (#0a0a1a) so black bars stand out */}
+
+      {/* Preview canvas — background matches canvas workspace (#0a0a1a) so empty area stands out */}
       <div ref={containerRef} className="flex-1 flex items-center justify-center p-8 overflow-auto bg-[#12122a]">
         <canvas
           ref={canvasRef}
@@ -266,7 +405,7 @@ export default function PreviewPanel() {
       {state.useWindowsArrangement && (
         <div className="px-4 py-2 border-t border-gray-800 bg-gray-900 shrink-0">
           <div className="text-xs text-gray-500">
-            Output uses your custom virtual layout for monitor ordering and vertical offsets.
+            Output uses your custom virtual layout for monitor ordering and horizontal/vertical offsets.
           </div>
         </div>
       )}

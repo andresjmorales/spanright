@@ -127,13 +127,15 @@ export default function MonitorPresetsSidebar() {
   const standard = filtered.filter(p => p.diagonal >= 20 && p.aspectRatio[0] === 16)
   const ultrawides = filtered.filter(p => p.aspectRatio[0] >= 21)
 
-  const [collapsed, setCollapsed] = useState(false)
+  const collapsed = state.presetsSidebarCollapsed
 
-  if (collapsed) {
+  // When eyedropper is active we show the collapsed UI (so canvas has room); collapsed state lives in store so it persists across tab switch.
+  if (collapsed || state.eyedropperActive) {
     return (
       <button
-        onClick={() => setCollapsed(false)}
-        className="absolute top-8 left-8 z-30 flex items-center gap-1.5 bg-gray-800/90 hover:bg-gray-700 border border-gray-600/50 hover:border-gray-500 backdrop-blur-sm text-gray-300 hover:text-white text-xs font-medium px-2.5 py-1.5 rounded-md shadow-lg transition-all"
+        onClick={() => !state.eyedropperActive && dispatch({ type: 'SET_PRESETS_SIDEBAR_COLLAPSED', collapsed: false })}
+        disabled={state.eyedropperActive}
+        className="absolute top-8 left-8 z-30 flex items-center gap-1.5 bg-gray-800/90 hover:bg-gray-700 border border-gray-600/50 hover:border-gray-500 backdrop-blur-sm text-gray-300 hover:text-white text-xs font-medium px-2.5 py-1.5 rounded-md shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-800/90 disabled:hover:border-gray-600/50"
       >
         <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
           <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
@@ -153,7 +155,7 @@ export default function MonitorPresetsSidebar() {
               Add a Monitor
             </h2>
             <button
-              onClick={() => setCollapsed(true)}
+              onClick={() => dispatch({ type: 'SET_PRESETS_SIDEBAR_COLLAPSED', collapsed: true })}
               className="text-gray-500 hover:text-gray-300 transition-colors p-0.5 -mr-1"
               title="Collapse sidebar"
             >
