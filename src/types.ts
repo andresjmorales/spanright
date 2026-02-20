@@ -55,6 +55,9 @@ export interface WindowsMonitorPosition {
 
 export type ActiveTab = 'physical' | 'windows' | 'preview'
 
+/** How to fill empty area (output regions not covered by the source image). */
+export type FillMode = 'solid' | 'blur' | 'transparent'
+
 export interface SavedConfig {
   id: string
   name: string

@@ -60,16 +60,28 @@ export default function InfoDialog({ onClose }: InfoDialogProps) {
             </div>
           </section>
 
-          {/* Illustration */}
+          {/* Virtual layout in detail: what it controls and why empty area doesn't show */}
+          <section className="space-y-2 bg-gray-800/30 border border-gray-700/50 rounded-lg p-3">
+            <h3 className="text-sm font-medium text-gray-200">Virtual layout in detail</h3>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Your OS display arrangement defines the <strong className="text-gray-300">virtual desktop</strong>: where the cursor and windows move between monitors. If one display is above the other, the cursor crosses at the shared top edge; side-by-side, at the vertical edge between them. Offsets change where that &quot;seam&quot; is. Matching the Virtual Layout tab to your OS ensures the output image lines up with how the OS will paint it.
+            </p>
+            <p className="text-xs text-gray-400 leading-relaxed mt-2">
+              <strong className="text-gray-300">Why empty area doesn&apos;t show:</strong> The OS (Windows, macOS, Linux) paints the wallpaper from the top-left over that bounding box. Each monitor only displays the rectangle of the image at its position — so only pixels that fall inside a monitor&apos;s rectangle are ever shown on a screen. Gaps in the image (from different resolutions or vertical offsets) lie outside every monitor&apos;s rectangle, so no physical display ever shows them. You only see the parts that map to your actual monitors.
+            </p>
+          </section>
+
+          {/* Illustration: Your desk → Your OS sees (same resolution = two identical rectangles) */}
           <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
-            <div className="flex items-center justify-center gap-6">
+            <div className="flex items-center justify-center gap-6 flex-wrap">
               <div className="text-center">
                 <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Your desk</div>
                 <div className="relative w-32 h-16">
-                  <div className="absolute left-0 bottom-0 w-12 h-9 border border-cyan-500/60 bg-cyan-500/10 rounded-sm flex items-center justify-center">
+                  {/* 16:9 each — laptop smaller, monitor larger */}
+                  <div className="absolute left-0 bottom-0 w-12 border border-cyan-500/60 bg-cyan-500/10 rounded-sm flex items-center justify-center" style={{ height: 27 }}>
                     <span className="text-[8px] text-cyan-400">Laptop</span>
                   </div>
-                  <div className="absolute left-14 top-0 w-18 h-14 border border-blue-500/60 bg-blue-500/10 rounded-sm flex items-center justify-center">
+                  <div className="absolute left-14 top-0 w-16 h-9 border border-blue-500/60 bg-blue-500/10 rounded-sm flex items-center justify-center">
                     <span className="text-[8px] text-blue-400">Monitor</span>
                   </div>
                 </div>
@@ -79,19 +91,40 @@ export default function InfoDialog({ onClose }: InfoDialogProps) {
 
               <div className="text-center">
                 <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Your OS sees</div>
-                <div className="inline-block overflow-visible p-px">
-                  <div className="flex gap-px items-stretch">
-                    <div className="shrink-0 w-10 h-10 border border-cyan-500/60 bg-cyan-500/10 rounded-l-md rounded-r-sm flex items-center justify-center">
-                      <span className="text-[8px] text-cyan-400">1</span>
-                    </div>
-                    <div className="shrink-0 w-[72px] h-10 border border-blue-500/60 bg-blue-500/10 rounded-r-md rounded-l-sm flex items-center justify-center">
-                      <span className="text-[8px] text-blue-400">2</span>
-                    </div>
+                <div className="flex gap-px items-stretch">
+                  {/* Same 16:9 aspect ratio as desk rectangles; two identical (same resolution) */}
+                  <div className="shrink-0 border border-cyan-500/60 bg-cyan-500/10 rounded-l-md rounded-r-sm flex items-center justify-center" style={{ width: 40, height: 22.5 }}>
+                    <span className="text-[8px] text-cyan-400">1</span>
+                  </div>
+                  <div className="shrink-0 border border-blue-500/60 bg-blue-500/10 rounded-r-md rounded-l-sm flex items-center justify-center" style={{ width: 40, height: 22.5 }}>
+                    <span className="text-[8px] text-blue-400">2</span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
+
+          {/* Illustration 2 (hidden — user will explain via YouTube): bounding box and empty area when resolutions/offsets differ */}
+          {false && (
+            <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+              <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-2 text-center">Different resolutions or offset → bounding box has empty area</div>
+              <div className="flex justify-center">
+                <div className="relative rounded" style={{ width: 112, height: 76 }}>
+                  <div className="absolute inset-0 border-2 border-dashed border-amber-500/50 rounded" />
+                  <div className="absolute left-0 top-0 border border-cyan-500/60 bg-cyan-500/10 rounded-tl flex items-center justify-center" style={{ width: 56, height: 56 }}>
+                    <span className="text-[8px] text-cyan-400">1</span>
+                  </div>
+                  <div className="absolute left-[56px] top-5 border border-blue-500/60 bg-blue-500/10 rounded-tr flex items-center justify-center" style={{ width: 56, height: 56 }}>
+                    <span className="text-[8px] text-blue-400">2</span>
+                  </div>
+                  <div className="absolute left-14 top-0 w-14 h-5 bg-gray-600/70 rounded-b flex items-center justify-center">
+                    <span className="text-[7px] text-gray-400 leading-tight text-center">Empty area</span>
+                  </div>
+                </div>
+              </div>
+              <p className="text-[9px] text-gray-500 mt-2 text-center">Output image = full dashed box; each monitor only shows its rectangle. The gap is never displayed.</p>
+            </div>
+          )}
 
           {/* Step 3 */}
           <section className="space-y-2">

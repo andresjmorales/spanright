@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, type ReactNode } from 'react'
-import type { Monitor, SourceImage, MonitorPreset, WindowsMonitorPosition, ActiveTab, Bezels } from './types'
+import type { Monitor, SourceImage, MonitorPreset, WindowsMonitorPosition, ActiveTab, Bezels, FillMode } from './types'
 import { createMonitor } from './utils'
 
 const MAX_HISTORY = 50
@@ -35,6 +35,12 @@ interface State {
   activeTab: ActiveTab
   showTroubleshootingGuide: boolean
   showHowItWorks: boolean
+  // Fill (empty area) options — not undoable
+  fillMode: FillMode
+  fillSolidColor: string
+  eyedropperActive: boolean
+  /** Monitor presets sidebar collapsed (persists across tab switch so eyedropper→preview→canvas keeps it collapsed) */
+  presetsSidebarCollapsed: boolean
   // Undo/redo (internal)
   _undoStack: UndoableSnapshot[]
   _redoStack: UndoableSnapshot[]
@@ -70,6 +76,11 @@ type Action =
   | { type: 'SYNC_WINDOWS_ARRANGEMENT' }
   | { type: 'SET_SHOW_TROUBLESHOOTING_GUIDE'; value: boolean }
   | { type: 'SET_SHOW_HOW_IT_WORKS'; value: boolean }
+  // Fill (empty area)
+  | { type: 'SET_FILL_MODE'; mode: FillMode }
+  | { type: 'SET_FILL_SOLID_COLOR'; color: string }
+  | { type: 'SET_EYEDROPPER_ACTIVE'; active: boolean }
+  | { type: 'SET_PRESETS_SIDEBAR_COLLAPSED'; collapsed: boolean }
   // Composite / undo-redo
   | { type: 'LOAD_LAYOUT'; monitors: { preset: MonitorPreset; physicalX: number; physicalY: number; rotation?: 0 | 90; displayName?: string; bezels?: Bezels }[] }
   | { type: 'UNDO' }
@@ -91,6 +102,10 @@ const initialState: State = {
   activeTab: 'physical',
   showTroubleshootingGuide: false,
   showHowItWorks: false,
+  fillMode: 'solid',
+  fillSolidColor: '#000000',
+  eyedropperActive: false,
+  presetsSidebarCollapsed: false,
   _undoStack: [],
   _redoStack: [],
   _continuousKey: null,
@@ -272,7 +287,12 @@ function reducer(state: State, action: Action): State {
       return { ...state, gridSize: action.size }
     // Windows arrangement
     case 'SET_ACTIVE_TAB':
-      return { ...state, activeTab: action.tab }
+      return {
+        ...state,
+        activeTab: action.tab,
+        // Exit eyedropper when leaving Physical layout (only place color picking works)
+        eyedropperActive: action.tab === 'physical' ? state.eyedropperActive : false,
+      }
     case 'SET_USE_WINDOWS_ARRANGEMENT': {
       if (!action.value) {
         // Switching back to auto: regenerate from physical layout
@@ -302,6 +322,14 @@ function reducer(state: State, action: Action): State {
       return { ...state, showTroubleshootingGuide: action.value }
     case 'SET_SHOW_HOW_IT_WORKS':
       return { ...state, showHowItWorks: action.value }
+    case 'SET_FILL_MODE':
+      return { ...state, fillMode: action.mode }
+    case 'SET_FILL_SOLID_COLOR':
+      return { ...state, fillSolidColor: action.color }
+    case 'SET_EYEDROPPER_ACTIVE':
+      return { ...state, eyedropperActive: action.active }
+    case 'SET_PRESETS_SIDEBAR_COLLAPSED':
+      return { ...state, presetsSidebarCollapsed: action.collapsed }
     default:
       return state
   }

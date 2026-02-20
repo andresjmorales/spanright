@@ -146,3 +146,13 @@ export function IconInfoCircle(props: SVGProps<SVGSVGElement>) {
     </svg>
   )
 }
+
+/** Eyedropper / pipette (sample color from image) — thick diagonal stem (two lines, rounded) with bulb circle */
+export function IconEyedropper(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg className={iconClass} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M6 20L15 6L17 6L8 20Z" />
+      <circle cx="18" cy="6" r="3.5" fill="currentColor" />
+    </svg>
+  )
+}
