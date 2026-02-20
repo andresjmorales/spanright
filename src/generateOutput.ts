@@ -1,4 +1,4 @@
-import type { Monitor, SourceImage, WindowsMonitorPosition } from './types'
+import type { Monitor, SourceImage, WindowsMonitorPosition, FillOptions } from './types'
 
 /**
  * Build a canvas with the image drawn at the given rotation (degrees CW).
@@ -116,8 +116,11 @@ export function generateOutput(
   monitors: Monitor[],
   sourceImage: SourceImage | null,
   windowsArrangement: WindowsMonitorPosition[],
+  fillOptions?: FillOptions,
 ): OutputResult | null {
   if (monitors.length === 0) return null
+
+  const fill = fillOptions ?? { mode: 'solid', color: '#000000' }
 
   // Build lookup maps
   const monitorMap = new Map<string, Monitor>()
@@ -149,17 +152,124 @@ export function generateOutput(
   outputCanvas.height = totalHeight
   const ctx = outputCanvas.getContext('2d')!
 
-  // Fill with black
-  ctx.fillStyle = '#000000'
-  ctx.fillRect(0, 0, totalWidth, totalHeight)
-
-  const monitorStrips: OutputResult['monitors'] = []
-
   // One-time: get source element (original or rotated canvas)
   const sourceElement =
     sourceImage && (sourceImage.rotation ?? 0) !== 0
       ? rotatedImageCanvas(sourceImage)
       : sourceImage?.element ?? null
+
+  // --- Fill background based on mode ---
+  if (fill.mode === 'blur' && sourceImage && sourceElement) {
+    // Blurred edge extension: draw source image stretched to fill entire output with heavy blur,
+    // then draw sharp per-monitor crops on top.
+    const imgLeft = sourceImage.physicalX
+    const imgTop = sourceImage.physicalY
+    const imgW = sourceImage.physicalWidth
+    const imgH = sourceImage.physicalHeight
+
+    // Map the full output bounding box (in physical space) to the source image.
+    // We need to figure out what physical area the output covers.
+    // The output covers the bounding box of all monitors in the Windows arrangement.
+    // We need to map this back to physical space to know what part of the source image to draw.
+    // However, the output is in pixel space (Windows arrangement). We'll approximate by
+    // drawing the source image scaled to fill the output canvas with edge clamping, then blurring.
+
+    // Use an offscreen canvas to create the blurred background
+    const blurCanvas = document.createElement('canvas')
+    // Use a smaller size for performance, then scale up
+    const blurScale = Math.min(1, 2000 / Math.max(totalWidth, totalHeight))
+    const bw = Math.round(totalWidth * blurScale)
+    const bh = Math.round(totalHeight * blurScale)
+    blurCanvas.width = bw
+    blurCanvas.height = bh
+    const bctx = blurCanvas.getContext('2d')!
+
+    // To create edge extension, we need to figure out where the source image sits
+    // relative to the output canvas. We'll use the first monitor's mapping as reference
+    // to compute a rough physical-to-pixel transform for the output.
+    // Average PPI across monitors for a rough transform
+    let avgPpiX = 0, avgPpiY = 0
+    for (const wp of winPosList) {
+      const mon = monitorMap.get(wp.monitorId)!
+      avgPpiX += stripWidth(mon) / mon.physicalWidth
+      avgPpiY += stripHeight(mon) / mon.physicalHeight
+    }
+    avgPpiX /= winPosList.length
+    avgPpiY /= winPosList.length
+
+    // Map source image physical bounds to output pixel coordinates
+    // Output pixel (0,0) corresponds to (minX, minY) in Windows pixels
+    // Physical pos -> Windows pixel: roughly (physX - someOffset) * avgPpi
+    // We use the first monitor as anchor to compute the offset
+    const anchor = winPosList[0]
+    const anchorMon = monitorMap.get(anchor.monitorId)!
+    const physToPixX = stripWidth(anchorMon) / anchorMon.physicalWidth
+    const physToPixY = stripHeight(anchorMon) / anchorMon.physicalHeight
+    const physOriginX = anchorMon.physicalX - anchor.pixelX / physToPixX
+    const physOriginY = anchorMon.physicalY - anchor.pixelY / physToPixY
+
+    const imgPixelX = (imgLeft - physOriginX) * physToPixX - minX
+    const imgPixelY = (imgTop - physOriginY) * physToPixY - minY
+    const imgPixelW = imgW * physToPixX
+    const imgPixelH = imgH * physToPixY
+
+    // Draw source image with edge extension by using drawImage with clamped coordinates
+    // First, fill the blur canvas with the source image, stretching edges outward
+    // We'll draw the image 3x3 grid style: center is the actual image, edges repeat edge pixels
+
+    // Scale coordinates to blur canvas
+    const sx = imgPixelX * blurScale
+    const sy = imgPixelY * blurScale
+    const sw = imgPixelW * blurScale
+    const sh = imgPixelH * blurScale
+
+    const srcW = sourceElement instanceof HTMLCanvasElement ? sourceElement.width : sourceElement.naturalWidth
+    const srcH = sourceElement instanceof HTMLCanvasElement ? sourceElement.height : sourceElement.naturalHeight
+
+    // Draw edge extensions using 1px edge strips stretched outward
+    const edgeExtend = Math.max(bw, bh)
+
+    // Top-left corner
+    bctx.drawImage(sourceElement, 0, 0, 1, 1, sx - edgeExtend, sy - edgeExtend, edgeExtend, edgeExtend)
+    // Top edge
+    bctx.drawImage(sourceElement, 0, 0, srcW, 1, sx, sy - edgeExtend, sw, edgeExtend)
+    // Top-right corner
+    bctx.drawImage(sourceElement, srcW - 1, 0, 1, 1, sx + sw, sy - edgeExtend, edgeExtend, edgeExtend)
+    // Left edge
+    bctx.drawImage(sourceElement, 0, 0, 1, srcH, sx - edgeExtend, sy, edgeExtend, sh)
+    // Center (actual image)
+    bctx.drawImage(sourceElement, 0, 0, srcW, srcH, sx, sy, sw, sh)
+    // Right edge
+    bctx.drawImage(sourceElement, srcW - 1, 0, 1, srcH, sx + sw, sy, edgeExtend, sh)
+    // Bottom-left corner
+    bctx.drawImage(sourceElement, 0, srcH - 1, 1, 1, sx - edgeExtend, sy + sh, edgeExtend, edgeExtend)
+    // Bottom edge
+    bctx.drawImage(sourceElement, 0, srcH - 1, srcW, 1, sx, sy + sh, sw, edgeExtend)
+    // Bottom-right corner
+    bctx.drawImage(sourceElement, srcW - 1, srcH - 1, 1, 1, sx + sw, sy + sh, edgeExtend, edgeExtend)
+
+    // Apply heavy blur
+    const blurRadius = Math.round(80 * blurScale)
+    const blurred = document.createElement('canvas')
+    blurred.width = bw
+    blurred.height = bh
+    const bctx2 = blurred.getContext('2d')!
+    bctx2.filter = `blur(${blurRadius}px)`
+    bctx2.drawImage(blurCanvas, 0, 0)
+    bctx2.filter = 'none'
+
+    // Draw blurred background onto output canvas
+    ctx.drawImage(blurred, 0, 0, bw, bh, 0, 0, totalWidth, totalHeight)
+  } else if (fill.mode === 'transparent') {
+    // Leave canvas transparent (default state)
+    ctx.clearRect(0, 0, totalWidth, totalHeight)
+  } else {
+    // Solid color fill (default)
+    ctx.fillStyle = fill.color
+    ctx.fillRect(0, 0, totalWidth, totalHeight)
+  }
+
+  const monitorStrips: OutputResult['monitors'] = []
 
   for (const wp of winPosList) {
     const monitor = monitorMap.get(wp.monitorId)!

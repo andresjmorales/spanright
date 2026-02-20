@@ -55,6 +55,14 @@ export interface WindowsMonitorPosition {
 
 export type ActiveTab = 'physical' | 'windows' | 'preview'
 
+export type FillMode = 'solid' | 'blur' | 'transparent'
+
+export interface FillOptions {
+  mode: FillMode
+  /** Hex color for solid fill (e.g. '#000000'). */
+  color: string
+}
+
 export interface SavedConfig {
   id: string
   name: string

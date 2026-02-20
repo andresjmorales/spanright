@@ -3,6 +3,8 @@ import { useStore } from '../store'
 import { useToast } from './Toast'
 import { generateOutput, type OutputResult } from '../generateOutput'
 import { getMonitorDisplayName } from '../utils'
+import FillControls from './FillControls'
+import type { FillMode, FillOptions } from '../types'
 
 
 export default function PreviewPanel() {
@@ -19,6 +21,20 @@ export default function PreviewPanel() {
   const downloadPopoverRef = useRef<HTMLDivElement>(null)
   const debounceRef = useRef<number | null>(null)
 
+  // Fill options state
+  const [fillMode, setFillMode] = useState<FillMode>('solid')
+  const [fillColor, setFillColor] = useState('#000000')
+
+  // Auto-switch to PNG when transparent is selected
+  const handleFillModeChange = useCallback((mode: FillMode) => {
+    setFillMode(mode)
+    if (mode === 'transparent') {
+      setFormat('png')
+    }
+  }, [])
+
+  const fillOptions: FillOptions = { mode: fillMode, color: fillColor }
+
   // Debounced output generation
   useEffect(() => {
     if (state.monitors.length === 0) {
@@ -33,7 +49,7 @@ export default function PreviewPanel() {
     }
 
     debounceRef.current = requestAnimationFrame(() => {
-      const result = generateOutput(state.monitors, state.sourceImage, state.windowsArrangement)
+      const result = generateOutput(state.monitors, state.sourceImage, state.windowsArrangement, fillOptions)
       setOutput(result)
       setIsGenerating(false)
     })
@@ -43,7 +59,7 @@ export default function PreviewPanel() {
         cancelAnimationFrame(debounceRef.current)
       }
     }
-  }, [state.monitors, state.sourceImage, state.windowsArrangement])
+  }, [state.monitors, state.sourceImage, state.windowsArrangement, fillMode, fillColor])
 
   // Draw preview
   useEffect(() => {
@@ -61,8 +77,19 @@ export default function PreviewPanel() {
     canvas.width = Math.round(output.width * displayScale)
     canvas.height = Math.round(output.height * displayScale)
 
-    ctx.fillStyle = '#000000'
-    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    // For transparent mode, draw a checkerboard pattern to indicate transparency
+    if (fillMode === 'transparent') {
+      const size = 8
+      for (let y = 0; y < canvas.height; y += size) {
+        for (let x = 0; x < canvas.width; x += size) {
+          ctx.fillStyle = ((x / size + y / size) % 2 === 0) ? '#2a2a2a' : '#1a1a1a'
+          ctx.fillRect(x, y, size, size)
+        }
+      }
+    } else {
+      ctx.fillStyle = '#000000'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+    }
     ctx.drawImage(output.canvas, 0, 0, canvas.width, canvas.height)
 
     // Draw monitor strip boundaries and labels (each at its actual position)
@@ -113,8 +140,10 @@ export default function PreviewPanel() {
 
   const doDownload = useCallback((filename: string) => {
     if (!output) return
-    const mimeType = format === 'png' ? 'image/png' : 'image/jpeg'
-    const quality = format === 'jpeg' ? jpegQuality / 100 : undefined
+    // Force PNG for transparent fill (JPEG doesn't support alpha)
+    const effectiveFormat = fillMode === 'transparent' ? 'png' : format
+    const mimeType = effectiveFormat === 'png' ? 'image/png' : 'image/jpeg'
+    const quality = effectiveFormat === 'jpeg' ? jpegQuality / 100 : undefined
     const cleanName = filename.trim() || getDefaultFilename()
 
     output.canvas.toBlob((blob) => {
@@ -122,7 +151,7 @@ export default function PreviewPanel() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `${cleanName}.${format}`
+      a.download = `${cleanName}.${effectiveFormat}`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -130,7 +159,7 @@ export default function PreviewPanel() {
       toast.success('Wallpaper downloaded')
     }, mimeType, quality)
     setShowDownloadDialog(false)
-  }, [output, format, jpegQuality, getDefaultFilename, toast])
+  }, [output, format, fillMode, jpegQuality, getDefaultFilename, toast])
 
   if (state.monitors.length === 0) {
     return (
@@ -173,14 +202,15 @@ export default function PreviewPanel() {
             </button>
             <div className="flex items-center gap-2">
               <select
-                value={format}
+                value={fillMode === 'transparent' ? 'png' : format}
                 onChange={(e) => setFormat(e.target.value as 'png' | 'jpeg')}
-                className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
+                disabled={fillMode === 'transparent'}
+                className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="png">PNG (lossless)</option>
-                <option value="jpeg">JPEG</option>
+                {fillMode !== 'transparent' && <option value="jpeg">JPEG</option>}
               </select>
-              {format === 'jpeg' && (
+              {format === 'jpeg' && fillMode !== 'transparent' && (
                 <div className="flex items-center gap-1">
                   <input
                     type="range"
@@ -244,11 +274,28 @@ export default function PreviewPanel() {
         )}
       </div>
 
-      {/* Black bars note — when output has black fill (vertical offsets / different heights) */}
+      {/* Fill controls */}
+      {output && (
+        <div className="shrink-0 px-4 py-2 bg-gray-900 border-b border-gray-800">
+          <FillControls
+            fillMode={fillMode}
+            fillColor={fillColor}
+            sourceImage={state.sourceImage}
+            onFillModeChange={handleFillModeChange}
+            onFillColorChange={setFillColor}
+          />
+        </div>
+      )}
+
+      {/* Fill note — when output has empty regions */}
       {output?.hasBlackBars && (
         <div className="shrink-0 px-4 py-2 bg-gray-800/80 border-b border-gray-700/50">
           <p className="text-xs text-gray-400">
-            Black bars in the preview are normal — they fill the negative space around your displays and shouldn’t be visible on the monitors themselves.
+            {fillMode === 'transparent'
+              ? 'Transparent regions (shown as checkerboard) won\'t be visible on the monitors themselves.'
+              : fillMode === 'blur'
+                ? 'Blurred fill in the preview fills the negative space around your displays and shouldn\'t be visible on the monitors themselves.'
+                : 'Filled regions in the preview are normal — they fill the negative space around your displays and shouldn\'t be visible on the monitors themselves.'}
           </p>
         </div>
       )}
