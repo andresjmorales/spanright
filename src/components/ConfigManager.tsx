@@ -7,7 +7,19 @@ import { deleteImagePositionBookmark } from '../imagePositionStorage'
 import { IconBookmark, IconPlus, IconTrash } from '../icons'
 
 const STORAGE_KEY = 'spanright-saved-configs'
-const MAX_CONFIGS = 10
+const MAX_CONFIGS = 24
+
+/** Validation limits for imported layouts (match app rules). */
+const IMPORT_MIN_DIAGONAL = 5
+const IMPORT_MAX_DIAGONAL = 120
+const IMPORT_MAX_ASPECT_RATIO = 10
+const LAYOUT_NAME_MAX_LENGTH = 40
+
+const EXPORT_FILENAME_PREFIX = 'spanright-layouts'
+
+/** Dropdown width in px (w-72 = 18rem) for viewport clamp. */
+const SAVED_LAYOUTS_DROPDOWN_WIDTH_PX = 288
+const VIEWPORT_PADDING_PX = 8
 
 function loadConfigs(): SavedConfig[] {
   try {
@@ -22,6 +34,103 @@ function saveConfigs(configs: SavedConfig[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(configs))
 }
 
+function validateImportedLayouts(data: unknown): { valid: true; configs: SavedConfig[] } | { valid: false; error: string } {
+  if (!Array.isArray(data)) {
+    return { valid: false, error: 'File must be a JSON array of layouts.' }
+  }
+  const configs: SavedConfig[] = []
+  for (let i = 0; i < data.length; i++) {
+    const item = data[i]
+    if (!item || typeof item !== 'object') {
+      return { valid: false, error: `Layout ${i + 1}: invalid entry.` }
+    }
+    const { id, name, savedAt, monitors: rawMonitors, imagePosition: rawImg } = item as Record<string, unknown>
+    if (typeof name !== 'string' || !name.trim()) {
+      return { valid: false, error: `Layout ${i + 1}: name is required.` }
+    }
+    if (name.length > LAYOUT_NAME_MAX_LENGTH) {
+      return { valid: false, error: `Layout "${name.slice(0, 20)}…": name must be ${LAYOUT_NAME_MAX_LENGTH} characters or less.` }
+    }
+    if (typeof savedAt !== 'number' || !Number.isFinite(savedAt)) {
+      return { valid: false, error: `Layout "${name}": savedAt must be a number.` }
+    }
+    if (!Array.isArray(rawMonitors) || rawMonitors.length === 0) {
+      return { valid: false, error: `Layout "${name}": must have at least one monitor.` }
+    }
+    const monitors: SavedConfig['monitors'] = []
+    for (let j = 0; j < rawMonitors.length; j++) {
+      const mon = rawMonitors[j] as Record<string, unknown>
+      const preset = mon.preset as Record<string, unknown> | undefined
+      if (!preset || typeof preset !== 'object') {
+        return { valid: false, error: `Layout "${name}", monitor ${j + 1}: preset is required.` }
+      }
+      const diagonal = Number(preset.diagonal)
+      const ar = preset.aspectRatio
+      const resX = Number(preset.resolutionX)
+      const resY = Number(preset.resolutionY)
+      if (!Number.isFinite(diagonal) || diagonal < IMPORT_MIN_DIAGONAL || diagonal > IMPORT_MAX_DIAGONAL) {
+        return { valid: false, error: `Layout "${name}", monitor ${j + 1}: diagonal must be ${IMPORT_MIN_DIAGONAL}–${IMPORT_MAX_DIAGONAL}".` }
+      }
+      if (!Array.isArray(ar) || ar.length !== 2 || !Number.isFinite(ar[0]) || !Number.isFinite(ar[1]) || (ar[0] as number) <= 0 || (ar[1] as number) <= 0) {
+        return { valid: false, error: `Layout "${name}", monitor ${j + 1}: aspectRatio must be [number, number].` }
+      }
+      const ratio = Math.max((ar[0] as number) / (ar[1] as number), (ar[1] as number) / (ar[0] as number))
+      if (ratio > IMPORT_MAX_ASPECT_RATIO) {
+        return { valid: false, error: `Layout "${name}", monitor ${j + 1}: aspect ratio cannot exceed ${IMPORT_MAX_ASPECT_RATIO}:1.` }
+      }
+      if (!Number.isFinite(resX) || !Number.isFinite(resY) || resX < 1 || resY < 1) {
+        return { valid: false, error: `Layout "${name}", monitor ${j + 1}: resolution must be positive numbers.` }
+      }
+      const presetName = typeof preset.name === 'string' ? preset.name : `Monitor ${j + 1}`
+      const physicalX = Number(mon.physicalX)
+      const physicalY = Number(mon.physicalY)
+      if (!Number.isFinite(physicalX) || !Number.isFinite(physicalY)) {
+        return { valid: false, error: `Layout "${name}", monitor ${j + 1}: physicalX and physicalY are required.` }
+      }
+      const rotation = mon.rotation === 90 ? 90 : 0
+      const displayName = typeof mon.displayName === 'string' ? mon.displayName : undefined
+      let bezels: SavedConfig['monitors'][0]['bezels'] | undefined
+      if (mon.bezels != null && typeof mon.bezels === 'object') {
+        const b = mon.bezels as Record<string, unknown>
+        const t = Number(b.top), bot = Number(b.bottom), l = Number(b.left), r = Number(b.right)
+        if (Number.isFinite(t) && Number.isFinite(bot) && Number.isFinite(l) && Number.isFinite(r) && t >= 0 && bot >= 0 && l >= 0 && r >= 0) {
+          bezels = { top: t, bottom: bot, left: l, right: r }
+        }
+      }
+      monitors.push({
+        preset: {
+          name: presetName,
+          diagonal,
+          aspectRatio: [ar[0] as number, ar[1] as number],
+          resolutionX: resX,
+          resolutionY: resY,
+        },
+        physicalX,
+        physicalY,
+        rotation,
+        displayName,
+        bezels,
+      })
+    }
+    let imagePosition: SavedImagePosition | null = null
+    if (rawImg != null && typeof rawImg === 'object') {
+      const img = rawImg as Record<string, unknown>
+      const x = Number(img.x), y = Number(img.y), w = Number(img.width), h = Number(img.height), ar = Number(img.aspectRatio)
+      if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(w) && Number.isFinite(h) && Number.isFinite(ar) && w > 0 && h > 0 && ar > 0) {
+        imagePosition = { x, y, width: w, height: h, aspectRatio: ar }
+      }
+    }
+    configs.push({
+      id: typeof id === 'string' ? id : crypto.randomUUID(),
+      name: name.trim(),
+      savedAt,
+      monitors,
+      imagePosition: imagePosition ?? undefined,
+    })
+  }
+  return { valid: true, configs }
+}
+
 export default function ConfigManager() {
   const { state, dispatch } = useStore()
   const toast = useToast()
@@ -30,8 +139,18 @@ export default function ConfigManager() {
   const [showSaveInput, setShowSaveInput] = useState(false)
   const [saveName, setSaveName] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [dropdownAlignRight, setDropdownAlignRight] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
   const saveInputRef = useRef<HTMLInputElement>(null)
+  const importInputRef = useRef<HTMLInputElement>(null)
+
+  // Keep dropdown inside viewport when opening (align right if it would overflow)
+  useEffect(() => {
+    if (!open || !panelRef.current) return
+    const rect = panelRef.current.getBoundingClientRect()
+    const wouldOverflowRight = rect.left + SAVED_LAYOUTS_DROPDOWN_WIDTH_PX > window.innerWidth - VIEWPORT_PADDING_PX
+    setDropdownAlignRight(wouldOverflowRight)
+  }, [open])
 
   // Load on mount
   useEffect(() => {
@@ -136,6 +255,60 @@ export default function ConfigManager() {
       ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
   }
 
+  const handleExport = () => {
+    if (configs.length === 0) {
+      toast('No layouts to export.')
+      return
+    }
+    const json = JSON.stringify(configs, null, 2)
+    const blob = new Blob([json], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${EXPORT_FILENAME_PREFIX}-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success(`Exported ${configs.length} layout${configs.length !== 1 ? 's' : ''}`)
+  }
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result as string)
+        const result = validateImportedLayouts(data)
+        if (!result.valid) {
+          toast(result.error)
+          return
+        }
+        const slotLeft = Math.max(0, MAX_CONFIGS - configs.length)
+        if (slotLeft === 0) {
+          toast(`Already at maximum of ${MAX_CONFIGS} layouts. Remove some to import.`)
+          return
+        }
+        const toAdd = result.configs.slice(0, slotLeft).map(c => ({
+          ...c,
+          id: crypto.randomUUID(),
+        }))
+        const updated = [...configs, ...toAdd]
+        setConfigs(updated)
+        saveConfigs(updated)
+        const skipped = result.configs.length - toAdd.length
+        toast.success(
+          skipped > 0
+            ? `Imported ${toAdd.length} layout${toAdd.length !== 1 ? 's' : ''}. ${skipped} skipped (max ${MAX_CONFIGS}).`
+            : `Imported ${toAdd.length} layout${toAdd.length !== 1 ? 's' : ''}`,
+        )
+      } catch {
+        toast('Invalid JSON file.')
+      }
+    }
+    reader.readAsText(file)
+  }
+
   return (
     <div ref={panelRef} className="relative">
       <button
@@ -157,7 +330,9 @@ export default function ConfigManager() {
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 w-72 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl z-50 overflow-hidden">
+        <div
+          className={`absolute top-full mt-1 w-72 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl z-50 overflow-hidden ${dropdownAlignRight ? 'right-0 left-auto' : 'left-0'}`}
+        >
           {/* Save current */}
           <div className="p-2 border-b border-gray-800">
             {!showSaveInput ? (
@@ -263,6 +438,33 @@ export default function ConfigManager() {
                 </div>
               ))
             )}
+          </div>
+
+          {/* Export / Import */}
+          <div className="p-2 border-t border-gray-800 flex gap-1.5">
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={configs.length === 0}
+              className="flex-1 px-2.5 py-1.5 text-xs text-gray-300 hover:bg-gray-800 hover:text-white rounded transition-colors disabled:opacity-40 disabled:cursor-default"
+            >
+              Export
+            </button>
+            <button
+              type="button"
+              onClick={() => importInputRef.current?.click()}
+              disabled={configs.length >= MAX_CONFIGS}
+              className="flex-1 px-2.5 py-1.5 text-xs text-gray-300 hover:bg-gray-800 hover:text-white rounded transition-colors disabled:opacity-40 disabled:cursor-default"
+            >
+              Import
+            </button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".json,application/json"
+              className="hidden"
+              onChange={handleImport}
+            />
           </div>
 
           {/* Quick layouts (from preloadedLayouts.ts) */}
