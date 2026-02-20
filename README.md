@@ -20,7 +20,8 @@ Spanright operates in **physical space** (inches/cm), so you arrange monitors as
 - **Accurate output generation** — Crops and scales the source image per-monitor at each screen's native PPI, then stitches at each monitor's virtual layout position (side-by-side, stacked, or mixed). Gaps in the layout use a configurable fill: solid color (default black), blurred edge extension, or transparent (PNG only).
 - **Preview & download** — Live preview of the final stitched wallpaper with one-click PNG/JPEG export.
 - **Canvas controls** — Scroll to pan, Ctrl+Scroll to zoom (up to 400%), right-click drag to pan. Custom scrollbars, Align Assist guides/snapping, and fit-to-view.
-- **Saved Layouts** — Save and load monitor layouts (names, positions, rotation, bezels, virtual layout). Layouts are stored in your browser (localStorage); you can keep several setups (e.g. desk vs laptop-only) and switch between them. Optional **Quick layouts** (preloaded in code) appear at the top of the Saved Layouts dropdown when configured. The Saved Layouts control sits on the right side of the toolbar, to the left of Share Layout.
+- **Saved Layouts** — Save and load monitor layouts (names, positions, rotation, bezels, virtual layout). Saving a layout also stores the current image position when an image is loaded; loading a layout and then uploading an image applies that saved position (with aspect-ratio adaptation). Layouts are stored in your browser (localStorage); you can keep several setups (e.g. desk vs laptop-only) and switch between them. Optional **Quick layouts** (preloaded in code) appear at the top of the Saved Layouts dropdown when configured. The Saved Layouts control sits on the right side of the toolbar, to the left of Share Layout.
+- **Image position bookmark** — Right-click the source image for **Bookmark image position**, **Apply bookmarked position**, and **Clear bookmarked position**. The bookmark is stored per layout name (or "_default" when no layout is active) so you can pin a preferred image position independently of saving the full layout.
 - **Cross-platform** — Works in any modern browser. Output can be applied as a spanned wallpaper on Windows (Span/Tile mode), macOS (per-monitor crop), and Linux (varies by DE — GNOME, KDE, feh, swaybg, etc.).
 
 ## Example
@@ -64,7 +65,7 @@ Drag monitors on the canvas to match your physical desk arrangement:
 - Position your laptop screen lower-left, your main monitor centered, etc.
 - The canvas uses physical dimensions — a 27" monitor will appear larger than a 13" laptop
 - **Right-click** a monitor, or select it and click the **⋮** kebab next to the **✕**, for the context menu: **Set Bezels**, **Rename**, **Rotate 90°**, or **Delete**. Bezels extend outward from the display area; Align Assist snaps to outer bezel edges when bezels are set.
-- When the **source image** is selected, use the **⋮** kebab (next to **✕**) for **Size image to fit** or **Remove image**.
+- When the **source image** is selected, use the **⋮** kebab or **right-click** the image for **Size image to fit**, **Bookmark image position**, **Apply bookmarked position** (when a bookmark exists), **Clear bookmarked position**, and **Remove image**.
 - Use **Align Assist** (canvas menu) for dynamic edge/center alignment guides while dragging monitors
 - Use the **↻** (rotate) button on a monitor, or **Rotate 90°** from the right-click menu, to switch between landscape and portrait
 - Click a monitor and press **Delete** (or use the context menu) to remove it
@@ -74,10 +75,11 @@ Drag monitors on the canvas to match your physical desk arrangement:
 ### 3. Upload & Position Your Image
 
 - Drag and drop an image file onto the canvas, or use the upload button in the toolbar
-- The image appears behind the monitors with 70% opacity
+- The image appears behind the monitors with 70% opacity. If you loaded a layout that had a saved image position, the next image you upload is automatically positioned from that layout (with aspect-ratio adaptation); a toast confirms "Image positioned from saved layout"
 - **Drag** the image to reposition it
 - **Click** the image and use the corner handles to resize it
-- Use **Size image to fit** from the canvas menu (top-right ⋮) or from the **⋮** kebab on the source image when selected
+- Use **Size image to fit** from the canvas menu (top-right ⋮) or from the **⋮** kebab / right-click menu on the source image
+- **Right-click** the image for **Bookmark image position**, **Apply bookmarked position**, or **Clear bookmarked position**
 - With **Align Assist** enabled, image drag/resize shows green alignment guides against monitor edges/centers
 - Check the **recommended image size** banner in the toolbar — green means your image is large enough, yellow/red means it may appear pixelated
 

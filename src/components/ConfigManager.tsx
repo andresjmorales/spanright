@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useStore } from '../store'
 import { useToast } from './Toast'
-import type { SavedConfig } from '../types'
+import type { SavedConfig, SavedImagePosition } from '../types'
 import { PRELOADED_LAYOUTS, decodePreloadedLayout } from '../preloadedLayouts'
+import { deleteImagePositionBookmark } from '../imagePositionStorage'
 import { IconBookmark, IconPlus, IconTrash } from '../icons'
 
 const STORAGE_KEY = 'spanright-saved-configs'
@@ -60,6 +61,17 @@ export default function ConfigManager() {
 
   const handleSave = () => {
     if (!saveName.trim() || state.monitors.length === 0) return
+    // Always use current canvas image position (never bookmark or previous layout)
+    const img = state.sourceImage
+    const imagePosition: SavedImagePosition | null = img
+      ? {
+          x: img.physicalX,
+          y: img.physicalY,
+          width: img.physicalWidth,
+          height: img.physicalHeight,
+          aspectRatio: img.naturalWidth / img.naturalHeight,
+        }
+      : null
     const newConfig: SavedConfig = {
       id: crypto.randomUUID(),
       name: saveName.trim(),
@@ -72,17 +84,25 @@ export default function ConfigManager() {
         displayName: m.displayName,
         bezels: m.bezels,
       })),
+      imagePosition,
     }
     const updated = [newConfig, ...configs].slice(0, MAX_CONFIGS)
     setConfigs(updated)
     saveConfigs(updated)
+    dispatch({ type: 'SET_ACTIVE_LAYOUT_NAME', name: newConfig.name })
+    dispatch({ type: 'SET_LOADED_LAYOUT_IMAGE_POSITION', position: imagePosition })
     toast.success(`Layout saved: ${newConfig.name}`)
     setSaveName('')
     setShowSaveInput(false)
   }
 
   const handleLoad = (config: SavedConfig) => {
-    dispatch({ type: 'LOAD_LAYOUT', monitors: config.monitors })
+    dispatch({
+      type: 'LOAD_LAYOUT',
+      monitors: config.monitors,
+      layoutName: config.name,
+      imagePosition: config.imagePosition ?? null,
+    })
     toast.success(`Layout loaded: ${config.name}`)
     setOpen(false)
   }
@@ -95,12 +115,14 @@ export default function ConfigManager() {
   }, [])
 
   const handleLoadPreloaded = (monitors: SavedConfig['monitors'], name: string) => {
-    dispatch({ type: 'LOAD_LAYOUT', monitors })
+    dispatch({ type: 'LOAD_LAYOUT', monitors, layoutName: name, imagePosition: null })
     toast.success(`Layout loaded: ${name}`)
     setOpen(false)
   }
 
   const handleDelete = (id: string) => {
+    const config = configs.find(c => c.id === id)
+    if (config) deleteImagePositionBookmark(config.name)
     const updated = configs.filter(c => c.id !== id)
     setConfigs(updated)
     saveConfigs(updated)

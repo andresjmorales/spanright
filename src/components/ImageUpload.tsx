@@ -2,6 +2,8 @@ import React, { useCallback, useRef } from 'react'
 import { useStore } from '../store'
 import { useToast } from './Toast'
 import type { SourceImage } from '../types'
+import { adaptSavedPositionToAspectRatio } from '../utils'
+import { getImagePositionBookmark } from '../imagePositionStorage'
 
 export default function ImageUpload() {
   const { state, dispatch } = useStore()
@@ -9,39 +11,69 @@ export default function ImageUpload() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const loadImage = useCallback((file: File) => {
+    const loadedLayoutImagePosition = state.loadedLayoutImagePosition
+    const bookmarkPosition = loadedLayoutImagePosition
+      ? null
+      : getImagePositionBookmark(state.activeLayoutName ?? '_default')
     const reader = new FileReader()
     reader.onload = (e) => {
       const img = new Image()
       img.onload = () => {
         const imgAspect = img.naturalWidth / img.naturalHeight
         const sixFeet = 72 // inches
-        const physWidth = img.naturalHeight > img.naturalWidth ? sixFeet * imgAspect : sixFeet
-        const physHeight = img.naturalHeight > img.naturalWidth ? sixFeet : sixFeet / imgAspect
+        let physWidth = img.naturalHeight > img.naturalWidth ? sixFeet * imgAspect : sixFeet
+        let physHeight = img.naturalHeight > img.naturalWidth ? sixFeet : sixFeet / imgAspect
+        let physicalX: number
+        let physicalY: number
+        let usedSavedPosition: 'layout' | 'bookmark' | false = false
 
-        // Center on current viewport
-        const containerEl = document.querySelector('[data-editor-canvas]')
-        const canvasW = containerEl?.clientWidth ?? 800
-        const canvasH = containerEl?.clientHeight ?? 500
-        const centerPhysX = (canvasW / 2 - state.canvasOffsetX) / state.canvasScale
-        const centerPhysY = (canvasH / 2 - state.canvasOffsetY) / state.canvasScale
+        if (loadedLayoutImagePosition) {
+          const adapted = adaptSavedPositionToAspectRatio(loadedLayoutImagePosition, imgAspect)
+          physicalX = adapted.x
+          physicalY = adapted.y
+          physWidth = adapted.width
+          physHeight = adapted.height
+          usedSavedPosition = 'layout'
+        } else if (bookmarkPosition) {
+          const adapted = adaptSavedPositionToAspectRatio(bookmarkPosition, imgAspect)
+          physicalX = adapted.x
+          physicalY = adapted.y
+          physWidth = adapted.width
+          physHeight = adapted.height
+          usedSavedPosition = 'bookmark'
+        } else {
+          const containerEl = document.querySelector('[data-editor-canvas]')
+          const canvasW = containerEl?.clientWidth ?? 800
+          const canvasH = containerEl?.clientHeight ?? 500
+          const centerPhysX = (canvasW / 2 - state.canvasOffsetX) / state.canvasScale
+          const centerPhysY = (canvasH / 2 - state.canvasOffsetY) / state.canvasScale
+          physicalX = centerPhysX - physWidth / 2
+          physicalY = centerPhysY - physHeight / 2
+        }
 
         const sourceImage: SourceImage = {
           element: img,
           fileName: file.name,
           naturalWidth: img.naturalWidth,
           naturalHeight: img.naturalHeight,
-          physicalX: centerPhysX - physWidth / 2,
-          physicalY: centerPhysY - physHeight / 2,
+          physicalX,
+          physicalY,
           physicalWidth: physWidth,
           physicalHeight: physHeight,
         }
         dispatch({ type: 'SET_SOURCE_IMAGE', image: sourceImage })
-        toast.success(`Image loaded: ${file.name}`)
+        if (usedSavedPosition === 'layout') {
+          toast.success('Image positioned from saved layout')
+        } else if (usedSavedPosition === 'bookmark') {
+          toast.success('Image positioned from bookmark')
+        } else {
+          toast.success(`Image loaded: ${file.name}`)
+        }
       }
       img.src = e.target?.result as string
     }
     reader.readAsDataURL(file)
-  }, [state.canvasOffsetX, state.canvasOffsetY, state.canvasScale, dispatch, toast])
+  }, [state.canvasOffsetX, state.canvasOffsetY, state.canvasScale, state.activeLayoutName, state.loadedLayoutImagePosition, dispatch, toast])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()

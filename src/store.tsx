@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, type ReactNode } from 'react'
-import type { Monitor, SourceImage, MonitorPreset, WindowsMonitorPosition, ActiveTab, Bezels, FillMode } from './types'
+import type { Monitor, SourceImage, MonitorPreset, WindowsMonitorPosition, ActiveTab, Bezels, FillMode, SavedImagePosition } from './types'
 import { createMonitor } from './utils'
 
 const MAX_HISTORY = 50
@@ -41,6 +41,10 @@ interface State {
   eyedropperActive: boolean
   /** Monitor presets sidebar collapsed (persists across tab switch so eyedropper→preview→canvas keeps it collapsed) */
   presetsSidebarCollapsed: boolean
+  /** Active layout name (set when loading/saving a layout); null = use "_default" for image position bookmark key */
+  activeLayoutName: string | null
+  /** Image position from the current layout (set when loading or saving a layout); used for upload and Apply from layout */
+  loadedLayoutImagePosition: SavedImagePosition | null
   // Undo/redo (internal)
   _undoStack: UndoableSnapshot[]
   _redoStack: UndoableSnapshot[]
@@ -81,8 +85,11 @@ type Action =
   | { type: 'SET_FILL_SOLID_COLOR'; color: string }
   | { type: 'SET_EYEDROPPER_ACTIVE'; active: boolean }
   | { type: 'SET_PRESETS_SIDEBAR_COLLAPSED'; collapsed: boolean }
+  | { type: 'SET_ACTIVE_LAYOUT_NAME'; name: string | null }
+  | { type: 'SET_LOADED_LAYOUT_IMAGE_POSITION'; position: SavedImagePosition | null }
+  | { type: 'CLEAR_LOADED_LAYOUT_IMAGE_POSITION' }
   // Composite / undo-redo
-  | { type: 'LOAD_LAYOUT'; monitors: { preset: MonitorPreset; physicalX: number; physicalY: number; rotation?: 0 | 90; displayName?: string; bezels?: Bezels }[] }
+  | { type: 'LOAD_LAYOUT'; monitors: { preset: MonitorPreset; physicalX: number; physicalY: number; rotation?: 0 | 90; displayName?: string; bezels?: Bezels }[]; layoutName?: string; imagePosition?: SavedImagePosition | null }
   | { type: 'UNDO' }
   | { type: 'REDO' }
 
@@ -106,6 +113,8 @@ const initialState: State = {
   fillSolidColor: '#000000',
   eyedropperActive: false,
   presetsSidebarCollapsed: false,
+  activeLayoutName: null,
+  loadedLayoutImagePosition: null,
   _undoStack: [],
   _redoStack: [],
   _continuousKey: null,
@@ -265,8 +274,16 @@ function reducer(state: State, action: Action): State {
         monitors,
         selectedMonitorId: null,
         windowsArrangement: generateDefaultWindowsArrangement(monitors),
+        activeLayoutName: action.layoutName ?? state.activeLayoutName,
+        loadedLayoutImagePosition: action.imagePosition ?? null,
       }
     }
+    case 'SET_ACTIVE_LAYOUT_NAME':
+      return { ...state, activeLayoutName: action.name }
+    case 'SET_LOADED_LAYOUT_IMAGE_POSITION':
+      return { ...state, loadedLayoutImagePosition: action.position }
+    case 'CLEAR_LOADED_LAYOUT_IMAGE_POSITION':
+      return { ...state, loadedLayoutImagePosition: null }
     case 'SET_CANVAS_SCALE':
       return { ...state, canvasScale: Math.max(CANVAS_SCALE_MIN, Math.min(CANVAS_SCALE_MAX, action.scale)) }
     case 'PAN_CANVAS':
