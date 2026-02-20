@@ -402,13 +402,11 @@ export default function PreviewPanel() {
       </div>
 
       {/* Windows arrangement info */}
-      {state.useWindowsArrangement && (
-        <div className="px-4 py-2 border-t border-gray-800 bg-gray-900 shrink-0">
-          <div className="text-xs text-gray-500">
-            Output uses your custom virtual layout for monitor ordering and horizontal/vertical offsets.
-          </div>
+      <div className="px-4 py-2 border-t border-gray-800 bg-gray-900 shrink-0">
+        <div className="text-xs text-gray-500">
+          Output uses your virtual layout for monitor ordering and horizontal/vertical offsets, and physical layout for cropping sections of your image.
         </div>
-      )}
+      </div>
 
     </div>
   )
