@@ -214,7 +214,7 @@ src/
 ├── utils.ts                   # PPI calculations, coordinate math
 ├── presets.ts                 # Monitor preset definitions
 ├── canvasConstants.ts         # Canvas bounds (inches) and center for preloaded layouts
-├── urlLayout.ts               # Encode/decode layout for share URL
+├── urlLayout.ts               # Encode/decode layout for share URL (LZ-compressed for shorter links)
 ├── preloadedLayouts.ts       # Optional quick-layout presets (centered at canvas center)
 ├── icons.tsx                  # Shared SVG icon components
 ├── generateOutput.ts          # Wallpaper stitching logic
