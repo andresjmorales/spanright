@@ -1,6 +1,6 @@
 # Spanright — Architecture & Design
 
-**Last updated:** 2025-02-20
+**Last updated:** 2025-02-20 (responsive/mobile shell added)
 
 This document describes the structure and design of Spanright so that maintainers, collaborators, and tooling (including AI) can reason about the codebase. If the app has changed since the date above, this file may be outdated and should be refreshed.
 
@@ -140,6 +140,8 @@ PPI and physical size: `utils.ts` (and store when creating monitors) use `ppi = 
 | `src/generateOutput.ts` | Stitching: rotated image canvas, per-monitor crop at native PPI, placement by `windowsArrangement`, fill for empty area. |
 | **Layout encoding & persistence** | |
 | `src/urlLayout.ts` | Encode/decode layout for share URL (compact JSON → LZ or base64url); `getLayoutFromHash`, `buildShareUrl`, `setLayoutHash`, `clearLayoutHash`. |
+| `src/viewportConstants.ts` | Breakpoints for responsive layout (phone &lt;768px, tablet 768–1024, desktop ≥1024). |
+| `src/useViewport.ts` | Hook returning `{ width, height, isPhone, isTablet, isDesktop }` with resize listener. |
 | `src/preloadedLayouts.ts` | Optional quick-layout list (name + encoded string); `decodePreloadedLayout`. |
 | `src/imagePositionStorage.ts` | localStorage get/set/delete for image position bookmarks by layout key; `formatAspectRatioLabel`. |
 | **Components** | |
@@ -151,6 +153,7 @@ PPI and physical size: `utils.ts` (and store when creating monitors) use `ppi = 
 | `src/components/ImageUpload.tsx` | File input; creates `SourceImage` and dispatches `SET_SOURCE_IMAGE`; applies `loadedLayoutImagePosition` when relevant. |
 | `src/components/ConfigManager.tsx` | Saved layouts: load, save, delete, export JSON, import JSON; quick layouts from preloaded; integrates with store and localStorage. |
 | `src/components/ShareButton.tsx` | Builds share URL from current monitors via `buildShareUrl`, copies to clipboard. |
+| `src/components/MobileShell.tsx` | Phone (&lt;768px) informational view: hero, read-only layout summary from URL hash, “open on desktop” message, “Open full editor” button. |
 | `src/components/Toast.tsx` | Toast provider and trigger (success/error). |
 | `src/components/InfoDialog.tsx` | “How it works” content. |
 | `src/components/TroubleshootingGuide.tsx` | Wallpaper setup / troubleshooting modal. |

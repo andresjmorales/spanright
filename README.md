@@ -23,6 +23,7 @@ Spanright operates in **physical space** (inches/cm), so you arrange monitors as
 - **Saved Layouts** — Save and load monitor layouts (names, positions, rotation, bezels, virtual layout). Saving a layout also stores the current image position when an image is loaded; loading a layout and then uploading an image applies that saved position (with aspect-ratio adaptation). Layouts are stored in your browser (localStorage); you can keep several setups (e.g. desk vs laptop-only) and switch between them. **Export** downloads all saved layouts as a JSON file; **Import** uploads a JSON file (same format), validates it (monitor rules: diagonal 5"–120", aspect ratio ≤10:1, etc.), and adds layouts to your list (up to the 24-layout limit). Optional **Quick layouts** (preloaded in code) appear at the bottom of the Saved Layouts dropdown when configured. The Saved Layouts control sits on the right side of the toolbar, to the left of Share Layout.
 - **Image position bookmark** — Right-click the source image for **Bookmark image position**, **Apply bookmarked position**, and **Clear bookmarked position**. The bookmark is stored per layout name (or "_default" when no layout is active) so you can pin a preferred image position independently of saving the full layout.
 - **Cross-platform** — Works in any modern browser. Output can be applied as a spanned wallpaper on Windows (Span/Tile mode), macOS (per-monitor crop), and Linux (varies by DE — GNOME, KDE, feh, swaybg, etc.).
+- **Responsive layout** — On tablet (768px–1024px) the preset sidebar becomes a slide-out drawer (default collapsed) and the header/toolbar wrap or shorten. On phone (&lt;768px) an informational view explains the app and shows a read-only summary of shared layout URLs, with an option to open the full editor.
 
 ## Example
 Dragon image [source](https://unsplash.com/photos/dragon-effigy-breathes-fire-over-a-crowd-at-night-TP7InDDpeRE) from Unsplash.
@@ -215,6 +216,8 @@ src/
 ├── presets.ts                 # Monitor preset definitions
 ├── canvasConstants.ts         # Canvas bounds (inches) and center for preloaded layouts
 ├── urlLayout.ts               # Encode/decode layout for share URL (LZ-compressed for shorter links)
+├── viewportConstants.ts       # Breakpoints for responsive (phone/tablet/desktop)
+├── useViewport.ts             # Hook for viewport size and isPhone/isTablet/isDesktop
 ├── preloadedLayouts.ts       # Optional quick-layout presets (centered at canvas center)
 ├── icons.tsx                  # Shared SVG icon components
 ├── generateOutput.ts          # Wallpaper stitching logic
@@ -228,6 +231,7 @@ src/
     ├── ImageUpload.tsx             # File upload component
     ├── ConfigManager.tsx            # Saved layouts + quick layouts (save/load)
     ├── ShareButton.tsx             # Copy share link to clipboard
+    ├── MobileShell.tsx             # Phone informational view (hero, read-only layout, open editor)
     ├── InfoDialog.tsx              # App info / keyboard shortcuts
     └── TroubleshootingGuide.tsx     # Wallpaper troubleshooting
 

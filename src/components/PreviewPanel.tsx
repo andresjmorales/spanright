@@ -194,8 +194,8 @@ export default function PreviewPanel() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header — fixed height to match other tab banners (h-11) */}
-      <div className="flex items-center justify-between px-4 h-11 border-b border-gray-800 bg-gray-900 shrink-0">
+      {/* Header — two-row min-height on mobile so controls don't overflow; single-row on sm+ */}
+      <div className="flex items-center justify-between px-4 min-h-[4.5rem] sm:min-h-0 sm:h-11 border-b border-gray-800 bg-gray-900 shrink-0 flex-wrap gap-2 py-2 sm:py-0">
         <div className="flex items-center gap-3">
           <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
             Output Preview
@@ -217,7 +217,7 @@ export default function PreviewPanel() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => dispatch({ type: 'SET_SHOW_TROUBLESHOOTING_GUIDE', value: true })}
-              className="text-xs text-gray-500 hover:text-gray-300 transition-colors underline underline-offset-2 decoration-gray-600 hover:decoration-gray-400 shrink-0"
+              className="hidden md:inline text-xs text-gray-500 hover:text-gray-300 transition-colors underline underline-offset-2 decoration-gray-600 hover:decoration-gray-400 shrink-0"
             >
               Wallpaper not looking right?
             </button>

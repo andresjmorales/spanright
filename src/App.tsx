@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { StoreProvider, useStore } from './store'
 import MonitorPresetsSidebar from './components/MonitorPresetsSidebar'
 import EditorCanvas from './components/EditorCanvas'
@@ -10,7 +10,10 @@ import InfoDialog from './components/InfoDialog'
 import { ToastProvider } from './components/Toast'
 import type { ActiveTab } from './types'
 import { getLayoutFromHash, clearLayoutHash } from './urlLayout'
-import { IconClose, IconBook, IconLightbulb, IconInfoCircle } from './icons'
+import { useViewport } from './useViewport'
+import { VIEWPORT_BP_DESKTOP } from './viewportConstants'
+import { IconClose, IconBook, IconLightbulb, IconWrench, IconInfoCircle } from './icons'
+import MobileShell from './components/MobileShell'
 
 function TabButton({ tab, label, active, onClick }: { tab: ActiveTab; label: string; active: boolean; onClick: (tab: ActiveTab) => void }) {
   return (
@@ -155,74 +158,107 @@ function AppContent() {
   const [showAbout, setShowAbout] = useState(false)
   const [showWelcome, setShowWelcome] = useState(false)
   const tab = state.activeTab
+  const viewport = useViewport()
+  const hasSetInitialSidebarCollapse = useRef(false)
+  const [forceDesktopView, setForceDesktopView] = useState(false)
 
-  // On mount: load layout from URL hash if present, otherwise show welcome on first visit
+  // On mount: load layout from URL hash if present (skip on phone — we show it in MobileShell), else show welcome on first visit
   useEffect(() => {
+    const layoutFromHash = getLayoutFromHash()
+    if (layoutFromHash && !viewport.isPhone) {
+      dispatch({ type: 'LOAD_LAYOUT', monitors: layoutFromHash })
+      clearLayoutHash()
+    } else if (!layoutFromHash && !localStorage.getItem(WELCOME_SEEN_KEY)) {
+      setShowWelcome(true)
+    }
+  }, [viewport.isPhone, dispatch])
+
+  // On tablet/narrow viewport, default sidebar to collapsed so canvas gets full width (once per load)
+  useEffect(() => {
+    if (hasSetInitialSidebarCollapse.current) return
+    if (viewport.width > 0 && viewport.width < VIEWPORT_BP_DESKTOP) {
+      dispatch({ type: 'SET_PRESETS_SIDEBAR_COLLAPSED', collapsed: true })
+      hasSetInitialSidebarCollapse.current = true
+    }
+  }, [viewport.width, dispatch])
+
+  // When user switches from phone shell to full editor, load layout from hash if present
+  useEffect(() => {
+    if (!forceDesktopView) return
     const layoutFromHash = getLayoutFromHash()
     if (layoutFromHash) {
       dispatch({ type: 'LOAD_LAYOUT', monitors: layoutFromHash })
       clearLayoutHash()
-    } else if (!localStorage.getItem(WELCOME_SEEN_KEY)) {
-      setShowWelcome(true)
     }
-  }, [])
+  }, [forceDesktopView, dispatch])
 
   const setTab = (t: ActiveTab) => dispatch({ type: 'SET_ACTIVE_TAB', tab: t })
 
+  // Phone: show informational shell unless user chose to open full editor
+  if (viewport.isPhone && !forceDesktopView) {
+    return (
+      <div className="h-screen flex flex-col bg-gray-950 overflow-hidden">
+        <MobileShell onOpenFullEditor={() => setForceDesktopView(true)} />
+      </div>
+    )
+  }
+
   return (
     <div className="h-screen flex flex-col bg-gray-950 text-gray-100 overflow-hidden">
-      {/* Header */}
-      <header className="bg-gray-900 border-b border-gray-800 px-4 py-2.5 flex items-center gap-3 shrink-0">
+      {/* Header — wraps on small screens; icon-only labels below md */}
+      <header className="bg-gray-900 border-b border-gray-800 px-3 sm:px-4 py-2.5 flex items-center gap-2 sm:gap-3 flex-wrap shrink-0">
         <a
           href="/"
           onClick={(e) => { e.preventDefault() }}
-          className="flex items-center gap-2 no-underline"
+          className="flex items-center gap-2 no-underline shrink-0"
         >
           <img src="/spanright-logo-large.png" alt="Spanright" className="h-6 w-auto" />
           <h1 className="text-sm font-bold text-gray-100 tracking-tight">
             Spanright
           </h1>
         </a>
-        <span className="text-xs text-gray-500">
+        <span className="text-xs text-gray-500 hidden md:inline">
           Multi-Monitor Wallpaper Alignment Tool
         </span>
-        <button
-          onClick={() => setShowWelcome(true)}
-          className="flex items-center gap-1.5 text-gray-500 hover:text-gray-300 transition-colors px-2 py-1 rounded hover:bg-gray-800"
-          title="Quick Start"
-        >
-          <IconBook className="w-4 h-4" />
-          <span className="text-xs">Quick Start</span>
-        </button>
-        <div className="flex-1" />
-        <button
-          onClick={() => dispatch({ type: 'SET_SHOW_HOW_IT_WORKS', value: true })}
-          className="flex items-center gap-1.5 text-gray-500 hover:text-gray-300 transition-colors px-2 py-1 rounded hover:bg-gray-800"
-          title="How It Works"
-        >
-          <IconLightbulb className="w-4 h-4" />
-          <span className="text-xs">How It Works</span>
-        </button>
-        <button
-          onClick={() => dispatch({ type: 'SET_SHOW_TROUBLESHOOTING_GUIDE', value: true })}
-          className="flex items-center gap-1.5 text-gray-500 hover:text-gray-300 transition-colors px-2 py-1 rounded hover:bg-gray-800"
-          title="Troubleshooting Guide"
-        >
-          <IconInfoCircle className="w-4 h-4" />
-          <span className="text-xs">Troubleshooting</span>
-        </button>
-        <button
-          onClick={() => setShowAbout(true)}
-          className="flex items-center gap-1.5 text-gray-500 hover:text-gray-300 transition-colors px-2 py-1 rounded hover:bg-gray-800"
-          title="About Spanright"
-        >
-          <IconInfoCircle className="w-4 h-4" />
-          <span className="text-xs">About</span>
-        </button>
+        <div className="flex-1 min-w-[0.5rem]" />
+        <div className="flex items-center gap-1 sm:gap-2 flex-wrap justify-end">
+          <button
+            onClick={() => setShowWelcome(true)}
+            className="flex items-center gap-1.5 text-gray-500 hover:text-gray-300 transition-colors px-2 py-1 rounded hover:bg-gray-800"
+            title="Quick Start"
+          >
+            <IconBook className="w-4 h-4 shrink-0" />
+            <span className="text-xs hidden sm:inline">Quick Start</span>
+          </button>
+          <button
+            onClick={() => dispatch({ type: 'SET_SHOW_HOW_IT_WORKS', value: true })}
+            className="flex items-center gap-1.5 text-gray-500 hover:text-gray-300 transition-colors px-2 py-1 rounded hover:bg-gray-800"
+            title="How It Works"
+          >
+            <IconLightbulb className="w-4 h-4 shrink-0" />
+            <span className="text-xs hidden sm:inline">How It Works</span>
+          </button>
+          <button
+            onClick={() => dispatch({ type: 'SET_SHOW_TROUBLESHOOTING_GUIDE', value: true })}
+            className="flex items-center gap-1.5 text-gray-500 hover:text-gray-300 transition-colors px-2 py-1 rounded hover:bg-gray-800"
+            title="Troubleshooting Guide"
+          >
+            <IconWrench className="w-4 h-4 shrink-0" />
+            <span className="text-xs hidden sm:inline">Troubleshooting</span>
+          </button>
+          <button
+            onClick={() => setShowAbout(true)}
+            className="flex items-center gap-1.5 text-gray-500 hover:text-gray-300 transition-colors px-2 py-1 rounded hover:bg-gray-800"
+            title="About Spanright"
+          >
+            <IconInfoCircle className="w-4 h-4 shrink-0" />
+            <span className="text-xs hidden sm:inline">About</span>
+          </button>
+        </div>
       </header>
 
       {/* Tabs */}
-      <div className="bg-gray-900 border-b border-gray-700 px-4 flex items-end gap-1 shrink-0">
+      <div className="bg-gray-900 border-b border-gray-700 px-2 sm:px-4 flex items-end gap-0.5 sm:gap-1 shrink-0 overflow-x-auto">
         <TabButton tab="physical" label="Physical Layout" active={tab === 'physical'} onClick={setTab} />
         <TabButton tab="windows" label="Virtual Layout" active={tab === 'windows'} onClick={setTab} />
         <TabButton tab="preview" label="Preview & Export" active={tab === 'preview'} onClick={setTab} />

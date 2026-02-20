@@ -421,7 +421,7 @@ export default function WindowsArrangementCanvas() {
   return (
     <div className="flex flex-col h-full">
       {/* Top bar */}
-      <div className="bg-gray-900 border-b border-gray-800 px-4 h-11 flex items-center gap-4 shrink-0 flex-wrap">
+      <div className="bg-gray-900 border-b border-gray-800 px-4 min-h-[4.5rem] sm:min-h-0 sm:h-11 flex items-center gap-4 shrink-0 flex-wrap py-2 sm:py-0">
         <label className="flex items-center gap-2 cursor-pointer select-none">
           <input
             type="checkbox"
