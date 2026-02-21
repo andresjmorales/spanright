@@ -2123,7 +2123,10 @@ function BezelEditorPopover({
   const cx = monitor.physicalX * canvasScale + offsetX + (monitor.physicalWidth * canvasScale) / 2
   const cy = monitor.physicalY * canvasScale + offsetY + (monitor.physicalHeight * canvasScale) / 2
   const popoverLeft = Math.max(8, Math.min(cx - 128, window.innerWidth - 280))
-  const popoverTop = Math.max(8, cy + (monitor.physicalHeight * canvasScale) / 2 + 8)
+  const gap = 8
+  const bezelPopoverMaxHeight = 420
+  const preferredTop = cy + (monitor.physicalHeight * canvasScale) / 2 + gap
+  const popoverTop = Math.max(gap, Math.min(preferredTop, window.innerHeight - bezelPopoverMaxHeight - gap))
 
   const inputClass = 'w-14 bg-gray-800 border border-gray-600 rounded px-1.5 py-1 text-xs text-gray-100 text-center focus:outline-none focus:border-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none'
 
