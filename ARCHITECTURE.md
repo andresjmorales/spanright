@@ -107,9 +107,31 @@ flowchart LR
 ```
 
 - **URL → app:** On load, `App` reads `#layout=ENCODED`. `urlLayout.getLayoutFromHash()` → `decodeLayout(encoded)` returns `{ monitors, imagePosition }` (LZ or base64url); `LOAD_LAYOUT` is dispatched with both, then hash is cleared.
-- **Share:** `ShareButton` uses `buildShareUrl(monitors, imagePosition?)` → `encodeLayout` (monitors + optional image position → JSON → LZ → `~`-prefixed string) → copy URL to clipboard. When an image is loaded, its position is included so the recipient’s next upload is placed the same way.
-- **Saved layouts:** `ConfigManager` reads/writes a list of `SavedConfig` to localStorage; loading dispatches `LOAD_LAYOUT` with optional `imagePosition`. Preloaded (quick) layouts live in `preloadedLayouts.ts` and are decoded with the same `decodeLayout`.
+- **Share:** `ShareButton` uses `buildShareUrl(monitors, imagePosition?)`. Image position in the URL = current canvas image if present, else `loadedLayoutImagePosition` (so sharing right after loading a layout with no image still includes the layout’s position).
+- **Saved layouts:** `ConfigManager` reads/writes a list of `SavedConfig` to localStorage; loading dispatches `LOAD_LAYOUT` with optional `imagePosition`. Preloaded (quick) layouts pass `imagePosition: null`.
 - **Image position bookmarks:** `imagePositionStorage.ts` stores `SavedImagePosition` by layout key (`activeLayoutName` or `_default`). Used when applying a bookmark or when loading a layout that had an image (restore position on next upload).
+
+### 5.1 Image position: full behavior
+
+Single source of truth for “where the layout wants the image” is **`loadedLayoutImagePosition`** in the store. It is used when: (1) **uploading** an image (if set, place image there; else bookmark or center), (2) **saving** a layout with no image on canvas, (3) **sharing** when there is no image on canvas.
+
+**When `loadedLayoutImagePosition` is set**
+
+- **Load saved layout** (from list) → `LOAD_LAYOUT` with `config.imagePosition` → store sets `loadedLayoutImagePosition`.
+- **Open shared link** → decode URL → `LOAD_LAYOUT` with `imagePosition` from URL → store sets `loadedLayoutImagePosition`.
+- **Save layout** (with no image) → we save `state.loadedLayoutImagePosition` into the config.
+- **Remove image** → `CLEAR_SOURCE_IMAGE` reducer sets `loadedLayoutImagePosition` to the position the image had (so “move → remove → save” keeps the moved position).
+
+**When it is cleared / not set**
+
+- **Load preloaded (quick) layout** → `LOAD_LAYOUT` with `imagePosition: null`.
+- **CLEAR_LOADED_LAYOUT_IMAGE_POSITION** (if ever dispatched).
+
+**Rules that must stay consistent**
+
+1. **Share URL:** `imagePosition` = `state.sourceImage` position if present, else `state.loadedLayoutImagePosition`. (So “load layout → share with no image” still puts position in the link.)
+2. **Save layout:** `imagePosition` = current image position if there is an image, else `loadedLayoutImagePosition`. (So “load link → save with no image” or “move → remove → save” both retain the right position.)
+3. **Upload image:** Prefer `loadedLayoutImagePosition`, then bookmark for `activeLayoutName`, then center.
 
 ---
 

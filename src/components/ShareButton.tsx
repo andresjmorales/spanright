@@ -29,7 +29,7 @@ export default function ShareButton() {
           height: state.sourceImage.physicalHeight,
           aspectRatio: state.sourceImage.naturalWidth / state.sourceImage.naturalHeight,
         }
-      : null
+      : state.loadedLayoutImagePosition ?? null
 
     const url = buildShareUrl(monitors, imagePosition)
 

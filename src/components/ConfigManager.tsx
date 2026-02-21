@@ -180,7 +180,7 @@ export default function ConfigManager() {
 
   const handleSave = () => {
     if (!saveName.trim() || state.monitors.length === 0) return
-    // Always use current canvas image position (never bookmark or previous layout)
+    // Use current canvas image position when present; otherwise keep layout image position (e.g. from shared link)
     const img = state.sourceImage
     const imagePosition: SavedImagePosition | null = img
       ? {
@@ -190,7 +190,7 @@ export default function ConfigManager() {
           height: img.physicalHeight,
           aspectRatio: img.naturalWidth / img.naturalHeight,
         }
-      : null
+      : state.loadedLayoutImagePosition ?? null
     const newConfig: SavedConfig = {
       id: crypto.randomUUID(),
       name: saveName.trim(),
@@ -423,7 +423,9 @@ export default function ConfigManager() {
                           {config.name}
                         </div>
                         <div className="text-[10px] text-gray-500">
-                          {config.monitors.length} monitor{config.monitors.length !== 1 ? 's' : ''} · {formatDate(config.savedAt)}
+                          {config.monitors.length} monitor{config.monitors.length !== 1 ? 's' : ''}
+                          {config.imagePosition ? ', 1 image position' : ', no image position'}
+                          {' · '}{formatDate(config.savedAt)}
                         </div>
                       </button>
                       <button
@@ -478,7 +480,7 @@ export default function ConfigManager() {
                   className="w-full text-left px-2.5 py-1.5 text-xs text-gray-300 hover:bg-gray-800 hover:text-white rounded transition-colors flex items-center gap-1.5"
                 >
                   <span className="font-medium truncate">{entry.name}</span>
-                  <span className="text-gray-600 shrink-0">{monitors.length} monitor{monitors.length !== 1 ? 's' : ''}</span>
+                  <span className="text-gray-600 shrink-0">{monitors.length} monitor{monitors.length !== 1 ? 's' : ''}, no image position</span>
                 </button>
               ))}
             </div>

@@ -263,8 +263,23 @@ function reducer(state: State, action: Action): State {
       return { ...state, selectedMonitorId: action.id }
     case 'SET_SOURCE_IMAGE':
       return { ...state, sourceImage: action.image }
-    case 'CLEAR_SOURCE_IMAGE':
-      return { ...state, sourceImage: null }
+    case 'CLEAR_SOURCE_IMAGE': {
+      const retainedPosition: SavedImagePosition | null =
+        state.sourceImage
+          ? {
+              x: state.sourceImage.physicalX,
+              y: state.sourceImage.physicalY,
+              width: state.sourceImage.physicalWidth,
+              height: state.sourceImage.physicalHeight,
+              aspectRatio: state.sourceImage.naturalWidth / state.sourceImage.naturalHeight,
+            }
+          : null
+      return {
+        ...state,
+        sourceImage: null,
+        loadedLayoutImagePosition: retainedPosition ?? state.loadedLayoutImagePosition,
+      }
+    }
     case 'ROTATE_SOURCE_IMAGE': {
       if (!state.sourceImage) return state
       const r = state.sourceImage.rotation ?? 0
