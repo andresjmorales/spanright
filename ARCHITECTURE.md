@@ -137,7 +137,7 @@ Single source of truth for “where the layout wants the image” is **`loadedLa
 
 ## 6. Coordinate spaces
 
-- **Physical (inches):** Canvas grid. 1 unit = 1 inch. Bounds in `canvasConstants.ts` (e.g. 0–144" × 0–96"). Monitor positions and image transform live here.
+- **Physical (inches):** Canvas grid. 1 unit = 1 inch. Bounds in `canvasConstants.ts` (e.g. 0–144" × 0–96"). Display unit (inches/cm) is toggled in the canvas menu (⋮); only grid and ruler markings switch to cm — layout, snap, and zoom stay in inches. Monitor positions and image transform live here.
 - **Pixel (output):** Each monitor has a rectangle in “virtual desktop” pixel space (`pixelX`, `pixelY`, width/height from resolution and rotation). Output image = bounding box of all monitors; empty regions use fill mode (solid/blur/transparent).
 
 PPI and physical size: `utils.ts` (and store when creating monitors) use `ppi = sqrt(rx² + ry²) / diagonal`, then `physicalWidth = resolutionX / ppi`, `physicalHeight = resolutionY / ppi`.
@@ -170,7 +170,7 @@ PPI and physical size: `utils.ts` (and store when creating monitors) use `ppi = 
 | `src/components/EditorCanvas.tsx` | Physical layout: Konva stage, monitors + image, pan/zoom, drag, selection, context menus, align assist, fit, eyedropper. |
 | `src/components/WindowsArrangementCanvas.tsx` | Virtual layout: arrange monitors in pixel space; toggle “Use custom arrangement” and “Sync from physical”. |
 | `src/components/MonitorPresetsSidebar.tsx` | Preset list + custom monitor form; add by click or drag onto canvas. |
-| `src/components/Toolbar.tsx` | Top bar: unit toggle, zoom, fit, align assist, grid, saved layouts dropdown (ConfigManager), Share Layout (ShareButton), upload (ImageUpload), clear. |
+| `src/components/Toolbar.tsx` | Top bar: layout dimensions (in/cm when set), recommended image size, undersized status, saved layouts (ConfigManager), Share Layout, ImageUpload. |
 | `src/components/PreviewPanel.tsx` | Live preview canvas from `generateOutput`; fill mode/color; eyedropper; download PNG/JPEG; troubleshooting link. |
 | `src/components/ImageUpload.tsx` | File input; creates `SourceImage` and dispatches `SET_SOURCE_IMAGE`; applies `loadedLayoutImagePosition` when relevant. |
 | `src/components/ConfigManager.tsx` | Saved layouts: load, save, delete, export JSON, import JSON; quick layouts from preloaded; integrates with store and localStorage. |

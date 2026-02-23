@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useCallback, useState, useMemo, type Dispatch
 import { Stage, Layer, Rect, Text, Group, Image as KonvaImage, Line, Transformer } from 'react-konva'
 import type Konva from 'konva'
 import { useStore, CANVAS_SCALE_MIN, CANVAS_SCALE_MAX, DEFAULT_CANVAS_SCALE } from '../store'
-import { formatDimension, getMonitorsBoundingBox, getMonitorDisplayName, getBezelInches, adaptSavedPositionToAspectRatio } from '../utils'
+import { formatDimension, getMonitorsBoundingBox, getMonitorDisplayName, getBezelInches, adaptSavedPositionToAspectRatio, INCHES_PER_CM } from '../utils'
 import { useToast } from './Toast'
 import { IconUndo, IconRedo, IconCheck, IconKebabVertical } from '../icons'
 import type { Monitor, SourceImage, Bezels } from '../types'
@@ -50,6 +50,9 @@ const MONITOR_NUDGE_STEP_LARGE_IN = 5
 const BEZEL_FILL = '#2a2a2e'
 const BEZEL_OPACITY = 0.92
 const BEZEL_STROKE = '#3a3a3e'
+
+/** In cm mode, use 10 cm grid when zoom is below this % so lines stay visible when zoomed out. */
+const CM_GRID_USE_COARSE_BELOW_ZOOM_PCT = 125
 
 interface AlignGuide {
   orientation: 'horizontal' | 'vertical'
@@ -970,9 +973,19 @@ export default function EditorCanvas() {
     setIsDragOverCanvas(false)
   }, [])
 
-  // Generate grid lines
+  // Generate grid lines (display-only: 1" or 1 cm spacing; major every 5 units; in cm mode use 10 cm grid when zoomed out)
+  // (Previous approach used visible extent in cm = viewportPx / scale * 2.54; when that exceeded 10 cm we used 10 cm grid.
+  //  That backfired because viewport is hundreds of px, so visibleExtentCm was usually 50–300+ and we almost always used coarse grid.)
   const gridLines: React.ReactNode[] = []
-  const gridSpacing = state.gridSize * scale
+  const zoomPct = (state.canvasScale / DEFAULT_CANVAS_SCALE) * 100
+  const useCoarseCmGrid = state.unit === 'cm' && zoomPct < CM_GRID_USE_COARSE_BELOW_ZOOM_PCT
+  const displayGridSpacingInches = state.unit === 'cm'
+    ? (useCoarseCmGrid ? 10 * INCHES_PER_CM : INCHES_PER_CM)
+    : state.gridSize
+  const majorIntervalInches = state.unit === 'cm'
+    ? (useCoarseCmGrid ? 50 * INCHES_PER_CM : 5 * INCHES_PER_CM)
+    : 5 * state.gridSize
+  const gridSpacing = displayGridSpacingInches * scale
 
   if (gridSpacing > 4) {
     const startX = Math.floor(-offsetX / gridSpacing) * gridSpacing
@@ -980,7 +993,7 @@ export default function EditorCanvas() {
       const canvasX = x + offsetX
       if (canvasX < 0 || canvasX > dimensions.width) continue
       const physVal = x / scale
-      const isMajor = Math.abs(physVal % (5 * state.gridSize)) < 0.01
+      const isMajor = Math.abs(physVal % majorIntervalInches) < 0.01
       gridLines.push(
         <Line
           key={`v-${x}`}
@@ -996,7 +1009,7 @@ export default function EditorCanvas() {
       const canvasY = y + offsetY
       if (canvasY < 0 || canvasY > dimensions.height) continue
       const physVal = y / scale
-      const isMajor = Math.abs(physVal % (5 * state.gridSize)) < 0.01
+      const isMajor = Math.abs(physVal % majorIntervalInches) < 0.01
       gridLines.push(
         <Line
           key={`h-${y}`}
@@ -1793,6 +1806,7 @@ export default function EditorCanvas() {
           hasMonitors={state.monitors.length > 0}
           hasImage={!!state.sourceImage}
           smartAlign={state.smartAlign}
+          unit={state.unit}
           canSizeImageToFit={state.monitors.length > 0 && !!state.sourceImage}
           onSizeImageToFit={handleSizeImageToFit}
           onOpenEditorShortcuts={() => setShowEditorShortcuts(true)}
@@ -2256,6 +2270,7 @@ function CanvasMenuInner({
   hasMonitors,
   hasImage,
   smartAlign,
+  unit,
   canSizeImageToFit,
   onSizeImageToFit,
   onOpenEditorShortcuts,
@@ -2265,6 +2280,7 @@ function CanvasMenuInner({
   hasMonitors: boolean
   hasImage: boolean
   smartAlign: boolean
+  unit: 'inches' | 'cm'
   canSizeImageToFit: boolean
   onSizeImageToFit: () => void
   onOpenEditorShortcuts: () => void
@@ -2324,6 +2340,21 @@ function CanvasMenuInner({
             Editor shortcuts
           </button>
           <div className="border-t border-gray-700" />
+          <button
+            onClick={() => {
+              dispatch({ type: 'TOGGLE_UNIT' })
+              toast(unit === 'inches' ? 'Rulers and grid in cm' : 'Rulers and grid in inches')
+              setOpen(false)
+            }}
+            className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between gap-2 ${
+              unit === 'cm' ? 'text-blue-400 bg-blue-500/10' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+            }`}
+          >
+            Show in cm
+            <span className="shrink-0 w-4 h-4 flex items-center justify-center text-[10px] font-medium">
+              {unit === 'cm' ? 'cm' : 'in'}
+            </span>
+          </button>
           <button
             onClick={() => {
               dispatch({ type: 'TOGGLE_SMART_ALIGN' })
