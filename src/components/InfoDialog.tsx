@@ -1,3 +1,5 @@
+import { VIDEO_DEMO_URL } from '../appConstants'
+
 interface InfoDialogProps {
   onClose: () => void
 }
@@ -30,6 +32,17 @@ export default function InfoDialog({ onClose }: InfoDialogProps) {
               Understanding how the two layout tabs work together
             </p>
           </div>
+
+          <p>
+            <a
+              href={VIDEO_DEMO_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:text-blue-300 underline underline-offset-2 text-sm"
+            >
+              Watch a video demo
+            </a>
+          </p>
 
           {/* Step 1 */}
           <section className="space-y-2">

@@ -14,6 +14,7 @@ import { useViewport } from './useViewport'
 import { VIEWPORT_BP_DESKTOP } from './viewportConstants'
 import { IconClose, IconBook, IconLightbulb, IconWrench, IconInfoCircle } from './icons'
 import MobileShell from './components/MobileShell'
+import { VIDEO_DEMO_URL } from './appConstants'
 
 function TabButton({ tab, label, active, onClick }: { tab: ActiveTab; label: string; active: boolean; onClick: (tab: ActiveTab) => void }) {
   return (
@@ -140,6 +141,17 @@ function WelcomeDialog({ onClose }: { onClose: () => void }) {
               </div>
             </li>
           </ol>
+
+          <p className="text-center">
+            <a
+              href={VIDEO_DEMO_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:text-blue-300 underline underline-offset-2 text-sm"
+            >
+              Watch a video demo
+            </a>
+          </p>
 
           <button
             onClick={handleClose}
