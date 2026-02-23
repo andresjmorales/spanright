@@ -24,6 +24,7 @@ Spanright operates in **physical space** (inches/cm), so you arrange monitors as
 - **Image position bookmark** — Right-click the source image for **Bookmark image position**, **Apply bookmarked position**, and **Clear bookmarked position**. The bookmark is stored per layout name (or "_default" when no layout is active) so you can pin a preferred image position independently of saving the full layout.
 - **Share Layout link** — Share encodes the monitor arrangement and, when an image is loaded, its position and size. Opening a shared link restores the layout and image position so the next image you upload is placed where the shared layout had it (with aspect-ratio adaptation).
 - **Cross-platform** — Works in any modern browser. Output can be applied as a spanned wallpaper on Windows (Span/Tile mode), macOS (per-monitor crop), and Linux (varies by DE — GNOME, KDE, feh, swaybg, etc.).
+- **Video demo** — A “Watch a video demo” link appears in the **How It Works** dialog and at the end of the **Quick Start** guide.
 - **Responsive layout** — On tablet (768px–1024px) the preset sidebar becomes a slide-out drawer (default collapsed) and the header/toolbar wrap or shorten. On phone (&lt;768px) an informational view explains the app and shows a read-only summary of shared layout URLs, with an option to open the full editor.
 
 ## Example
@@ -167,6 +168,8 @@ Linux wallpaper handling varies by desktop environment:
 | Full shortcuts list | Canvas menu (top-right ⋮) → **Editor shortcuts** |
 
 ## How It Works
+
+In the app, open **How It Works** from the header to read a step-by-step explanation and use the “Watch a video demo” link. The **Quick Start** modal (first-time welcome) also ends with the same link.
 
 ### Coordinate Spaces
 
