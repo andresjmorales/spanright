@@ -51,8 +51,8 @@ const BEZEL_FILL = '#2a2a2e'
 const BEZEL_OPACITY = 0.92
 const BEZEL_STROKE = '#3a3a3e'
 
-/** In cm mode, use 10 cm grid when zoom is below this % so lines stay visible when zoomed out. */
-const CM_GRID_USE_COARSE_BELOW_ZOOM_PCT = 125
+/** In cm mode: when the visible extent (longer viewport side in cm) exceeds this, use 5 cm grid so lines stay visible. Device-independent (depends on viewport px and scale, not a fixed zoom %). */
+const CM_GRID_COARSE_THRESHOLD_CM = 250
 
 interface AlignGuide {
   orientation: 'horizontal' | 'vertical'
@@ -973,17 +973,20 @@ export default function EditorCanvas() {
     setIsDragOverCanvas(false)
   }, [])
 
-  // Generate grid lines (display-only: 1" or 1 cm spacing; major every 5 units; in cm mode use 10 cm grid when zoomed out)
-  // (Previous approach used visible extent in cm = viewportPx / scale * 2.54; when that exceeded 10 cm we used 10 cm grid.
-  //  That backfired because viewport is hundreds of px, so visibleExtentCm was usually 50–300+ and we almost always used coarse grid.)
+  // Generate grid lines (display-only: 1" or 1 cm spacing; major every 5 units; in cm mode use 5 cm grid when zoomed out)
+  // Visible extent = longer side of viewport in physical cm (viewportPx / scale * 2.54). When that exceeds threshold,
+  // 1 cm lines would be too dense, so we use 5 cm grid. Threshold must be large enough that at typical 100% zoom
+  // (e.g. 800px viewport → ~200 cm) we still get 1 cm grid; zooming out increases visible cm and switches to 5 cm.
   const gridLines: React.ReactNode[] = []
-  const zoomPct = (state.canvasScale / DEFAULT_CANVAS_SCALE) * 100
-  const useCoarseCmGrid = state.unit === 'cm' && zoomPct < CM_GRID_USE_COARSE_BELOW_ZOOM_PCT
+  const visibleExtentCm = state.unit === 'cm'
+    ? Math.max(dimensions.width, dimensions.height) * (1 / scale) * 2.54
+    : 0
+  const useCoarseCmGrid = state.unit === 'cm' && visibleExtentCm > CM_GRID_COARSE_THRESHOLD_CM
   const displayGridSpacingInches = state.unit === 'cm'
-    ? (useCoarseCmGrid ? 10 * INCHES_PER_CM : INCHES_PER_CM)
+    ? (useCoarseCmGrid ? 5 * INCHES_PER_CM : INCHES_PER_CM)
     : state.gridSize
   const majorIntervalInches = state.unit === 'cm'
-    ? (useCoarseCmGrid ? 50 * INCHES_PER_CM : 5 * INCHES_PER_CM)
+    ? (useCoarseCmGrid ? 25 * INCHES_PER_CM : 5 * INCHES_PER_CM)
     : 5 * state.gridSize
   const gridSpacing = displayGridSpacingInches * scale
 
@@ -1806,7 +1809,6 @@ export default function EditorCanvas() {
           hasMonitors={state.monitors.length > 0}
           hasImage={!!state.sourceImage}
           smartAlign={state.smartAlign}
-          unit={state.unit}
           canSizeImageToFit={state.monitors.length > 0 && !!state.sourceImage}
           onSizeImageToFit={handleSizeImageToFit}
           onOpenEditorShortcuts={() => setShowEditorShortcuts(true)}
@@ -1830,40 +1832,72 @@ export default function EditorCanvas() {
         dispatch={dispatch}
       />
 
-      {/* Zoom controls + hint */}
+      {/* Unit toggle + Zoom controls + hint */}
       <div className="absolute bottom-3 right-3 flex flex-col items-end gap-1.5 select-none">
-        <div className="bg-gray-900/80 backdrop-blur px-3 py-1.5 rounded text-xs text-gray-400 flex items-center gap-2">
-          <button
-            onClick={() => {
-              const pct = (state.canvasScale / DEFAULT_CANVAS_SCALE) * 100
-              const newPct = Math.max(75, Math.floor((pct - 0.5) / 25) * 25)
-              dispatch({ type: 'SET_CANVAS_SCALE', scale: (newPct / 100) * DEFAULT_CANVAS_SCALE })
-            }}
-            className="hover:text-white transition-colors px-1"
-            title="Zoom out"
-          >
-            −
-          </button>
-          <span>{Math.round((state.canvasScale / DEFAULT_CANVAS_SCALE) * 100)}%</span>
-          <button
-            onClick={() => {
-              const pct = (state.canvasScale / DEFAULT_CANVAS_SCALE) * 100
-              const newPct = Math.min(ZOOM_PCT_MAX, Math.ceil((pct + 0.5) / 25) * 25)
-              dispatch({ type: 'SET_CANVAS_SCALE', scale: (newPct / 100) * DEFAULT_CANVAS_SCALE })
-            }}
-            className="hover:text-white transition-colors px-1"
-            title="Zoom in"
-          >
-            +
-          </button>
-          <div className="w-px h-3 bg-gray-700 mx-0.5" />
-          <button
-            onClick={fitView}
-            className="hover:text-white transition-colors px-1"
-            title="Fit view (F)"
-          >
-            Fit
-          </button>
+        <div className="flex items-center gap-2">
+          <div className="bg-gray-900/80 backdrop-blur rounded text-xs text-gray-400 flex">
+            <button
+              onClick={() => {
+                if (state.unit !== 'inches') {
+                  dispatch({ type: 'TOGGLE_UNIT' })
+                  toast('Rulers and grid in inches')
+                }
+              }}
+              className={`px-2 py-1.5 rounded-l transition-colors ${
+                state.unit === 'inches' ? 'text-blue-400 bg-blue-500/10' : 'hover:text-white hover:bg-gray-800'
+              }`}
+              title="Show rulers and grid in inches"
+            >
+              in
+            </button>
+            <button
+              onClick={() => {
+                if (state.unit !== 'cm') {
+                  dispatch({ type: 'TOGGLE_UNIT' })
+                  toast('Rulers and grid in cm')
+                }
+              }}
+              className={`px-2 py-1.5 rounded-r transition-colors ${
+                state.unit === 'cm' ? 'text-blue-400 bg-blue-500/10' : 'hover:text-white hover:bg-gray-800'
+              }`}
+              title="Show rulers and grid in cm"
+            >
+              cm
+            </button>
+          </div>
+          <div className="bg-gray-900/80 backdrop-blur px-3 py-1.5 rounded text-xs text-gray-400 flex items-center gap-2">
+            <button
+              onClick={() => {
+                const pct = (state.canvasScale / DEFAULT_CANVAS_SCALE) * 100
+                const newPct = Math.max(75, Math.floor((pct - 0.5) / 25) * 25)
+                dispatch({ type: 'SET_CANVAS_SCALE', scale: (newPct / 100) * DEFAULT_CANVAS_SCALE })
+              }}
+              className="hover:text-white transition-colors px-1"
+              title="Zoom out"
+            >
+              −
+            </button>
+            <span>{Math.round((state.canvasScale / DEFAULT_CANVAS_SCALE) * 100)}%</span>
+            <button
+              onClick={() => {
+                const pct = (state.canvasScale / DEFAULT_CANVAS_SCALE) * 100
+                const newPct = Math.min(ZOOM_PCT_MAX, Math.ceil((pct + 0.5) / 25) * 25)
+                dispatch({ type: 'SET_CANVAS_SCALE', scale: (newPct / 100) * DEFAULT_CANVAS_SCALE })
+              }}
+              className="hover:text-white transition-colors px-1"
+              title="Zoom in"
+            >
+              +
+            </button>
+            <div className="w-px h-3 bg-gray-700 mx-0.5" />
+            <button
+              onClick={fitView}
+              className="hover:text-white transition-colors px-1"
+              title="Fit view (F)"
+            >
+              Fit
+            </button>
+          </div>
         </div>
         <div className="bg-gray-900/60 backdrop-blur px-2 py-1 rounded text-[10px] text-gray-500">
           Scroll to pan · Ctrl+Scroll to zoom · Right-click drag to pan
@@ -2270,7 +2304,6 @@ function CanvasMenuInner({
   hasMonitors,
   hasImage,
   smartAlign,
-  unit,
   canSizeImageToFit,
   onSizeImageToFit,
   onOpenEditorShortcuts,
@@ -2280,7 +2313,6 @@ function CanvasMenuInner({
   hasMonitors: boolean
   hasImage: boolean
   smartAlign: boolean
-  unit: 'inches' | 'cm'
   canSizeImageToFit: boolean
   onSizeImageToFit: () => void
   onOpenEditorShortcuts: () => void
@@ -2340,21 +2372,6 @@ function CanvasMenuInner({
             Editor shortcuts
           </button>
           <div className="border-t border-gray-700" />
-          <button
-            onClick={() => {
-              dispatch({ type: 'TOGGLE_UNIT' })
-              toast(unit === 'inches' ? 'Rulers and grid in cm' : 'Rulers and grid in inches')
-              setOpen(false)
-            }}
-            className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between gap-2 ${
-              unit === 'cm' ? 'text-blue-400 bg-blue-500/10' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-            }`}
-          >
-            Show in cm
-            <span className="shrink-0 w-4 h-4 flex items-center justify-center text-[10px] font-medium">
-              {unit === 'cm' ? 'cm' : 'in'}
-            </span>
-          </button>
           <button
             onClick={() => {
               dispatch({ type: 'TOGGLE_SMART_ALIGN' })
