@@ -137,7 +137,7 @@ Single source of truth for “where the layout wants the image” is **`loadedLa
 
 ## 6. Coordinate spaces
 
-- **Physical (inches):** Canvas grid. 1 unit = 1 inch. Bounds in `canvasConstants.ts` (e.g. 0–144" × 0–96"). Display unit (inches/cm) is toggled via **in | cm** (bottom-right, left of zoom/Fit); only grid and ruler markings switch to cm — layout, snap, and zoom stay in inches. Monitor positions and image transform live here.
+- **Physical (inches):** Canvas grid. 1 unit = 1 inch. Bounds in `canvasConstants.ts` (e.g. 0–144" × 0–96"). Display unit (inches/cm) is toggled via **in | cm** (bottom-right, left of zoom/Fit); only grid and ruler markings switch to cm. Monitor positions and image transform live here.
 - **Pixel (output):** Each monitor has a rectangle in “virtual desktop” pixel space (`pixelX`, `pixelY`, width/height from resolution and rotation). Output image = bounding box of all monitors; empty regions use fill mode (solid/blur/transparent).
 
 PPI and physical size: `utils.ts` (and store when creating monitors) use `ppi = sqrt(rx² + ry²) / diagonal`, then `physicalWidth = resolutionX / ppi`, `physicalHeight = resolutionY / ppi`.
