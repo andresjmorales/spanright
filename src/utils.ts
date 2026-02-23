@@ -146,6 +146,9 @@ export function getBezelInches(monitor: Monitor): { top: number; bottom: number;
   }
 }
 
+/** One centimeter in inches (for display grid spacing when unit is cm). */
+export const INCHES_PER_CM = 1 / 2.54
+
 /**
  * Inches to centimeters conversion.
  */

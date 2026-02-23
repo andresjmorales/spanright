@@ -19,7 +19,7 @@ Spanright operates in **physical space** (inches/cm), so you arrange monitors as
 - **Smart image recommendations** — Calculates the minimum source image resolution needed based on your layout's physical size and the highest-PPI monitor.
 - **Accurate output generation** — Crops and scales the source image per-monitor at each screen's native PPI, then stitches at each monitor's virtual layout position (side-by-side, stacked, or mixed). Gaps in the layout use a configurable fill: solid color (default black), blurred edge extension, or transparent (PNG only).
 - **Preview & download** — Live preview of the final stitched wallpaper with one-click PNG/JPEG export.
-- **Canvas controls** — Scroll to pan, Ctrl+Scroll to zoom (up to 400%), right-click drag to pan. Custom scrollbars, Align Assist guides/snapping, and fit-to-view.
+- **Canvas controls** — Scroll to pan, Ctrl+Scroll to zoom (up to 400%), right-click drag to pan. Custom scrollbars, Align Assist guides/snapping, and fit-to-view. Optional **inches/cm** display for grid, rulers, and dimension labels (toggle **in | cm** next to zoom, bottom-right). Diagonal sizes remain in inches.
 - **Saved Layouts** — Save and load monitor layouts (names, positions, rotation, bezels, virtual layout). Saving a layout also stores the current image position when an image is loaded; loading a layout and then uploading an image applies that saved position (with aspect-ratio adaptation). Layouts are stored in your browser (localStorage); you can keep several setups (e.g. desk vs laptop-only) and switch between them. **Export** downloads all saved layouts as a JSON file; **Import** uploads a JSON file (same format), validates it (monitor rules: diagonal 5"–120", aspect ratio ≤10:1, etc.), and adds layouts to your list (up to the 24-layout limit). Optional **Quick layouts** (preloaded in code) appear at the bottom of the Saved Layouts dropdown when configured. The Saved Layouts control sits on the right side of the toolbar, to the left of Share Layout.
 - **Image position bookmark** — Right-click the source image for **Bookmark image position**, **Apply bookmarked position**, and **Clear bookmarked position**. The bookmark is stored per layout name (or "_default" when no layout is active) so you can pin a preferred image position independently of saving the full layout.
 - **Share Layout link** — Share encodes the monitor arrangement and, when an image is loaded, its position and size. Opening a shared link restores the layout and image position so the next image you upload is placed where the shared layout had it (with aspect-ratio adaptation).
@@ -165,6 +165,7 @@ Linux wallpaper handling varies by desktop environment:
 | Monitor context menu | **Right-click** monitor or select + **⋮** kebab → Set Bezels, Rename, Rotate 90°, Duplicate, Delete |
 | Delete monitor | Select + **Delete** or **Backspace**, or right-click → Delete |
 | Deselect | **Escape** or click empty space |
+| Rulers & grid in cm | **in | cm** toggle (bottom-right, left of zoom/Fit) — display-only |
 | Full shortcuts list | Canvas menu (top-right ⋮) → **Editor shortcuts** |
 
 ## How It Works
@@ -175,7 +176,7 @@ In the app, open **How It Works** from the header to read a step-by-step explana
 
 Spanright operates in two coordinate spaces:
 
-- **Physical space (inches)** — The canvas grid. Monitor sizes and image positioning happen here. 1 canvas unit = 1 physical inch.
+- **Physical space (inches)** — The canvas grid and layout. 1 canvas unit = 1 physical inch. You can switch the **grid and ruler** to display in cm (**in | cm** toggle next to zoom, bottom-right). Dimension labels in the toolbar and preset cards follow the chosen unit; diagonal sizes remain in inches.
 - **Pixel space** — Each monitor's native resolution. The output image lives here.
 
 ### PPI Calculation

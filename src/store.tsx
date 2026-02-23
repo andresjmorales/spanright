@@ -94,13 +94,23 @@ type Action =
   | { type: 'UNDO' }
   | { type: 'REDO' }
 
+const UNIT_STORAGE_KEY = 'spanright-unit'
+
+function getInitialUnit(): 'inches' | 'cm' {
+  try {
+    return localStorage.getItem(UNIT_STORAGE_KEY) === 'cm' ? 'cm' : 'inches'
+  } catch {
+    return 'inches'
+  }
+}
+
 const initialState: State = {
   monitors: [],
   sourceImage: null,
   canvasScale: DEFAULT_CANVAS_SCALE,
   canvasOffsetX: 50,
   canvasOffsetY: 50,
-  unit: 'inches',
+  unit: getInitialUnit(),
   selectedMonitorId: null,
   snapToGrid: false,
   gridSize: 1,
@@ -343,8 +353,15 @@ function reducer(state: State, action: Action): State {
       }
     case 'SET_CANVAS_OFFSET':
       return { ...state, canvasOffsetX: action.x, canvasOffsetY: action.y }
-    case 'TOGGLE_UNIT':
-      return { ...state, unit: state.unit === 'inches' ? 'cm' : 'inches' }
+    case 'TOGGLE_UNIT': {
+      const next = state.unit === 'inches' ? 'cm' : 'inches'
+      try {
+        localStorage.setItem(UNIT_STORAGE_KEY, next)
+      } catch {
+        /* ignore */
+      }
+      return { ...state, unit: next }
+    }
     case 'TOGGLE_SNAP':
       return { ...state, snapToGrid: !state.snapToGrid }
     case 'TOGGLE_SMART_ALIGN':
