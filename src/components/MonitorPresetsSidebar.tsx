@@ -110,11 +110,48 @@ export default function MonitorPresetsSidebar() {
     } else if (diag > MAX_DIAGONAL) {
       warnings.push(`Diagonal cannot exceed ${MAX_DIAGONAL}".`)
     }
-    const { resW, resH } = getCustomRes()
-    if (resW > 0 && resH > 0) {
-      const ratio = Math.max(resW, resH) / Math.min(resW, resH)
-      if (ratio > MAX_ASPECT_RATIO) {
-        warnings.push(`Aspect ratio cannot exceed ${MAX_ASPECT_RATIO}:1 (e.g. ${MAX_ASPECT_RATIO}:1 or 1:${MAX_ASPECT_RATIO}).`)
+    const MIN_CUSTOM_RES_W = 512
+    const MIN_CUSTOM_RES_H = 384
+    const MAX_CUSTOM_RES_W = 15360
+    const MAX_CUSTOM_RES_H = 8640
+
+    if (useCustomRes) {
+      const trimmedW = customResW.trim()
+      const trimmedH = customResH.trim()
+      const w = parseInt(trimmedW, 10)
+      const h = parseInt(trimmedH, 10)
+
+      if (!trimmedW || !trimmedH || Number.isNaN(w) || Number.isNaN(h)) {
+        warnings.push('Enter both width and height for the custom resolution.')
+        return warnings
+      }
+
+      const resW = w
+      const resH = h
+
+      if (resW < MIN_CUSTOM_RES_W || resH < MIN_CUSTOM_RES_H) {
+        warnings.push(`Resolution must be at least ${MIN_CUSTOM_RES_W}x${MIN_CUSTOM_RES_H}.`)
+      } else if (resW > MAX_CUSTOM_RES_W || resH > MAX_CUSTOM_RES_H) {
+        warnings.push(`Resolution cannot exceed ${MAX_CUSTOM_RES_W}x${MAX_CUSTOM_RES_H}.`)
+      } else {
+        const ratio = Math.max(resW, resH) / Math.min(resW, resH)
+        if (ratio > MAX_ASPECT_RATIO) {
+          warnings.push(`Aspect ratio cannot exceed ${MAX_ASPECT_RATIO}:1 (e.g. ${MAX_ASPECT_RATIO}:1 or 1:${MAX_ASPECT_RATIO}).`)
+        }
+      }
+    } else {
+      const { resW, resH } = getCustomRes()
+      if (resW > 0 && resH > 0) {
+        if (resW < MIN_CUSTOM_RES_W || resH < MIN_CUSTOM_RES_H) {
+          warnings.push(`Resolution must be at least ${MIN_CUSTOM_RES_W}x${MIN_CUSTOM_RES_H}.`)
+        } else if (resW > MAX_CUSTOM_RES_W || resH > MAX_CUSTOM_RES_H) {
+          warnings.push(`Resolution cannot exceed ${MAX_CUSTOM_RES_W}x${MAX_CUSTOM_RES_H}.`)
+        } else {
+          const ratio = Math.max(resW, resH) / Math.min(resW, resH)
+          if (ratio > MAX_ASPECT_RATIO) {
+            warnings.push(`Aspect ratio cannot exceed ${MAX_ASPECT_RATIO}:1 (e.g. ${MAX_ASPECT_RATIO}:1 or 1:${MAX_ASPECT_RATIO}).`)
+          }
+        }
       }
     }
     return warnings
@@ -307,7 +344,14 @@ export default function MonitorPresetsSidebar() {
                   <div className="mt-2 flex items-center justify-between gap-2">
                     <div className="h-3.5 w-3.5" aria-hidden="true" />
                     <button
-                      onClick={() => setUseCustomRes(true)}
+                      onClick={() => {
+                        const selected = filteredResolutions[customResIdx]
+                        if (selected) {
+                          setCustomResW(String(selected.w))
+                          setCustomResH(String(selected.h))
+                        }
+                        setUseCustomRes(true)
+                      }}
                       className="text-xs text-blue-400 hover:text-blue-300 transition-colors whitespace-nowrap"
                     >
                       Enter custom resolution
@@ -332,7 +376,7 @@ export default function MonitorPresetsSidebar() {
                           }
                         }
                       }}
-                      min="640"
+                      min="512"
                       max="15360"
                       placeholder="Width"
                       className="flex-1 h-8 bg-gray-800 border border-gray-700 rounded px-2 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
@@ -353,7 +397,7 @@ export default function MonitorPresetsSidebar() {
                           }
                         }
                       }}
-                      min="480"
+                      min="384"
                       max="8640"
                       placeholder="Height"
                       className="flex-1 h-8 bg-gray-800 border border-gray-700 rounded px-2 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
@@ -382,7 +426,7 @@ export default function MonitorPresetsSidebar() {
                         }}
                         className="h-3.5 w-3.5 rounded border-gray-600 bg-gray-900 text-blue-500 focus:ring-blue-500"
                       />
-                      <span>Lock aspect ratio</span>
+                      <span>Maintain aspect ratio</span>
                     </label>
                     {filteredResolutions.length > 0 && (
                       <button
