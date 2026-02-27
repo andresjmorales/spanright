@@ -5,6 +5,8 @@ import { useStore } from '../store'
 import { useToast } from './Toast'
 import { calculatePPI, calculatePhysicalDimensions, formatDimension } from '../utils'
 
+const PRESET_GROUP_CONTENT_ID_PREFIX = 'preset-group-'
+
 export default function MonitorPresetsSidebar() {
   const { state, dispatch } = useStore()
   const toast = useToast()
@@ -16,6 +18,7 @@ export default function MonitorPresetsSidebar() {
   const [customResW, setCustomResW] = useState('2560')
   const [customResH, setCustomResH] = useState('1440')
   const [searchFilter, setSearchFilter] = useState('')
+  const [lockAspect, setLockAspect] = useState(true)
 
   // Filter resolutions based on selected aspect ratio (with tolerance for rounding)
   const filteredResolutions = useMemo(() => {
@@ -30,9 +33,26 @@ export default function MonitorPresetsSidebar() {
   // Reset resolution selection when aspect ratio changes
   function handleAspectChange(a: number, b: number) {
     setCustomAspect([a, b])
+
+    // If we're in custom resolution mode, keep using custom fields and, when locked, reconcile to the new aspect.
+    if (useCustomRes) {
+      if (lockAspect) {
+        const width = parseInt(customResW, 10)
+        const height = parseInt(customResH, 10)
+        if (!Number.isNaN(width) && width > 0) {
+          const newH = Math.round(width * b / a)
+          setCustomResH(String(newH))
+        } else if (!Number.isNaN(height) && height > 0) {
+          const newW = Math.round(height * a / b)
+          setCustomResW(String(newW))
+        }
+      }
+      return
+    }
+
+    // Preset resolution mode: reset to first matching preset for this aspect (or a reasonable default).
     setCustomResIdx(0)
     setUseCustomRes(false)
-    // Auto-fill custom resolution fields based on first matching resolution
     const targetRatio = a / b
     const match = COMMON_RESOLUTIONS.find(r => Math.abs(r.w / r.h - targetRatio) / targetRatio < 0.02)
     if (match) {
@@ -41,7 +61,6 @@ export default function MonitorPresetsSidebar() {
     } else {
       // No preset resolution for this ratio, auto-switch to custom entry
       setUseCustomRes(true)
-      // Calculate a reasonable default resolution for this aspect ratio
       const height = 1440
       const width = Math.round(height * a / b)
       setCustomResW(String(width))
@@ -128,6 +147,15 @@ export default function MonitorPresetsSidebar() {
   const ultrawides = filtered.filter(p => p.aspectRatio[0] >= 21)
 
   const collapsed = state.presetsSidebarCollapsed
+  const groupExpanded = state.presetsGroupExpanded
+
+  function toggleGroup(id: 'laptops' | 'standard' | 'ultrawides') {
+    dispatch({
+      type: 'SET_PRESETS_GROUP_EXPANDED',
+      groupId: id,
+      expanded: !groupExpanded[id],
+    })
+  }
 
   // When eyedropper is active we show the collapsed UI (so canvas has room); collapsed state lives in store so it persists across tab switch.
   if (collapsed || state.eyedropperActive) {
@@ -181,13 +209,43 @@ export default function MonitorPresetsSidebar() {
 
           <div className="flex-1 overflow-y-auto p-2 space-y-3">
             {laptops.length > 0 && (
-              <PresetGroup title="Laptops" presets={laptops} onAdd={addPreset} unit={state.unit} canvasScale={state.canvasScale} nextColorIndex={state.monitors.length} />
+              <PresetGroup
+                groupId="laptops"
+                title="Laptops"
+                expanded={groupExpanded.laptops}
+                onToggle={() => toggleGroup('laptops')}
+                presets={laptops}
+                onAdd={addPreset}
+                unit={state.unit}
+                canvasScale={state.canvasScale}
+                nextColorIndex={state.monitors.length}
+              />
             )}
             {standard.length > 0 && (
-              <PresetGroup title="Standard Monitors" presets={standard} onAdd={addPreset} unit={state.unit} canvasScale={state.canvasScale} nextColorIndex={state.monitors.length} />
+              <PresetGroup
+                groupId="standard"
+                title="Standard Monitors"
+                expanded={groupExpanded.standard}
+                onToggle={() => toggleGroup('standard')}
+                presets={standard}
+                onAdd={addPreset}
+                unit={state.unit}
+                canvasScale={state.canvasScale}
+                nextColorIndex={state.monitors.length}
+              />
             )}
             {ultrawides.length > 0 && (
-              <PresetGroup title="Ultrawides" presets={ultrawides} onAdd={addPreset} unit={state.unit} canvasScale={state.canvasScale} nextColorIndex={state.monitors.length} />
+              <PresetGroup
+                groupId="ultrawides"
+                title="Ultrawides"
+                expanded={groupExpanded.ultrawides}
+                onToggle={() => toggleGroup('ultrawides')}
+                presets={ultrawides}
+                onAdd={addPreset}
+                unit={state.unit}
+                canvasScale={state.canvasScale}
+                nextColorIndex={state.monitors.length}
+              />
             )}
           </div>
 
@@ -210,7 +268,7 @@ export default function MonitorPresetsSidebar() {
                 onChange={e => setCustomDiagonal(e.target.value)}
                 step="0.1"
                 placeholder="5–120"
-                className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
+                className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
               />
             </div>
             <div>
@@ -221,7 +279,12 @@ export default function MonitorPresetsSidebar() {
                   const [a, b] = e.target.value.split(':').map(Number)
                   handleAspectChange(a, b)
                 }}
-                className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
+                disabled={useCustomRes && !lockAspect}
+                className={`w-full bg-gray-800 border rounded px-2 py-1.5 text-sm focus:outline-none focus:border-blue-500 ${
+                  useCustomRes && !lockAspect
+                    ? 'border-gray-800 text-gray-600 cursor-not-allowed opacity-70'
+                    : 'border-gray-700 text-gray-200'
+                }`}
               >
                 {COMMON_ASPECT_RATIOS.map(([a, b]) => (
                   <option key={`${a}:${b}`} value={`${a}:${b}`}>{a}:{b}</option>
@@ -235,18 +298,21 @@ export default function MonitorPresetsSidebar() {
                   <select
                     value={customResIdx}
                     onChange={e => setCustomResIdx(parseInt(e.target.value))}
-                    className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
+                    className="w-full h-8 bg-gray-800 border border-gray-700 rounded px-2 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
                   >
                     {filteredResolutions.map((r, i) => (
                       <option key={i} value={i}>{r.label}</option>
                     ))}
                   </select>
-                  <button
-                    onClick={() => setUseCustomRes(true)}
-                    className="text-xs text-blue-400 hover:text-blue-300 mt-1 transition-colors"
-                  >
-                    Enter custom resolution
-                  </button>
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <div className="h-3.5 w-3.5" aria-hidden="true" />
+                    <button
+                      onClick={() => setUseCustomRes(true)}
+                      className="text-xs text-blue-400 hover:text-blue-300 transition-colors whitespace-nowrap"
+                    >
+                      Enter custom resolution
+                    </button>
+                  </div>
                 </>
               ) : (
                 <>
@@ -254,31 +320,79 @@ export default function MonitorPresetsSidebar() {
                     <input
                       type="number"
                       value={customResW}
-                      onChange={e => setCustomResW(e.target.value)}
+                      onChange={e => {
+                        const value = e.target.value
+                        setCustomResW(value)
+                        if (lockAspect) {
+                          const w = parseInt(value, 10)
+                          if (!Number.isNaN(w) && w > 0) {
+                            const [a, b] = customAspect
+                            const h = Math.round(w * b / a)
+                            setCustomResH(String(h))
+                          }
+                        }
+                      }}
                       min="640"
                       max="15360"
                       placeholder="Width"
-                      className="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
+                      className="flex-1 h-8 bg-gray-800 border border-gray-700 rounded px-2 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
                     />
                     <span className="text-xs text-gray-500">x</span>
                     <input
                       type="number"
                       value={customResH}
-                      onChange={e => setCustomResH(e.target.value)}
+                      onChange={e => {
+                        const value = e.target.value
+                        setCustomResH(value)
+                        if (lockAspect) {
+                          const h = parseInt(value, 10)
+                          if (!Number.isNaN(h) && h > 0) {
+                            const [a, b] = customAspect
+                            const w = Math.round(h * a / b)
+                            setCustomResW(String(w))
+                          }
+                        }
+                      }}
                       min="480"
                       max="8640"
                       placeholder="Height"
-                      className="flex-1 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
+                      className="flex-1 h-8 bg-gray-800 border border-gray-700 rounded px-2 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
                     />
                   </div>
-                  {filteredResolutions.length > 0 && (
-                    <button
-                      onClick={() => { setUseCustomRes(false); setCustomResIdx(0) }}
-                      className="text-xs text-blue-400 hover:text-blue-300 mt-1 transition-colors"
-                    >
-                      Use preset resolution
-                    </button>
-                  )}
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <label className="inline-flex items-center gap-1.5 text-xs text-gray-500">
+                      <input
+                        type="checkbox"
+                        checked={lockAspect}
+                        onChange={e => {
+                          const next = e.target.checked
+                          setLockAspect(next)
+                          if (next) {
+                            const w = parseInt(customResW, 10)
+                            const h = parseInt(customResH, 10)
+                            const [a, b] = customAspect
+                            if (!Number.isNaN(w) && w > 0) {
+                              const newH = Math.round(w * b / a)
+                              setCustomResH(String(newH))
+                            } else if (!Number.isNaN(h) && h > 0) {
+                              const newW = Math.round(h * a / b)
+                              setCustomResW(String(newW))
+                            }
+                          }
+                        }}
+                        className="h-3.5 w-3.5 rounded border-gray-600 bg-gray-900 text-blue-500 focus:ring-blue-500"
+                      />
+                      <span>Lock aspect ratio</span>
+                    </label>
+                    {filteredResolutions.length > 0 && (
+                      <button
+                        onClick={() => { setUseCustomRes(false); setCustomResIdx(0) }}
+                        className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                      >
+                        Use preset resolution
+                      </button>
+                    )}
+                  </div>
                 </>
               )}
             </div>
@@ -397,21 +511,31 @@ function buildDragImage(preset: MonitorPreset, index: number, canvasScale: numbe
   return { canvas, offsetX: Math.round(w / 2), offsetY: Math.round(h / 2) }
 }
 
+type PresetGroupId = 'laptops' | 'standard' | 'ultrawides'
+
 function PresetGroup({
+  groupId,
   title,
+  expanded,
+  onToggle,
   presets,
   onAdd,
   unit,
   canvasScale,
   nextColorIndex,
 }: {
+  groupId: PresetGroupId
   title: string
+  expanded: boolean
+  onToggle: () => void
   presets: MonitorPreset[]
   onAdd: (p: MonitorPreset) => void
   unit: 'inches' | 'cm'
   canvasScale: number
   nextColorIndex: number
 }) {
+  const contentId = `${PRESET_GROUP_CONTENT_ID_PREFIX}${groupId}`
+
   const handleDragStart = (e: React.DragEvent, preset: MonitorPreset) => {
     e.dataTransfer.setData('application/monitor-preset', JSON.stringify(preset))
     e.dataTransfer.effectAllowed = 'copy'
@@ -426,11 +550,28 @@ function PresetGroup({
 
   return (
     <div>
-      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 px-1">
-        {title}
-      </h3>
-      <div className="space-y-1">
-        {presets.map((preset, i) => {
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        aria-controls={contentId}
+        className="w-full flex items-center gap-1.5 px-1 py-0.5 rounded hover:bg-gray-800/40 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+      >
+        <svg
+          className={`w-3.5 h-3.5 text-gray-500 transition-transform ${expanded ? 'rotate-90' : ''}`}
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          aria-hidden="true"
+        >
+          <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+        </svg>
+        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          {title}
+        </span>
+      </button>
+
+      <div id={contentId} hidden={!expanded} className="space-y-1 mt-1">
+        {expanded && presets.map((preset, i) => {
           const ppi = calculatePPI(preset.resolutionX, preset.resolutionY, preset.diagonal)
           const { width, height } = calculatePhysicalDimensions(preset.resolutionX, preset.resolutionY, ppi)
           return (

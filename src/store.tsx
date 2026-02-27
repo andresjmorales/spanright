@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, type ReactNode } from 'react'
-import type { Monitor, SourceImage, MonitorPreset, WindowsMonitorPosition, ActiveTab, Bezels, FillMode, SavedImagePosition } from './types'
+import type { Monitor, SourceImage, MonitorPreset, WindowsMonitorPosition, ActiveTab, Bezels, FillMode, SavedImagePosition, OutputFormat } from './types'
 import { createMonitor, getMonitorDisplayName } from './utils'
 
 const MAX_HISTORY = 50
@@ -16,6 +16,14 @@ interface UndoableSnapshot {
   useWindowsArrangement: boolean
   selectedMonitorId: string | null
   label: string
+}
+
+type PresetGroupId = 'laptops' | 'standard' | 'ultrawides'
+
+const DEFAULT_PRESET_GROUP_EXPANDED: Record<PresetGroupId, boolean> = {
+  laptops: true,
+  standard: true,
+  ultrawides: true,
 }
 
 interface State {
@@ -38,9 +46,15 @@ interface State {
   // Fill (empty area) options — not undoable
   fillMode: FillMode
   fillSolidColor: string
+  /** Preferred output format for download (PNG/JPEG). */
+  outputFormat: OutputFormat
+  /** JPEG quality (percentage, 50–100) for exports when using JPEG. */
+  jpegQuality: number
   eyedropperActive: boolean
   /** Monitor presets sidebar collapsed (persists across tab switch so eyedropper→preview→canvas keeps it collapsed) */
   presetsSidebarCollapsed: boolean
+  /** Per-category expanded state for monitor presets sidebar (persists across tab switch) */
+  presetsGroupExpanded: Record<PresetGroupId, boolean>
   /** Active layout name (set when loading/saving a layout); null = use "_default" for image position bookmark key */
   activeLayoutName: string | null
   /** Image position from the current layout (set when loading or saving a layout); used for upload and Apply from layout */
@@ -86,6 +100,9 @@ type Action =
   | { type: 'SET_FILL_SOLID_COLOR'; color: string }
   | { type: 'SET_EYEDROPPER_ACTIVE'; active: boolean }
   | { type: 'SET_PRESETS_SIDEBAR_COLLAPSED'; collapsed: boolean }
+  | { type: 'SET_PRESETS_GROUP_EXPANDED'; groupId: PresetGroupId; expanded: boolean }
+  | { type: 'SET_OUTPUT_FORMAT'; format: OutputFormat }
+  | { type: 'SET_JPEG_QUALITY'; quality: number }
   | { type: 'SET_ACTIVE_LAYOUT_NAME'; name: string | null }
   | { type: 'SET_LOADED_LAYOUT_IMAGE_POSITION'; position: SavedImagePosition | null }
   | { type: 'CLEAR_LOADED_LAYOUT_IMAGE_POSITION' }
@@ -122,8 +139,11 @@ const initialState: State = {
   showHowItWorks: false,
   fillMode: 'solid',
   fillSolidColor: '#000000',
+  outputFormat: 'png',
+  jpegQuality: 92,
   eyedropperActive: false,
   presetsSidebarCollapsed: false,
+  presetsGroupExpanded: { ...DEFAULT_PRESET_GROUP_EXPANDED },
   activeLayoutName: null,
   loadedLayoutImagePosition: null,
   _undoStack: [],
@@ -413,6 +433,20 @@ function reducer(state: State, action: Action): State {
       return { ...state, eyedropperActive: action.active }
     case 'SET_PRESETS_SIDEBAR_COLLAPSED':
       return { ...state, presetsSidebarCollapsed: action.collapsed }
+    case 'SET_PRESETS_GROUP_EXPANDED':
+      return {
+        ...state,
+        presetsGroupExpanded: {
+          ...state.presetsGroupExpanded,
+          [action.groupId]: action.expanded,
+        },
+      }
+    case 'SET_OUTPUT_FORMAT':
+      return { ...state, outputFormat: action.format }
+    case 'SET_JPEG_QUALITY': {
+      const clamped = Math.min(100, Math.max(50, Math.round(action.quality)))
+      return { ...state, jpegQuality: clamped }
+    }
     default:
       return state
   }

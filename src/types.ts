@@ -58,6 +58,9 @@ export type ActiveTab = 'physical' | 'windows' | 'preview'
 /** How to fill empty area (output regions not covered by the source image). */
 export type FillMode = 'solid' | 'blur' | 'transparent'
 
+/** Output image format for download. */
+export type OutputFormat = 'png' | 'jpeg'
+
 /** Image position in physical/canvas space (for saved layouts and bookmarks). */
 export interface SavedImagePosition {
   x: number
