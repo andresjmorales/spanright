@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useReducer, type ReactNode } from 'react'
-import type { Monitor, SourceImage, MonitorPreset, WindowsMonitorPosition, ActiveTab, Bezels, FillMode, SavedImagePosition } from './types'
+import type { Monitor, SourceImage, MonitorPreset, WindowsMonitorPosition, ActiveTab, Bezels, FillMode, SavedImagePosition, OutputFormat } from './types'
 import { createMonitor, getMonitorDisplayName } from './utils'
 
 const MAX_HISTORY = 50
+
+const CUSTOM_PRESETS_STORAGE_KEY = 'spanright-custom-presets-v1'
 
 /** Canvas zoom: scale = pixels per inch. 100% = DEFAULT_CANVAS_SCALE. */
 export const CANVAS_SCALE_MIN = 7.5
@@ -16,6 +18,15 @@ interface UndoableSnapshot {
   useWindowsArrangement: boolean
   selectedMonitorId: string | null
   label: string
+}
+
+type PresetGroupId = 'laptops' | 'standard' | 'ultrawides' | 'custom'
+
+const DEFAULT_PRESET_GROUP_EXPANDED: Record<PresetGroupId, boolean> = {
+  laptops: true,
+  standard: true,
+  ultrawides: true,
+  custom: true,
 }
 
 interface State {
@@ -38,9 +49,17 @@ interface State {
   // Fill (empty area) options — not undoable
   fillMode: FillMode
   fillSolidColor: string
+  /** Preferred output format for download (PNG/JPEG). */
+  outputFormat: OutputFormat
+  /** JPEG quality (percentage, 50–100) for exports when using JPEG. */
+  jpegQuality: number
+  /** Most recently used custom monitor presets (up to 24), persisted in localStorage. */
+  customPresets: MonitorPreset[]
   eyedropperActive: boolean
   /** Monitor presets sidebar collapsed (persists across tab switch so eyedropper→preview→canvas keeps it collapsed) */
   presetsSidebarCollapsed: boolean
+  /** Per-category expanded state for monitor presets sidebar (persists across tab switch) */
+  presetsGroupExpanded: Record<PresetGroupId, boolean>
   /** Active layout name (set when loading/saving a layout); null = use "_default" for image position bookmark key */
   activeLayoutName: string | null
   /** Image position from the current layout (set when loading or saving a layout); used for upload and Apply from layout */
@@ -86,6 +105,11 @@ type Action =
   | { type: 'SET_FILL_SOLID_COLOR'; color: string }
   | { type: 'SET_EYEDROPPER_ACTIVE'; active: boolean }
   | { type: 'SET_PRESETS_SIDEBAR_COLLAPSED'; collapsed: boolean }
+  | { type: 'SET_PRESETS_GROUP_EXPANDED'; groupId: PresetGroupId; expanded: boolean }
+  | { type: 'SET_OUTPUT_FORMAT'; format: OutputFormat }
+  | { type: 'SET_JPEG_QUALITY'; quality: number }
+  | { type: 'ADD_RECENT_CUSTOM_PRESET'; preset: MonitorPreset }
+  | { type: 'REMOVE_RECENT_CUSTOM_PRESET'; index: number }
   | { type: 'SET_ACTIVE_LAYOUT_NAME'; name: string | null }
   | { type: 'SET_LOADED_LAYOUT_IMAGE_POSITION'; position: SavedImagePosition | null }
   | { type: 'CLEAR_LOADED_LAYOUT_IMAGE_POSITION' }
@@ -101,6 +125,36 @@ function getInitialUnit(): 'inches' | 'cm' {
     return localStorage.getItem(UNIT_STORAGE_KEY) === 'cm' ? 'cm' : 'inches'
   } catch {
     return 'inches'
+  }
+}
+
+function loadCustomPresets(): MonitorPreset[] {
+  try {
+    const raw = localStorage.getItem(CUSTOM_PRESETS_STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((p): p is MonitorPreset =>
+      p &&
+      typeof p.name === 'string' &&
+      typeof p.diagonal === 'number' &&
+      Array.isArray(p.aspectRatio) &&
+      p.aspectRatio.length === 2 &&
+      typeof p.aspectRatio[0] === 'number' &&
+      typeof p.aspectRatio[1] === 'number' &&
+      typeof p.resolutionX === 'number' &&
+      typeof p.resolutionY === 'number'
+    ).slice(-24)
+  } catch {
+    return []
+  }
+}
+
+function saveCustomPresets(presets: MonitorPreset[]) {
+  try {
+    localStorage.setItem(CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify(presets.slice(-24)))
+  } catch {
+    /* ignore */
   }
 }
 
@@ -122,8 +176,12 @@ const initialState: State = {
   showHowItWorks: false,
   fillMode: 'solid',
   fillSolidColor: '#000000',
+  outputFormat: 'png',
+  jpegQuality: 92,
+  customPresets: loadCustomPresets(),
   eyedropperActive: false,
   presetsSidebarCollapsed: false,
+  presetsGroupExpanded: { ...DEFAULT_PRESET_GROUP_EXPANDED },
   activeLayoutName: null,
   loadedLayoutImagePosition: null,
   _undoStack: [],
@@ -413,6 +471,30 @@ function reducer(state: State, action: Action): State {
       return { ...state, eyedropperActive: action.active }
     case 'SET_PRESETS_SIDEBAR_COLLAPSED':
       return { ...state, presetsSidebarCollapsed: action.collapsed }
+    case 'SET_PRESETS_GROUP_EXPANDED':
+      return {
+        ...state,
+        presetsGroupExpanded: {
+          ...state.presetsGroupExpanded,
+          [action.groupId]: action.expanded,
+        },
+      }
+    case 'SET_OUTPUT_FORMAT':
+      return { ...state, outputFormat: action.format }
+    case 'SET_JPEG_QUALITY': {
+      const clamped = Math.min(100, Math.max(50, Math.round(action.quality)))
+      return { ...state, jpegQuality: clamped }
+    }
+    case 'ADD_RECENT_CUSTOM_PRESET': {
+      const next = [...state.customPresets, action.preset].slice(-24)
+      saveCustomPresets(next)
+      return { ...state, customPresets: next }
+    }
+    case 'REMOVE_RECENT_CUSTOM_PRESET': {
+      const next = state.customPresets.filter((_, i) => i !== action.index)
+      saveCustomPresets(next)
+      return { ...state, customPresets: next }
+    }
     default:
       return state
   }

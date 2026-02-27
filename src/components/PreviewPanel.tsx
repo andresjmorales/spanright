@@ -19,8 +19,6 @@ export default function PreviewPanel() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [output, setOutput] = useState<OutputResult | null>(null)
-  const [format, setFormat] = useState<'png' | 'jpeg'>('png')
-  const [jpegQuality, setJpegQuality] = useState(92)
   const [isGenerating, setIsGenerating] = useState(false)
   const [showDownloadDialog, setShowDownloadDialog] = useState(false)
   const [downloadFilename, setDownloadFilename] = useState('')
@@ -149,22 +147,22 @@ export default function PreviewPanel() {
 
   // Auto-switch to PNG when transparent fill is selected
   useEffect(() => {
-    if (state.fillMode === 'transparent' && format === 'jpeg') {
-      setFormat('png')
+    if (state.fillMode === 'transparent' && state.outputFormat === 'jpeg') {
+      dispatch({ type: 'SET_OUTPUT_FORMAT', format: 'png' })
     }
-  }, [state.fillMode, format])
+  }, [state.fillMode, state.outputFormat, dispatch])
 
   // Close empty area popover when layout no longer has empty area
   useEffect(() => {
     if (output && !output.hasBlackBars) setShowEmptyAreaOptions(false)
   }, [output?.hasBlackBars])
 
-  const effectiveFormat = state.fillMode === 'transparent' ? 'png' : format
+  const effectiveFormat = state.fillMode === 'transparent' ? 'png' : state.outputFormat
 
   const doDownload = useCallback((filename: string) => {
     if (!output) return
     const mimeType = effectiveFormat === 'png' ? 'image/png' : 'image/jpeg'
-    const quality = effectiveFormat === 'jpeg' ? jpegQuality / 100 : undefined
+    const quality = effectiveFormat === 'jpeg' ? state.jpegQuality / 100 : undefined
     const cleanName = filename.trim() || getDefaultFilename()
 
     output.canvas.toBlob((blob) => {
@@ -180,7 +178,7 @@ export default function PreviewPanel() {
       toast.success('Wallpaper downloaded')
     }, mimeType, quality)
     setShowDownloadDialog(false)
-  }, [output, effectiveFormat, jpegQuality, getDefaultFilename, toast])
+  }, [output, effectiveFormat, state.jpegQuality, getDefaultFilename, toast])
 
   if (state.monitors.length === 0) {
     return (
@@ -317,8 +315,8 @@ export default function PreviewPanel() {
               </div>
             <div className="flex items-center gap-2">
               <select
-                value={format}
-                onChange={(e) => setFormat(e.target.value as 'png' | 'jpeg')}
+                value={state.outputFormat}
+                onChange={(e) => dispatch({ type: 'SET_OUTPUT_FORMAT', format: e.target.value as 'png' | 'jpeg' })}
                 className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
               >
                 <option value="png">PNG (lossless)</option>
@@ -326,17 +324,17 @@ export default function PreviewPanel() {
                   JPEG{state.fillMode === 'transparent' ? ' (n/a)' : ''}
                 </option>
               </select>
-              {format === 'jpeg' && (
+              {state.outputFormat === 'jpeg' && (
                 <div className="flex items-center gap-1">
                   <input
                     type="range"
                     min="50"
                     max="100"
-                    value={jpegQuality}
-                    onChange={(e) => setJpegQuality(parseInt(e.target.value))}
+                    value={state.jpegQuality}
+                    onChange={(e) => dispatch({ type: 'SET_JPEG_QUALITY', quality: parseInt(e.target.value, 10) || 92 })}
                     className="w-16 h-1 accent-blue-500"
                   />
-                  <span className="text-xs text-gray-400 w-8">{jpegQuality}%</span>
+                  <span className="text-xs text-gray-400 w-8">{state.jpegQuality}%</span>
                 </div>
               )}
             </div>

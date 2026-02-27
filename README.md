@@ -11,8 +11,8 @@ Spanright operates in **physical space** (inches/cm), so you arrange monitors as
 ## Features
 
 - **Physical-space monitor layout** — Arrange monitors on a canvas using real-world dimensions (calculated from diagonal size + resolution). A 27" monitor appears physically larger than a 15.6" laptop, exactly as on your desk.
-- **Drag-and-drop presets** — Choose from 18+ built-in monitor presets (laptops, standard monitors, ultrawides, super ultrawides) and drag them directly onto the canvas.
-- **Custom monitors** — Define any monitor by diagonal size, aspect ratio, and resolution. Supports fully custom resolution entry or filtered presets by aspect ratio. Diagonal is limited to 5"–120"; aspect ratio is limited to 10:1 or less (no ultra-thin "line" monitors). Validation warnings appear when limits are exceeded; Add is disabled until fixed.
+- **Drag-and-drop presets** — Choose from 18+ built-in monitor presets (laptops, standard monitors, ultrawides, super ultrawides) grouped into collapsible sections, and drag them directly onto the canvas.
+- **Custom monitors** — Define any monitor by diagonal size, aspect ratio, and resolution. Supports preset resolutions filtered by aspect ratio, or fully custom width/height with an optional **Maintain aspect ratio** toggle that keeps custom resolutions aligned to the selected ratio. The last several custom monitors you add are kept in a collapsible **Custom** preset category (stored in your browser only, up to 24 entries, removable from the list). Diagonal is limited to 5"–120"; aspect ratio is limited to 10:1 or less (no ultra-thin "line" monitors). Validation warnings appear when limits are exceeded; Add is disabled until fixed.
 - **Monitor rotation** — Rotate any monitor 90° (portrait/landscape) via the ↻ button or **right-click** context menu. Resolution is swapped (e.g. 1080×1920 when rotated); rotation is saved in saved layouts and reflected in output and the Virtual Layout view.
 - **Right-click or kebab menu** — Right-click any monitor, or when a monitor is selected click the **⋮** (kebab) button next to the **✕** delete button, for **Set Bezels**, **Rename**, **Rotate 90°**, **Duplicate**, and **Delete**. Bezels are optional per-edge borders (in mm) that extend outward from the display area; they help with alignment and matching real bezels, and Align Assist snaps to outer bezel edges when set. **Duplicate** copies the monitor (preset/size, bezels, rotation, name with " - Copy 1" appended) and places the copy offset so you can drag it easily.
 - **Image placement** — Upload a source image and drag/scale it behind the monitor layout. Semi-transparent monitor overlays let you see exactly what portion of the image each screen will display. Vertical images (height > width) default to 6 ft tall; horizontal ones default to 6 ft wide.
@@ -59,6 +59,7 @@ Use the sidebar on the left to add monitors to the canvas:
 
 - **Click** a preset to add it at a default position
 - **Drag** a preset directly onto the canvas to place it where you want
+- **Collapse/expand preset categories**: Use the triangle next to a category header (e.g. Laptops, Standard Monitors, Ultrawides)
 - **Custom monitors**: Click "+ Custom Monitor" to define a monitor by diagonal size, aspect ratio, and resolution (diagonal 5"–120", aspect ratio ≤ 10:1)
 
 ### 2. Arrange Your Layout
