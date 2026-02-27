@@ -4,6 +4,7 @@ import type { MonitorPreset } from '../types'
 import { useStore } from '../store'
 import { useToast } from './Toast'
 import { calculatePPI, calculatePhysicalDimensions, formatDimension } from '../utils'
+import { IconTrash } from '../icons'
 
 const PRESET_GROUP_CONTENT_ID_PREFIX = 'preset-group-'
 
@@ -171,22 +172,29 @@ export default function MonitorPresetsSidebar() {
       resolutionY: resH,
     }
     addPreset(preset)
+    dispatch({ type: 'ADD_RECENT_CUSTOM_PRESET', preset })
     setShowCustom(false)
   }
 
-  const filtered = MONITOR_PRESETS.filter(p =>
-    p.name.toLowerCase().includes(searchFilter.toLowerCase())
+  const search = searchFilter.toLowerCase()
+
+  const filteredBuiltIn = MONITOR_PRESETS.filter(p =>
+    p.name.toLowerCase().includes(search)
+  )
+
+  const filteredCustomPresets = (state.customPresets ?? []).filter(p =>
+    p.name.toLowerCase().includes(search)
   )
 
   // Group presets
-  const laptops = filtered.filter(p => p.diagonal < 20)
-  const standard = filtered.filter(p => p.diagonal >= 20 && p.aspectRatio[0] === 16)
-  const ultrawides = filtered.filter(p => p.aspectRatio[0] >= 21)
+  const laptops = filteredBuiltIn.filter(p => p.diagonal < 20)
+  const standard = filteredBuiltIn.filter(p => p.diagonal >= 20 && p.aspectRatio[0] === 16)
+  const ultrawides = filteredBuiltIn.filter(p => p.aspectRatio[0] >= 21)
 
   const collapsed = state.presetsSidebarCollapsed
   const groupExpanded = state.presetsGroupExpanded
 
-  function toggleGroup(id: 'laptops' | 'standard' | 'ultrawides') {
+  function toggleGroup(id: PresetGroupId) {
     dispatch({
       type: 'SET_PRESETS_GROUP_EXPANDED',
       groupId: id,
@@ -245,6 +253,20 @@ export default function MonitorPresetsSidebar() {
           </div>
 
           <div className="flex-1 overflow-y-auto p-2 space-y-3">
+            {filteredCustomPresets.length > 0 && (
+              <PresetGroup
+                groupId="custom"
+                title="Custom"
+                expanded={groupExpanded.custom}
+                onToggle={() => toggleGroup('custom')}
+                presets={filteredCustomPresets}
+                onAdd={addPreset}
+                onDeletePreset={(index) => dispatch({ type: 'REMOVE_RECENT_CUSTOM_PRESET', index })}
+                unit={state.unit}
+                canvasScale={state.canvasScale}
+                nextColorIndex={state.monitors.length}
+              />
+            )}
             {laptops.length > 0 && (
               <PresetGroup
                 groupId="laptops"
@@ -555,7 +577,7 @@ function buildDragImage(preset: MonitorPreset, index: number, canvasScale: numbe
   return { canvas, offsetX: Math.round(w / 2), offsetY: Math.round(h / 2) }
 }
 
-type PresetGroupId = 'laptops' | 'standard' | 'ultrawides'
+type PresetGroupId = 'laptops' | 'standard' | 'ultrawides' | 'custom'
 
 function PresetGroup({
   groupId,
@@ -567,6 +589,7 @@ function PresetGroup({
   unit,
   canvasScale,
   nextColorIndex,
+  onDeletePreset,
 }: {
   groupId: PresetGroupId
   title: string
@@ -577,6 +600,7 @@ function PresetGroup({
   unit: 'inches' | 'cm'
   canvasScale: number
   nextColorIndex: number
+  onDeletePreset?: (index: number) => void
 }) {
   const contentId = `${PRESET_GROUP_CONTENT_ID_PREFIX}${groupId}`
 
@@ -626,13 +650,39 @@ function PresetGroup({
               onDragStart={(e) => handleDragStart(e, preset)}
               className="w-full text-left bg-gray-800 hover:bg-gray-750 hover:bg-gray-700 border border-gray-700 hover:border-gray-600 rounded p-2 transition-colors group cursor-grab active:cursor-grabbing"
             >
-              <div className="text-sm font-medium text-gray-200 group-hover:text-white">
-                {preset.name}
-              </div>
-              <div className="text-xs text-gray-500 mt-0.5">
-                {preset.resolutionX}x{preset.resolutionY} &middot;{' '}
-                {formatDimension(width, unit)} x {formatDimension(height, unit)} &middot;{' '}
-                {Math.round(ppi)} PPI
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="text-sm font-medium text-gray-200 group-hover:text-white">
+                    {preset.name}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    {preset.resolutionX}x{preset.resolutionY} &middot;{' '}
+                    {formatDimension(width, unit)} x {formatDimension(height, unit)} &middot;{' '}
+                    {Math.round(ppi)} PPI
+                  </div>
+                </div>
+                {onDeletePreset && groupId === 'custom' && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      onDeletePreset(i)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        onDeletePreset(i)
+                      }
+                    }}
+                    className="shrink-0 text-gray-500 hover:text-red-400 p-1 rounded hover:bg-gray-900/70 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70"
+                    aria-label="Remove custom preset"
+                  >
+                    <IconTrash className="w-4 h-4" aria-hidden="true" />
+                  </span>
+                )}
               </div>
             </button>
           )

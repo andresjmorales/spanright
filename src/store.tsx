@@ -4,6 +4,8 @@ import { createMonitor, getMonitorDisplayName } from './utils'
 
 const MAX_HISTORY = 50
 
+const CUSTOM_PRESETS_STORAGE_KEY = 'spanright-custom-presets-v1'
+
 /** Canvas zoom: scale = pixels per inch. 100% = DEFAULT_CANVAS_SCALE. */
 export const CANVAS_SCALE_MIN = 7.5
 export const CANVAS_SCALE_MAX = 40
@@ -18,12 +20,13 @@ interface UndoableSnapshot {
   label: string
 }
 
-type PresetGroupId = 'laptops' | 'standard' | 'ultrawides'
+type PresetGroupId = 'laptops' | 'standard' | 'ultrawides' | 'custom'
 
 const DEFAULT_PRESET_GROUP_EXPANDED: Record<PresetGroupId, boolean> = {
   laptops: true,
   standard: true,
   ultrawides: true,
+  custom: true,
 }
 
 interface State {
@@ -50,6 +53,8 @@ interface State {
   outputFormat: OutputFormat
   /** JPEG quality (percentage, 50–100) for exports when using JPEG. */
   jpegQuality: number
+  /** Most recently used custom monitor presets (up to 24), persisted in localStorage. */
+  customPresets: MonitorPreset[]
   eyedropperActive: boolean
   /** Monitor presets sidebar collapsed (persists across tab switch so eyedropper→preview→canvas keeps it collapsed) */
   presetsSidebarCollapsed: boolean
@@ -103,6 +108,8 @@ type Action =
   | { type: 'SET_PRESETS_GROUP_EXPANDED'; groupId: PresetGroupId; expanded: boolean }
   | { type: 'SET_OUTPUT_FORMAT'; format: OutputFormat }
   | { type: 'SET_JPEG_QUALITY'; quality: number }
+  | { type: 'ADD_RECENT_CUSTOM_PRESET'; preset: MonitorPreset }
+  | { type: 'REMOVE_RECENT_CUSTOM_PRESET'; index: number }
   | { type: 'SET_ACTIVE_LAYOUT_NAME'; name: string | null }
   | { type: 'SET_LOADED_LAYOUT_IMAGE_POSITION'; position: SavedImagePosition | null }
   | { type: 'CLEAR_LOADED_LAYOUT_IMAGE_POSITION' }
@@ -118,6 +125,36 @@ function getInitialUnit(): 'inches' | 'cm' {
     return localStorage.getItem(UNIT_STORAGE_KEY) === 'cm' ? 'cm' : 'inches'
   } catch {
     return 'inches'
+  }
+}
+
+function loadCustomPresets(): MonitorPreset[] {
+  try {
+    const raw = localStorage.getItem(CUSTOM_PRESETS_STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((p): p is MonitorPreset =>
+      p &&
+      typeof p.name === 'string' &&
+      typeof p.diagonal === 'number' &&
+      Array.isArray(p.aspectRatio) &&
+      p.aspectRatio.length === 2 &&
+      typeof p.aspectRatio[0] === 'number' &&
+      typeof p.aspectRatio[1] === 'number' &&
+      typeof p.resolutionX === 'number' &&
+      typeof p.resolutionY === 'number'
+    ).slice(-24)
+  } catch {
+    return []
+  }
+}
+
+function saveCustomPresets(presets: MonitorPreset[]) {
+  try {
+    localStorage.setItem(CUSTOM_PRESETS_STORAGE_KEY, JSON.stringify(presets.slice(-24)))
+  } catch {
+    /* ignore */
   }
 }
 
@@ -141,6 +178,7 @@ const initialState: State = {
   fillSolidColor: '#000000',
   outputFormat: 'png',
   jpegQuality: 92,
+  customPresets: loadCustomPresets(),
   eyedropperActive: false,
   presetsSidebarCollapsed: false,
   presetsGroupExpanded: { ...DEFAULT_PRESET_GROUP_EXPANDED },
@@ -446,6 +484,16 @@ function reducer(state: State, action: Action): State {
     case 'SET_JPEG_QUALITY': {
       const clamped = Math.min(100, Math.max(50, Math.round(action.quality)))
       return { ...state, jpegQuality: clamped }
+    }
+    case 'ADD_RECENT_CUSTOM_PRESET': {
+      const next = [...state.customPresets, action.preset].slice(-24)
+      saveCustomPresets(next)
+      return { ...state, customPresets: next }
+    }
+    case 'REMOVE_RECENT_CUSTOM_PRESET': {
+      const next = state.customPresets.filter((_, i) => i !== action.index)
+      saveCustomPresets(next)
+      return { ...state, customPresets: next }
     }
     default:
       return state
