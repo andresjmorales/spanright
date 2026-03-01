@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { CALIBRATE_REPO_URL } from '../appConstants'
 
 interface TroubleshootingGuideProps {
   onClose: () => void
@@ -78,6 +79,26 @@ function WindowsContent() {
         </p>
         <p className="text-xs text-gray-400 leading-relaxed">
           <strong className="text-gray-300">Why does this help?</strong> Span mode scales your image to fit the Windows virtual desktop bounding box — the exterior rectangle that contains your entire display setup (side-by-side, stacked vertical, or mixed). If any monitor is even a few pixels offset, Windows will stretch the image to compensate, causing visible bleed. Tile mode places the image at exact 1:1 pixel scale with no resizing, bypassing the issue entirely.
+        </p>
+      </div>
+
+      <div className="bg-amber-500/10 border border-amber-500/25 rounded-lg p-4 space-y-2">
+        <div className="flex items-center gap-2">
+          <span className="text-amber-400 text-sm">&#9733;</span>
+          <h3 className="text-sm font-semibold text-amber-300">
+            Companion tool: Spanright Calibrate
+          </h3>
+        </div>
+        <p className="text-sm text-gray-300 leading-relaxed">
+          <a
+            href={CALIBRATE_REPO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-amber-400 hover:text-amber-300 underline underline-offset-2 transition-colors"
+          >
+            Spanright Calibrate
+          </a>
+          {' '}is a Windows desktop app that reads your monitors via EDID, guides you through an interactive on-screen alignment (using colored overlay lines), and measures the exact physical gaps between your displays. It then exports directly into Spanright — no manual measuring needed.
         </p>
       </div>
 
