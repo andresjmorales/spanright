@@ -1,4 +1,4 @@
-import { VIDEO_DEMO_URL } from '../appConstants'
+import { VIDEO_DEMO_URL, CALIBRATE_REPO_URL } from '../appConstants'
 
 interface InfoDialogProps {
   onClose: () => void
@@ -177,6 +177,18 @@ export default function InfoDialog({ onClose }: InfoDialogProps) {
                 <li>Note their left-to-right order and vertical positions</li>
                 <li>Replicate that layout in the Virtual Layout tab</li>
               </ol>
+              <p className="text-[10px] text-amber-400/80 mt-1.5 leading-relaxed">
+                For precise gaps,{' '}
+                <a
+                  href={CALIBRATE_REPO_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-2 hover:text-amber-300 transition-colors"
+                >
+                  Spanright Calibrate
+                </a>
+                {' '}is a Windows app that visually measures your physical monitor arrangement and imports directly into Spanright.
+              </p>
             </div>
 
             <div className="space-y-1">

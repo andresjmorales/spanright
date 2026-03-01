@@ -12,9 +12,9 @@ import type { ActiveTab } from './types'
 import { getLayoutFromHash, clearLayoutHash } from './urlLayout'
 import { useViewport } from './useViewport'
 import { VIEWPORT_BP_DESKTOP } from './viewportConstants'
-import { IconClose, IconBook, IconLightbulb, IconWrench, IconInfoCircle } from './icons'
+import { IconClose, IconBook, IconLightbulb, IconWrench, IconInfoCircle, IconGitHub } from './icons'
 import MobileShell from './components/MobileShell'
-import { VIDEO_DEMO_URL } from './appConstants'
+import { VIDEO_DEMO_URL, GITHUB_REPO_URL, CALIBRATE_REPO_URL } from './appConstants'
 
 function TabButton({ tab, label, active, onClick }: { tab: ActiveTab; label: string; active: boolean; onClick: (tab: ActiveTab) => void }) {
   return (
@@ -54,13 +54,24 @@ function AboutDialog({ onClose }: { onClose: () => void }) {
           <p className="text-sm text-gray-300">
             Source code and documentation on{' '}
             <a
-              href="https://github.com/andresjmorales/spanright"
+              href={GITHUB_REPO_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="text-blue-400 hover:text-blue-300 underline underline-offset-2 transition-colors"
             >
               GitHub
             </a>
+          </p>
+          <p className="text-sm text-gray-300">
+            <a
+              href={CALIBRATE_REPO_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-amber-400/90 hover:text-amber-300 underline underline-offset-2 transition-colors"
+            >
+              Spanright Calibrate
+            </a>
+            {' '}— Windows companion for measuring monitor gaps
           </p>
           <p className="text-sm text-gray-300">
             Created by{' '}
@@ -117,6 +128,18 @@ function WelcomeDialog({ onClose }: { onClose: () => void }) {
               <div>
                 <div className="text-sm font-medium text-gray-200">Add your monitors</div>
                 <div className="text-xs text-gray-400 mt-0.5">Pick presets from the sidebar or add custom ones. Optionally add bezel widths. Drag them on the canvas to match your desk layout.</div>
+                <div className="text-xs text-amber-400/80 mt-1">
+                  Windows user? Try{' '}
+                  <a
+                    href={CALIBRATE_REPO_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline underline-offset-2 hover:text-amber-300 transition-colors"
+                  >
+                    Spanright Calibrate
+                  </a>
+                  {' '}to auto-measure your physical gaps and import directly.
+                </div>
               </div>
             </li>
             <li className="flex items-start gap-3">
@@ -276,6 +299,15 @@ function AppContent() {
             <IconInfoCircle className="w-4 h-4 shrink-0" />
             <span className="text-xs hidden sm:inline">About</span>
           </button>
+          <a
+            href={GITHUB_REPO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center text-gray-500 hover:text-gray-300 transition-colors px-2 py-1 rounded hover:bg-gray-800"
+            title="View on GitHub"
+          >
+            <IconGitHub className="w-4 h-4" />
+          </a>
         </div>
       </header>
 
@@ -284,6 +316,16 @@ function AppContent() {
         <TabButton tab="physical" label="Physical Layout" active={tab === 'physical'} onClick={setTab} />
         <TabButton tab="windows" label="Virtual Layout" active={tab === 'windows'} onClick={setTab} />
         <TabButton tab="preview" label="Preview & Export" active={tab === 'preview'} onClick={setTab} />
+        <div className="flex-1" />
+        <a
+          href={CALIBRATE_REPO_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hidden sm:flex items-center gap-1.5 text-[11px] text-amber-400/80 hover:text-amber-300 transition-colors px-2.5 py-1 mb-0.5 rounded-full border border-amber-500/20 hover:border-amber-500/40 hover:bg-amber-500/5 whitespace-nowrap"
+          title="Spanright Calibrate — Windows companion tool for measuring physical monitor gaps"
+        >
+          <span>✨ New calibration companion tool</span>
+        </a>
       </div>
 
       {/* Tab content */}

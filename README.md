@@ -27,6 +27,16 @@ Spanright operates in **physical space** (inches/cm), so you arrange monitors as
 - **Video demo** — A “Watch a video demo” link appears in the **How It Works** dialog and at the end of the **Quick Start** guide.
 - **Responsive layout** — On tablet (768px–1024px) the preset sidebar becomes a slide-out drawer (default collapsed) and the header/toolbar wrap or shorten. On phone (&lt;768px) an informational view explains the app and shows a read-only summary of shared layout URLs, with an option to open the full editor.
 
+## Companion Tool: Spanright Calibrate
+
+**[Spanright Calibrate](https://github.com/andresjmorales/spanright-calibrate)** is a Windows desktop app that visually calibrates the physical arrangement of your multi-monitor setup and exports an accurate layout directly into Spanright. Instead of manually measuring gaps and offsets between your monitors, Calibrate:
+
+1. **Discovers monitors** — enumerates all connected displays via Win32 and reads resolutions, pixel positions, and physical panel dimensions from EDID data.
+2. **Calibrates physical layout** — guides you through an interactive on-screen alignment using colored overlay lines drawn directly on your monitors (scale step + gap step).
+3. **Exports to Spanright** — generates a configuration matching Spanright's format and can open your calibrated layout directly in the Spanright editor via a compressed URL.
+
+Download the latest release from the [Spanright Calibrate releases page](https://github.com/andresjmorales/spanright-calibrate/releases).
+
 ## Example
 Dragon image [source](https://unsplash.com/photos/dragon-effigy-breathes-fire-over-a-crowd-at-night-TP7InDDpeRE) from Unsplash.
 
@@ -75,6 +85,7 @@ Drag monitors on the canvas to match your physical desk arrangement:
 - Click a monitor and press **Delete** (or use the context menu) to remove it
 - Press **F** to fit all monitors in view
 - Use **Saved Layouts** (right side of toolbar, left of Share Layout) to save or load monitor layouts; layouts are stored in your browser and include bezel settings. Use **Export** to download all saved layouts as JSON and **Import** to add layouts from a previously exported JSON file. Quick layouts can be preloaded in `src/preloadedLayouts.ts`.
+- **Windows users:** Use **[Spanright Calibrate](https://github.com/andresjmorales/spanright-calibrate)** to visually measure physical gaps between monitors and import the calibrated layout directly into Spanright.
 
 ### 3. Upload & Position Your Image
 
