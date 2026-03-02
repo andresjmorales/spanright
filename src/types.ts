@@ -70,6 +70,12 @@ export interface SavedImagePosition {
   aspectRatio: number // width/height of the image when saved
 }
 
+/** Per-monitor Windows virtual-desktop position (pixel coords, same order as monitors[]). */
+export interface SavedWindowsPosition {
+  pixelX: number
+  pixelY: number
+}
+
 export interface SavedConfig {
   id: string
   name: string
@@ -84,6 +90,8 @@ export interface SavedConfig {
   }[]
   /** Embedded image transform when layout was saved; null if no image. Omitted on older configs. */
   imagePosition?: SavedImagePosition | null
+  /** Custom Windows virtual-desktop arrangement (same order as monitors[]). Omitted when default top-aligned. */
+  windowsArrangement?: SavedWindowsPosition[]
 }
 
 export interface AppState {
