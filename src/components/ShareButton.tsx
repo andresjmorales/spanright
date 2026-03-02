@@ -31,7 +31,14 @@ export default function ShareButton() {
         }
       : state.loadedLayoutImagePosition ?? null
 
-    const url = buildShareUrl(monitors, imagePosition)
+    const windowsArrangement = state.useWindowsArrangement
+      ? state.monitors.map(m => {
+          const wp = state.windowsArrangement.find(w => w.monitorId === m.id)
+          return { pixelX: wp?.pixelX ?? 0, pixelY: wp?.pixelY ?? 0 }
+        })
+      : null
+
+    const url = buildShareUrl(monitors, imagePosition, windowsArrangement)
 
     try {
       await navigator.clipboard.writeText(url)

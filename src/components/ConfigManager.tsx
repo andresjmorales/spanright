@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useStore } from '../store'
 import { useToast } from './Toast'
-import type { SavedConfig, SavedImagePosition } from '../types'
+import type { SavedConfig, SavedImagePosition, SavedWindowsPosition } from '../types'
 import { PRELOADED_LAYOUTS, decodePreloadedLayout } from '../preloadedLayouts'
 import { deleteImagePositionBookmark } from '../imagePositionStorage'
 import { IconBookmark, IconPlus, IconTrash } from '../icons'
@@ -17,8 +17,8 @@ const LAYOUT_NAME_MAX_LENGTH = 40
 
 const EXPORT_FILENAME_PREFIX = 'spanright-layouts'
 
-/** Dropdown width in px (w-72 = 18rem) for viewport clamp. */
-const SAVED_LAYOUTS_DROPDOWN_WIDTH_PX = 288
+/** Dropdown width in px (w-80 = 20rem) for viewport clamp. */
+const SAVED_LAYOUTS_DROPDOWN_WIDTH_PX = 320
 const VIEWPORT_PADDING_PX = 8
 
 function loadConfigs(): SavedConfig[] {
@@ -120,12 +120,28 @@ function validateImportedLayouts(data: unknown): { valid: true; configs: SavedCo
         imagePosition = { x, y, width: w, height: h, aspectRatio: ar }
       }
     }
+    let windowsArrangement: SavedWindowsPosition[] | undefined
+    const rawWp = (item as Record<string, unknown>).windowsArrangement
+    if (Array.isArray(rawWp) && rawWp.length === monitors.length) {
+      const parsed = rawWp.map(wp => {
+        if (wp && typeof wp === 'object') {
+          const px = Number((wp as Record<string, unknown>).pixelX)
+          const py = Number((wp as Record<string, unknown>).pixelY)
+          if (Number.isFinite(px) && Number.isFinite(py)) return { pixelX: px, pixelY: py }
+        }
+        return null
+      })
+      if (parsed.every((p): p is SavedWindowsPosition => p !== null)) {
+        windowsArrangement = parsed
+      }
+    }
     configs.push({
       id: typeof id === 'string' ? id : crypto.randomUUID(),
       name: name.trim(),
       savedAt,
       monitors,
       imagePosition: imagePosition ?? undefined,
+      windowsArrangement,
     })
   }
   return { valid: true, configs }
@@ -191,6 +207,13 @@ export default function ConfigManager() {
           aspectRatio: img.naturalWidth / img.naturalHeight,
         }
       : state.loadedLayoutImagePosition ?? null
+    const windowsArrangement: SavedWindowsPosition[] | undefined =
+      state.useWindowsArrangement
+        ? state.monitors.map(m => {
+            const wp = state.windowsArrangement.find(w => w.monitorId === m.id)
+            return { pixelX: wp?.pixelX ?? 0, pixelY: wp?.pixelY ?? 0 }
+          })
+        : undefined
     const newConfig: SavedConfig = {
       id: crypto.randomUUID(),
       name: saveName.trim(),
@@ -204,6 +227,7 @@ export default function ConfigManager() {
         bezels: m.bezels,
       })),
       imagePosition,
+      windowsArrangement,
     }
     const updated = [newConfig, ...configs].slice(0, MAX_CONFIGS)
     setConfigs(updated)
@@ -221,6 +245,7 @@ export default function ConfigManager() {
       monitors: config.monitors,
       layoutName: config.name,
       imagePosition: config.imagePosition ?? null,
+      windowsArrangement: config.windowsArrangement ?? null,
     })
     toast.success(`Layout loaded: ${config.name}`)
     setOpen(false)
@@ -331,7 +356,7 @@ export default function ConfigManager() {
 
       {open && (
         <div
-          className={`absolute top-full mt-1 w-72 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl z-50 overflow-hidden ${dropdownAlignRight ? 'right-0 left-auto' : 'left-0'}`}
+          className={`absolute top-full mt-1 w-80 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl z-50 overflow-hidden ${dropdownAlignRight ? 'right-0 left-auto' : 'left-0'}`}
         >
           {/* Save current */}
           <div className="p-2 border-b border-gray-800">
@@ -424,7 +449,8 @@ export default function ConfigManager() {
                         </div>
                         <div className="text-[10px] text-gray-500">
                           {config.monitors.length} monitor{config.monitors.length !== 1 ? 's' : ''}
-                          {config.imagePosition ? ', 1 image position' : ', no image position'}
+                          {config.imagePosition ? ', image position' : ''}
+                          {config.windowsArrangement ? ', virtual layout' : ''}
                           {' · '}{formatDate(config.savedAt)}
                         </div>
                       </button>
@@ -480,7 +506,7 @@ export default function ConfigManager() {
                   className="w-full text-left px-2.5 py-1.5 text-xs text-gray-300 hover:bg-gray-800 hover:text-white rounded transition-colors flex items-center gap-1.5"
                 >
                   <span className="font-medium truncate">{entry.name}</span>
-                  <span className="text-gray-600 shrink-0">{monitors.length} monitor{monitors.length !== 1 ? 's' : ''}, no image position</span>
+                  <span className="text-gray-600 shrink-0">{monitors.length} monitor{monitors.length !== 1 ? 's' : ''}</span>
                 </button>
               ))}
             </div>

@@ -259,7 +259,7 @@ export default function WindowsArrangementCanvas() {
       ctx.roundRect(x, y, w, h, 3)
       ctx.stroke()
 
-      // Label
+      // Label (top-left: name + resolution)
       if (w > 50 && h > 30) {
         const labelW = Math.min(w - 8, 200)
         const showRes = w > 100 && h > 50
@@ -281,6 +281,24 @@ export default function WindowsArrangementCanvas() {
           const resH = getStripHeight(mon)
           ctx.fillText(`${resW} x ${resH} px`, x + 8, y + 31, labelW - 8)
         }
+      }
+
+      // Coordinates badge (top-right)
+      if (w > 80 && h > 30) {
+        const coordText = `(${wp.pixelX}, ${wp.pixelY})`
+        ctx.font = '9px system-ui, sans-serif'
+        const coordMetrics = ctx.measureText(coordText)
+        const coordW = coordMetrics.width + 8
+        const coordH = 16
+        const coordX = x + w - coordW - 4
+        const coordY = y + 4
+        ctx.fillStyle = 'rgba(0,0,0,0.65)'
+        ctx.beginPath()
+        ctx.roundRect(coordX, coordY, coordW, coordH, 3)
+        ctx.fill()
+        ctx.fillStyle = '#94a3b8'
+        ctx.textAlign = 'right'
+        ctx.fillText(coordText, x + w - 8, coordY + 12)
       }
     }
   }, [state.windowsArrangement, monitorMap, dimensions, displayScale, offsetX, offsetY, dragging, getMonitorIndex, toDisplayX, toDisplayY])

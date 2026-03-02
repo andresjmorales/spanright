@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, type ReactNode } from 'react'
-import type { Monitor, SourceImage, MonitorPreset, WindowsMonitorPosition, ActiveTab, Bezels, FillMode, SavedImagePosition, OutputFormat } from './types'
+import type { Monitor, SourceImage, MonitorPreset, WindowsMonitorPosition, ActiveTab, Bezels, FillMode, SavedImagePosition, SavedWindowsPosition, OutputFormat } from './types'
 import { createMonitor, getMonitorDisplayName } from './utils'
 
 const MAX_HISTORY = 50
@@ -114,7 +114,7 @@ type Action =
   | { type: 'SET_LOADED_LAYOUT_IMAGE_POSITION'; position: SavedImagePosition | null }
   | { type: 'CLEAR_LOADED_LAYOUT_IMAGE_POSITION' }
   // Composite / undo-redo
-  | { type: 'LOAD_LAYOUT'; monitors: { preset: MonitorPreset; physicalX: number; physicalY: number; rotation?: 0 | 90; displayName?: string; bezels?: Bezels }[]; layoutName?: string; imagePosition?: SavedImagePosition | null }
+  | { type: 'LOAD_LAYOUT'; monitors: { preset: MonitorPreset; physicalX: number; physicalY: number; rotation?: 0 | 90; displayName?: string; bezels?: Bezels }[]; layoutName?: string; imagePosition?: SavedImagePosition | null; windowsArrangement?: SavedWindowsPosition[] | null }
   | { type: 'UNDO' }
   | { type: 'REDO' }
 
@@ -386,11 +386,20 @@ function reducer(state: State, action: Action): State {
       const monitors = action.monitors.map(m =>
         createMonitor(m.preset, m.physicalX, m.physicalY, m.rotation ?? 0, m.displayName, m.bezels)
       )
+      const hasCustomArrangement = Array.isArray(action.windowsArrangement) && action.windowsArrangement.length === monitors.length
+      const arrangement: WindowsMonitorPosition[] = hasCustomArrangement
+        ? action.windowsArrangement!.map((wp, i) => ({
+            monitorId: monitors[i].id,
+            pixelX: wp.pixelX,
+            pixelY: wp.pixelY,
+          }))
+        : generateDefaultWindowsArrangement(monitors)
       return {
         ...state,
         monitors,
         selectedMonitorId: null,
-        windowsArrangement: generateDefaultWindowsArrangement(monitors),
+        windowsArrangement: arrangement,
+        useWindowsArrangement: hasCustomArrangement,
         activeLayoutName: action.layoutName ?? state.activeLayoutName,
         loadedLayoutImagePosition: action.imagePosition ?? null,
       }

@@ -205,6 +205,7 @@ function AppContent() {
         type: 'LOAD_LAYOUT',
         monitors: layoutFromHash.monitors,
         imagePosition: layoutFromHash.imagePosition,
+        windowsArrangement: layoutFromHash.windowsArrangement,
       })
       dispatch({ type: 'SET_ACTIVE_LAYOUT_NAME', name: null })
       clearLayoutHash()
@@ -231,6 +232,7 @@ function AppContent() {
         type: 'LOAD_LAYOUT',
         monitors: layoutFromHash.monitors,
         imagePosition: layoutFromHash.imagePosition,
+        windowsArrangement: layoutFromHash.windowsArrangement,
       })
       dispatch({ type: 'SET_ACTIVE_LAYOUT_NAME', name: null })
       clearLayoutHash()

@@ -1,5 +1,5 @@
 import LZString from 'lz-string'
-import type { SavedConfig, SavedImagePosition } from './types'
+import type { SavedConfig, SavedImagePosition, SavedWindowsPosition } from './types'
 
 /**
  * Prefix for LZ-compressed layout payloads; legacy base64url never starts with this.
@@ -30,10 +30,17 @@ type UrlImagePosition = {
   ar: number  // aspect ratio (width/height)
 }
 
+// Compact Windows virtual-desktop position (pixels, same order as m[])
+type UrlWindowsPosition = {
+  px: number  // pixelX
+  py: number  // pixelY
+}
+
 type UrlLayout = {
   v: 1
   m: UrlMonitor[]
   img?: UrlImagePosition   // optional; when present, next uploaded image uses this position
+  wp?: UrlWindowsPosition[] // optional; custom Windows arrangement (omitted when default top-aligned)
 }
 
 const HASH_KEY = 'layout'
@@ -53,9 +60,14 @@ export type LayoutEntry = SavedConfig['monitors'][number]
 export interface DecodedLayout {
   monitors: LayoutEntry[]
   imagePosition: SavedImagePosition | null
+  windowsArrangement: SavedWindowsPosition[] | null
 }
 
-export function encodeLayout(monitors: LayoutEntry[], imagePosition?: SavedImagePosition | null): string {
+export function encodeLayout(
+  monitors: LayoutEntry[],
+  imagePosition?: SavedImagePosition | null,
+  windowsArrangement?: SavedWindowsPosition[] | null,
+): string {
   const m: UrlMonitor[] = monitors.map(mon => {
     const entry: UrlMonitor = {
       n: mon.preset.name,
@@ -86,6 +98,9 @@ export function encodeLayout(monitors: LayoutEntry[], imagePosition?: SavedImage
       h: Math.round(imagePosition.height * 10000) / 10000,
       ar: imagePosition.aspectRatio,
     }
+  }
+  if (windowsArrangement && windowsArrangement.length === monitors.length) {
+    layout.wp = windowsArrangement.map(wp => ({ px: wp.pixelX, py: wp.pixelY }))
   }
   const json = JSON.stringify(layout)
   const compressed = LZString.compressToEncodedURIComponent(json)
@@ -130,7 +145,20 @@ export function decodeLayout(encoded: string): DecodedLayout | null {
       }
     }
 
-    return { monitors, imagePosition }
+    let windowsArrangement: SavedWindowsPosition[] | null = null
+    if (Array.isArray(layout.wp) && layout.wp.length === monitors.length) {
+      const parsed = layout.wp.map(wp => {
+        if (wp && Number.isFinite(wp.px) && Number.isFinite(wp.py)) {
+          return { pixelX: wp.px, pixelY: wp.py }
+        }
+        return null
+      })
+      if (parsed.every((p): p is SavedWindowsPosition => p !== null)) {
+        windowsArrangement = parsed
+      }
+    }
+
+    return { monitors, imagePosition, windowsArrangement }
   } catch {
     return null
   }
@@ -145,17 +173,25 @@ export function getLayoutFromHash(): DecodedLayout | null {
   return decodeLayout(encoded)
 }
 
-/** Encode the given monitors (and optional image position) into the URL hash and return the full URL string. */
-export function buildShareUrl(monitors: LayoutEntry[], imagePosition?: SavedImagePosition | null): string {
-  const encoded = encodeLayout(monitors, imagePosition)
+/** Encode the given monitors (and optional image position / windows arrangement) into the URL hash and return the full URL string. */
+export function buildShareUrl(
+  monitors: LayoutEntry[],
+  imagePosition?: SavedImagePosition | null,
+  windowsArrangement?: SavedWindowsPosition[] | null,
+): string {
+  const encoded = encodeLayout(monitors, imagePosition, windowsArrangement)
   const url = new URL(window.location.href)
   url.hash = `${HASH_KEY}=${encoded}`
   return url.toString()
 }
 
 /** Write the layout hash to the current URL (pushes a new history entry). */
-export function setLayoutHash(monitors: LayoutEntry[], imagePosition?: SavedImagePosition | null): string {
-  const encoded = encodeLayout(monitors, imagePosition)
+export function setLayoutHash(
+  monitors: LayoutEntry[],
+  imagePosition?: SavedImagePosition | null,
+  windowsArrangement?: SavedWindowsPosition[] | null,
+): string {
+  const encoded = encodeLayout(monitors, imagePosition, windowsArrangement)
   window.location.hash = `${HASH_KEY}=${encoded}`
   return window.location.href
 }
