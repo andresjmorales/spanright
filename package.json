@@ -24,6 +24,6 @@
     "react-dom": "^19.2.4",
     "react-konva": "^19.2.2",
     "tailwindcss": "^4.1.18",
-    "uuid": "^13.0.0"
+    "uuid": "^14.0.0"
   }
 }
