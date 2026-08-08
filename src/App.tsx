@@ -239,6 +239,18 @@ function AppContent() {
     }
   }, [forceDesktopView, dispatch])
 
+  // Warn on page refresh/close if there are unsaved monitors
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (state.monitors.length > 0 && !state.activeLayoutName) {
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [state.monitors.length, state.activeLayoutName])
+
   const setTab = (t: ActiveTab) => dispatch({ type: 'SET_ACTIVE_TAB', tab: t })
 
   // Phone: show informational shell unless user chose to open full editor
