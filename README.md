@@ -1,4 +1,41 @@
-# Spanright — Multi-Monitor Wallpaper Alignment Tool
+<p align="center">
+  <a href="https://spanright.com">
+    <img src="./public/spanright-logo-large.png" alt="Spanright logo" width="360">
+  </a>
+</p>
+
+<h1 align="center">Spanright</h1>
+
+<p align="center">
+  Multi-monitor wallpaper alignment: one image, seamless across screens of any size.
+</p>
+
+<p align="center">
+  <a href="./LICENSE"><img src="https://img.shields.io/github/license/andresjmorales/spanright?color=blue" alt="License: MIT"></a>
+  <a href="https://github.com/andresjmorales/spanright/commits/main"><img src="https://img.shields.io/github/last-commit/andresjmorales/spanright" alt="Last commit"></a>
+  <a href="https://github.com/andresjmorales/spanright/stargazers"><img src="https://img.shields.io/github/stars/andresjmorales/spanright?style=flat" alt="GitHub stars"></a>
+  <a href="https://spanright.com"><img src="https://img.shields.io/website?url=https%3A%2F%2Fspanright.com&label=spanright.com" alt="spanright.com status"></a>
+  <br>
+  <img src="https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white" alt="React 19">
+  <img src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white" alt="Vite 8">
+  <img src="https://img.shields.io/badge/Konva-10-0D83CD" alt="Konva 10">
+  <img src="https://img.shields.io/badge/Tailwind%20CSS-4-06B6D4?logo=tailwindcss&logoColor=white" alt="Tailwind CSS 4">
+  <img src="https://img.shields.io/badge/backend-none,%20runs%20in%20browser-success" alt="No backend: runs in the browser">
+  <img src="https://img.shields.io/badge/platform-Windows%20|%20macOS%20|%20Linux-informational" alt="Windows, macOS and Linux">
+  <a href="https://buymeacoffee.com/andresjmorales"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-FFDD00?logo=buymeacoffee&logoColor=black" alt="Buy Me a Coffee"></a>
+</p>
+
+<p align="center">
+  <a href="https://spanright.com"><b>Open Spanright</b></a> ·
+  <a href="#companion-tool-spanright-calibrate"><b>Calibrate companion</b></a> ·
+  <a href="#directions"><b>Directions</b></a> ·
+  <a href="#running-locally"><b>Run locally</b></a>
+</p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/116198b6-087a-49cb-8dd1-8e3de17d6f23" alt="A Spanright wallpaper lining up across a laptop, a 24-inch monitor and a 34-inch ultrawide" width="900">
+</p>
 
 Spanright is a single-page web app that lets you create pixel-perfect spanning wallpapers for non-standard multi-monitor setups. Most operating systems concatenate monitors by pixel resolution when spanning wallpapers, ignoring physical size differences — Spanright solves this by letting you model your physical desk layout, position a source image across it, and export a stitched wallpaper that looks seamless across all your screens. Works for Windows, macOS, and Linux.
 
@@ -219,7 +256,7 @@ Output matches the virtual desktop bounding box of your virtual layout. For each
 - [React](https://react.dev/) 19 + TypeScript
 - [Konva](https://konvajs.org/) / [react-konva](https://github.com/konvajs/react-konva) for canvas rendering
 - [Tailwind CSS](https://tailwindcss.com/) 4 for styling
-- [Vite](https://vite.dev/) 7 for build tooling
+- [Vite](https://vite.dev/) 8 for build tooling
 - No backend — all processing is client-side
 
 ## Project Structure
