@@ -520,7 +520,6 @@ const DISCRETE_UNDOABLE: Record<string, string> = {
   'SET_SOURCE_IMAGE': 'Load image',
   'CLEAR_SOURCE_IMAGE': 'Remove image',
   'SET_MONITOR_DISPLAY_NAME': 'Rename monitor',
-  'SET_MONITOR_BEZELS': 'Set bezels',
   'LOAD_LAYOUT': 'Load layout',
   'SET_IMAGE_TRANSFORM': 'Resize image',
 }
@@ -529,10 +528,13 @@ const CONTINUOUS_UNDOABLE: Record<string, string> = {
   'MOVE_MONITOR': 'Move monitor',
   'MOVE_IMAGE': 'Move image',
   'SCALE_IMAGE': 'Resize image',
+  // Bezel popover dispatches on every live-preview change; coalesce into one undo step
+  'SET_MONITOR_BEZELS': 'Set bezels',
 }
 
 function getContinuousKey(action: Action): string {
   if (action.type === 'MOVE_MONITOR') return `MOVE_MONITOR:${action.id}`
+  if (action.type === 'SET_MONITOR_BEZELS') return `SET_MONITOR_BEZELS:${action.id}`
   return action.type
 }
 

@@ -134,7 +134,7 @@ export default function ImageUpload() {
           <span className="text-xs text-gray-500 shrink-0">
             ({state.sourceImage.naturalWidth} x {state.sourceImage.naturalHeight} px)
           </span>
-          {/* TODO: Source image rotation (90/270°) — preview crop/position is unreliable for some monitors; re-enable when fixed. Store/ROTATE_SOURCE_IMAGE kept for saved layouts. */}
+          {/* TODO: Source image rotation is hidden. generateOutput now renders 0/90/180/270 correctly, but for 90/270 the editor canvas still draws the image with unswapped physicalWidth/Height under a rotated Group (and ROTATE_SOURCE_IMAGE doesn't swap them), so the canvas footprint wouldn't match the output. Fix that before re-enabling. */}
           <button
             onClick={() => fileInputRef.current?.click()}
             className="text-xs text-blue-400 hover:text-blue-300 transition-colors shrink-0 whitespace-nowrap"

@@ -7,89 +7,53 @@ export interface FillSettings {
 
 /**
  * Build a canvas with the image drawn at the given rotation (degrees CW).
- * TODO (source image rotation): 90° and 270° can produce wrong/missing crop for some monitors
- * in the output preview; physical↔pixel mapping or getSourceRect may need revisiting.
+ * For 90/270 the canvas is nH wide and nW tall.
  */
 export function rotatedImageCanvas(sourceImage: SourceImage): HTMLCanvasElement {
   const img = sourceImage.element
   const nW = sourceImage.naturalWidth
   const nH = sourceImage.naturalHeight
   const rot = sourceImage.rotation ?? 0
-  if (rot === 0) {
-    const c = document.createElement('canvas')
-    c.width = nW
-    c.height = nH
-    c.getContext('2d')!.drawImage(img, 0, 0)
-    return c
-  }
   const [width, height] = (rot === 90 || rot === 270) ? [nH, nW] : [nW, nH]
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height
   const ctx = canvas.getContext('2d')!
-  ctx.save()
+  // setTransform(a, b, c, d, e, f) maps image (x, y) -> canvas (a*x + c*y + e, b*x + d*y + f)
   if (rot === 90) {
-    // 90 CW: canvas (dx,dy) = image (dy, nH - dx). setTransform(a,b,c,d,e,f): (x,y)->(a*x+c*y+e, b*x+d*y+f)
-    ctx.setTransform(0, 1, -1, 0, 0, nH)
-    ctx.drawImage(img, 0, 0)
+    // 90 CW: canvas = (nH - y, x)
+    ctx.setTransform(0, 1, -1, 0, nH, 0)
   } else if (rot === 180) {
-    ctx.translate(nW, nH)
-    ctx.rotate(180 * Math.PI / 180)
-    ctx.drawImage(img, 0, 0)
+    // 180: canvas = (nW - x, nH - y)
+    ctx.setTransform(-1, 0, 0, -1, nW, nH)
   } else if (rot === 270) {
-    // 270 CW: canvas (dx,dy) = image (nW - dy, dx)
-    ctx.setTransform(0, 1, -1, 0, nW, 0)
-    ctx.drawImage(img, 0, 0)
+    // 270 CW: canvas = (y, nW - x)
+    ctx.setTransform(0, -1, 1, 0, 0, nW)
   }
-  ctx.restore()
+  ctx.drawImage(img, 0, 0)
   return canvas
 }
 
-/** Get source rect (in the possibly rotated image) for the physical intersection. See TODO on rotatedImageCanvas for 90/270° caveats. */
+/**
+ * Get the source rect for the physical intersection, in the coordinates of the element
+ * actually drawn from (the original image, or the already-rotated canvas from rotatedImageCanvas).
+ */
 function getSourceRect(
   sourceImage: SourceImage,
   imgLeft: number, imgTop: number, imgW: number, imgH: number,
   intLeft: number, intTop: number, intRight: number, intBottom: number
 ): { srcX: number; srcY: number; srcW: number; srcH: number } {
-  const nW = sourceImage.naturalWidth
-  const nH = sourceImage.naturalHeight
-  const u1 = (intLeft - imgLeft) / imgW
-  const v1 = (intTop - imgTop) / imgH
-  const u2 = (intRight - imgLeft) / imgW
-  const v2 = (intBottom - imgTop) / imgH
   const rot = sourceImage.rotation ?? 0
-  if (rot === 0) {
-    const scaleX = nW / imgW
-    const scaleY = nH / imgH
-    return {
-      srcX: (intLeft - imgLeft) * scaleX,
-      srcY: (intTop - imgTop) * scaleY,
-      srcW: (intRight - intLeft) * scaleX,
-      srcH: (intBottom - intTop) * scaleY,
-    }
-  }
-  if (rot === 90) {
-    return {
-      srcX: nH - u2 * nH,
-      srcY: (1 - v2) * nW,
-      srcW: (u2 - u1) * nH,
-      srcH: (v2 - v1) * nW,
-    }
-  }
-  if (rot === 180) {
-    return {
-      srcX: (1 - u2) * nW,
-      srcY: (1 - v2) * nH,
-      srcW: (u2 - u1) * nW,
-      srcH: (v2 - v1) * nH,
-    }
-  }
-  // 270 CW: rotated.x = original.y, rotated.y = nW - original.x; so srcX = nH*u1, srcY = nW*v1
+  const quarterTurn = rot === 90 || rot === 270
+  const srcElW = quarterTurn ? sourceImage.naturalHeight : sourceImage.naturalWidth
+  const srcElH = quarterTurn ? sourceImage.naturalWidth : sourceImage.naturalHeight
+  const scaleX = srcElW / imgW
+  const scaleY = srcElH / imgH
   return {
-    srcX: u1 * nH,
-    srcY: v1 * nW,
-    srcW: (u2 - u1) * nH,
-    srcH: (v2 - v1) * nW,
+    srcX: (intLeft - imgLeft) * scaleX,
+    srcY: (intTop - imgTop) * scaleY,
+    srcW: (intRight - intLeft) * scaleX,
+    srcH: (intBottom - intTop) * scaleY,
   }
 }
 
