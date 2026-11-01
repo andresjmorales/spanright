@@ -2,7 +2,7 @@ import React, { useCallback, useRef } from 'react'
 import { useStore } from '../store'
 import { useToast } from './Toast'
 import type { SourceImage } from '../types'
-import { adaptSavedPositionToAspectRatio } from '../utils'
+import { adaptSavedPositionToAspectRatio, getSourceImagePixelSize } from '../utils'
 import { getImagePositionBookmark } from '../imagePositionStorage'
 
 export default function ImageUpload() {
@@ -132,9 +132,19 @@ export default function ImageUpload() {
             })()}
           </div>
           <span className="text-xs text-gray-500 shrink-0">
-            ({state.sourceImage.naturalWidth} x {state.sourceImage.naturalHeight} px)
+            ({getSourceImagePixelSize(state.sourceImage).width} x {getSourceImagePixelSize(state.sourceImage).height} px)
           </span>
-          {/* TODO: Source image rotation (90/270°) — preview crop/position is unreliable for some monitors; re-enable when fixed. Store/ROTATE_SOURCE_IMAGE kept for saved layouts. */}
+          <button
+            onClick={() => {
+              dispatch({ type: 'ROTATE_SOURCE_IMAGE' })
+              const next = ((state.sourceImage?.rotation ?? 0) + 90) % 360
+              toast(`Image rotated to ${next}°`)
+            }}
+            className="text-xs text-blue-400 hover:text-blue-300 transition-colors shrink-0 whitespace-nowrap"
+            title="Rotate image 90° clockwise"
+          >
+            Rotate
+          </button>
           <button
             onClick={() => fileInputRef.current?.click()}
             className="text-xs text-blue-400 hover:text-blue-300 transition-colors shrink-0 whitespace-nowrap"

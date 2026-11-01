@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, type ReactNode } from 'react'
 import type { Monitor, SourceImage, MonitorPreset, WindowsMonitorPosition, ActiveTab, Bezels, FillMode, SavedImagePosition, SavedWindowsPosition, OutputFormat } from './types'
-import { createMonitor, getMonitorDisplayName } from './utils'
+import { createMonitor, getMonitorDisplayName, getSourceImageAspect } from './utils'
 
 const MAX_HISTORY = 50
 
@@ -194,22 +194,120 @@ function getMonitorStripWidth(m: Monitor): number {
   return (m.rotation ?? 0) === 90 ? m.preset.resolutionY : m.preset.resolutionX
 }
 
+function getMonitorStripHeight(m: Monitor): number {
+  return (m.rotation ?? 0) === 90 ? m.preset.resolutionX : m.preset.resolutionY
+}
+
+/** True when two monitors are physically one above the other (they share more width than height). */
+function arePhysicallyStacked(a: Monitor, b: Monitor): boolean {
+  const xOverlap = Math.min(a.physicalX + a.physicalWidth, b.physicalX + b.physicalWidth) - Math.max(a.physicalX, b.physicalX)
+  const yOverlap = Math.min(a.physicalY + a.physicalHeight, b.physicalY + b.physicalHeight) - Math.max(a.physicalY, b.physicalY)
+  return xOverlap > 0 && xOverlap > Math.max(0, yOverlap)
+}
+
 /**
- * Generate a default Windows arrangement from the physical layout:
- * same left-to-right order, all top-aligned, laid out side-by-side by pixel width.
+ * Generate a default (auto) Windows arrangement from the physical layout.
+ *
+ * Side-by-side layouts: same left-to-right order, all top-aligned, laid out by pixel width.
+ * Layouts with physically stacked monitors: each monitor is attached to its nearest
+ * already-placed neighbor — stacked neighbors go above/below (horizontally offset to
+ * follow the physical offset), side-by-side neighbors go left/right, top-aligned.
  */
 function generateDefaultWindowsArrangement(monitors: Monitor[]): WindowsMonitorPosition[] {
   const sorted = [...monitors].sort((a, b) => a.physicalX - b.physicalX)
-  let xOffset = 0
-  return sorted.map(m => {
-    const pos: WindowsMonitorPosition = {
-      monitorId: m.id,
-      pixelX: xOffset,
-      pixelY: 0,
+  const hasStack = monitors.some((a, i) => monitors.some((b, j) => i < j && arePhysicallyStacked(a, b)))
+  if (!hasStack) {
+    let xOffset = 0
+    return sorted.map(m => {
+      const pos: WindowsMonitorPosition = {
+        monitorId: m.id,
+        pixelX: xOffset,
+        pixelY: 0,
+      }
+      xOffset += getMonitorStripWidth(m)
+      return pos
+    })
+  }
+
+  type Placed = { m: Monitor; x: number; y: number; w: number; h: number }
+  const cx = (m: Monitor) => m.physicalX + m.physicalWidth / 2
+  const cy = (m: Monitor) => m.physicalY + m.physicalHeight / 2
+  const first = sorted[0]
+  const placed: Placed[] = [{ m: first, x: 0, y: 0, w: getMonitorStripWidth(first), h: getMonitorStripHeight(first) }]
+  const remaining = sorted.slice(1)
+  const overlapsPlaced = (x: number, y: number, w: number, h: number) =>
+    placed.some(p => x < p.x + p.w && x + w > p.x && y < p.y + p.h && y + h > p.y)
+
+  while (remaining.length > 0) {
+    // Nearest (by physical center) unplaced monitor to any placed one
+    let best = { i: 0, n: placed[0], d: Infinity }
+    remaining.forEach((m, i) => {
+      for (const n of placed) {
+        const d = Math.hypot(cx(m) - cx(n.m), cy(m) - cy(n.m))
+        if (d < best.d) best = { i, n, d }
+      }
+    })
+    const m = remaining.splice(best.i, 1)[0]
+    // Prefer attaching beside a placed monitor in the same row (shares height), so rows stay
+    // contiguous; otherwise attach to the nearest monitor.
+    const sameRow = placed
+      .filter(p => !arePhysicallyStacked(m, p.m) &&
+        Math.min(m.physicalY + m.physicalHeight, p.m.physicalY + p.m.physicalHeight) > Math.max(m.physicalY, p.m.physicalY))
+      .sort((a, b) => Math.abs(cx(a.m) - cx(m)) - Math.abs(cx(b.m) - cx(m)))[0]
+    const n = sameRow ?? best.n
+    const w = getMonitorStripWidth(m)
+    const h = getMonitorStripHeight(m)
+    let x: number, y: number
+    if (arePhysicallyStacked(m, n.m)) {
+      y = cy(m) > cy(n.m) ? n.y + n.h : n.y - h
+      // Follow the physical horizontal offset (in the neighbor's pixels), keeping a shared edge
+      const centered = n.x + n.w / 2 - w / 2 + (cx(m) - cx(n.m)) * n.m.ppi
+      x = Math.round(Math.max(n.x - w + 1, Math.min(n.x + n.w - 1, centered)))
+    } else {
+      x = cx(m) > cx(n.m) ? n.x + n.w : n.x - w
+      y = n.y
     }
-    xOffset += getMonitorStripWidth(m)
-    return pos
-  })
+    if (overlapsPlaced(x, y, w, h)) {
+      // No free spot next to its neighbor: append on the right, top-aligned
+      x = Math.max(...placed.map(p => p.x + p.w))
+      y = Math.min(...placed.map(p => p.y))
+    }
+    placed.push({ m, x, y, w, h })
+  }
+
+  const minX = Math.min(...placed.map(p => p.x))
+  const minY = Math.min(...placed.map(p => p.y))
+  return placed.map(p => ({ monitorId: p.m.id, pixelX: p.x - minX, pixelY: p.y - minY }))
+}
+
+/**
+ * Arrangement after the monitor list changed (add/remove/duplicate/rotate).
+ * Auto mode regenerates from the physical layout. A custom arrangement is kept:
+ * existing positions stay put, and any monitor that is new or now overlaps
+ * another is appended to the right edge, top-aligned.
+ */
+function updateArrangementForMonitors(state: State, monitors: Monitor[]): WindowsMonitorPosition[] {
+  if (!state.useWindowsArrangement) return generateDefaultWindowsArrangement(monitors)
+  const prev = new Map(state.windowsArrangement.map(wp => [wp.monitorId, wp]))
+  const placed: { wp: WindowsMonitorPosition; w: number; h: number }[] = []
+  const pending: Monitor[] = []
+  const overlaps = (x: number, y: number, w: number, h: number) =>
+    placed.some(p => x < p.wp.pixelX + p.w && x + w > p.wp.pixelX && y < p.wp.pixelY + p.h && y + h > p.wp.pixelY)
+  for (const m of monitors) {
+    const wp = prev.get(m.id)
+    const w = getMonitorStripWidth(m)
+    const h = getMonitorStripHeight(m)
+    if (wp && !overlaps(wp.pixelX, wp.pixelY, w, h)) placed.push({ wp: { ...wp }, w, h })
+    else pending.push(m)
+  }
+  let nextX = placed.length ? Math.max(...placed.map(p => p.wp.pixelX + p.w)) : 0
+  const topY = placed.length ? Math.min(...placed.map(p => p.wp.pixelY)) : 0
+  for (const m of pending) {
+    placed.push({ wp: { monitorId: m.id, pixelX: nextX, pixelY: topY }, w: 0, h: 0 })
+    nextX += getMonitorStripWidth(m)
+  }
+  const byMonitor = new Map(placed.map(p => [p.wp.monitorId, p.wp]))
+  return monitors.map(m => byMonitor.get(m.id)!)
 }
 
 function reducer(state: State, action: Action): State {
@@ -222,7 +320,7 @@ function reducer(state: State, action: Action): State {
         ...state,
         monitors: newMonitors,
         selectedMonitorId: monitor.id,
-        windowsArrangement: generateDefaultWindowsArrangement(newMonitors),
+        windowsArrangement: updateArrangementForMonitors(state, newMonitors),
       }
     }
     case 'SET_MONITOR_DISPLAY_NAME': {
@@ -248,7 +346,7 @@ function reducer(state: State, action: Action): State {
         ...state,
         monitors: newMonitors,
         selectedMonitorId: state.selectedMonitorId === action.id ? null : state.selectedMonitorId,
-        windowsArrangement: generateDefaultWindowsArrangement(newMonitors),
+        windowsArrangement: updateArrangementForMonitors(state, newMonitors),
       }
     }
     case 'DUPLICATE_MONITOR': {
@@ -281,7 +379,7 @@ function reducer(state: State, action: Action): State {
         ...state,
         monitors: newMonitors,
         selectedMonitorId: newMonitor.id,
-        windowsArrangement: generateDefaultWindowsArrangement(newMonitors),
+        windowsArrangement: updateArrangementForMonitors(state, newMonitors),
       }
     }
     case 'ROTATE_MONITOR': {
@@ -308,7 +406,7 @@ function reducer(state: State, action: Action): State {
       return {
         ...state,
         monitors: newMonitors,
-        windowsArrangement: generateDefaultWindowsArrangement(newMonitors),
+        windowsArrangement: updateArrangementForMonitors(state, newMonitors),
       }
     }
     case 'CLEAR_ALL_MONITORS':
@@ -339,7 +437,7 @@ function reducer(state: State, action: Action): State {
               y: state.sourceImage.physicalY,
               width: state.sourceImage.physicalWidth,
               height: state.sourceImage.physicalHeight,
-              aspectRatio: state.sourceImage.naturalWidth / state.sourceImage.naturalHeight,
+              aspectRatio: getSourceImageAspect(state.sourceImage),
             }
           : null
       return {
@@ -352,7 +450,21 @@ function reducer(state: State, action: Action): State {
       if (!state.sourceImage) return state
       const r = state.sourceImage.rotation ?? 0
       const next: 0 | 90 | 180 | 270 = r === 270 ? 0 : (r + 90) as 0 | 90 | 180 | 270
-      return { ...state, sourceImage: { ...state.sourceImage, rotation: next } }
+      // A quarter turn swaps the image's physical footprint; keep it centered in place.
+      const img = state.sourceImage
+      const cx = img.physicalX + img.physicalWidth / 2
+      const cy = img.physicalY + img.physicalHeight / 2
+      return {
+        ...state,
+        sourceImage: {
+          ...img,
+          rotation: next,
+          physicalX: cx - img.physicalHeight / 2,
+          physicalY: cy - img.physicalWidth / 2,
+          physicalWidth: img.physicalHeight,
+          physicalHeight: img.physicalWidth,
+        },
+      }
     }
     case 'MOVE_IMAGE':
       return state.sourceImage
@@ -520,19 +632,22 @@ const DISCRETE_UNDOABLE: Record<string, string> = {
   'SET_SOURCE_IMAGE': 'Load image',
   'CLEAR_SOURCE_IMAGE': 'Remove image',
   'SET_MONITOR_DISPLAY_NAME': 'Rename monitor',
-  'SET_MONITOR_BEZELS': 'Set bezels',
   'LOAD_LAYOUT': 'Load layout',
   'SET_IMAGE_TRANSFORM': 'Resize image',
+  'ROTATE_SOURCE_IMAGE': 'Rotate image',
 }
 
 const CONTINUOUS_UNDOABLE: Record<string, string> = {
   'MOVE_MONITOR': 'Move monitor',
   'MOVE_IMAGE': 'Move image',
   'SCALE_IMAGE': 'Resize image',
+  // Bezel popover dispatches on every live-preview change; coalesce into one undo step
+  'SET_MONITOR_BEZELS': 'Set bezels',
 }
 
 function getContinuousKey(action: Action): string {
   if (action.type === 'MOVE_MONITOR') return `MOVE_MONITOR:${action.id}`
+  if (action.type === 'SET_MONITOR_BEZELS') return `SET_MONITOR_BEZELS:${action.id}`
   return action.type
 }
 

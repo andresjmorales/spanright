@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useCallback, useState, useMemo, type Dispatch
 import { Stage, Layer, Rect, Text, Group, Image as KonvaImage, Line, Transformer } from 'react-konva'
 import type Konva from 'konva'
 import { useStore, CANVAS_SCALE_MIN, CANVAS_SCALE_MAX, DEFAULT_CANVAS_SCALE } from '../store'
-import { formatDimension, getMonitorsBoundingBox, getMonitorDisplayName, getBezelInches, adaptSavedPositionToAspectRatio, INCHES_PER_CM } from '../utils'
+import { formatDimension, getMonitorsBoundingBox, getMonitorDisplayName, getBezelInches, adaptSavedPositionToAspectRatio, INCHES_PER_CM, getSourceImageAspect, getSourceImagePixelSize } from '../utils'
 import { useToast } from './Toast'
 import { IconUndo, IconRedo, IconCheck, IconKebabVertical } from '../icons'
 import type { Monitor, SourceImage, Bezels } from '../types'
@@ -347,6 +347,16 @@ function RulerOverlay({
 export default function EditorCanvas() {
   const { state, dispatch, canUndo, canRedo, undoLabel, redoLabel } = useStore()
   const toast = useToast()
+  // The image as displayed: the original element, or a pre-rotated canvas so the Konva node
+  // (and its transformer / buttons) never needs a rotation of its own.
+  const sourceElement = state.sourceImage?.element
+  const sourceRotation = state.sourceImage?.rotation ?? 0
+  const displayImage = useMemo(() => {
+    if (!state.sourceImage) return null
+    return sourceRotation === 0 ? state.sourceImage.element : rotatedImageCanvas(state.sourceImage)
+    // Only the element and rotation affect the pixels; position/size changes must not re-rotate.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceElement, sourceRotation])
   const containerRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<Konva.Stage>(null)
   const imageRef = useRef<Konva.Image>(null)
@@ -590,10 +600,7 @@ export default function EditorCanvas() {
     const bbox = getMonitorsBoundingBox(state.monitors)
     if (bbox.width <= 0 || bbox.height <= 0) return
 
-    const rotation = state.sourceImage.rotation ?? 0
-    const imageAspect = (rotation === 90 || rotation === 270)
-      ? state.sourceImage.naturalHeight / state.sourceImage.naturalWidth
-      : state.sourceImage.naturalWidth / state.sourceImage.naturalHeight
+    const imageAspect = getSourceImageAspect(state.sourceImage)
     if (!Number.isFinite(imageAspect) || imageAspect <= 0) return
 
     const bboxAspect = bbox.width / bbox.height
@@ -784,10 +791,8 @@ export default function EditorCanvas() {
           physY >= img.physicalY && physY <= img.physicalY + img.physicalHeight) {
         const u = (physX - img.physicalX) / img.physicalWidth
         const v = (physY - img.physicalY) / img.physicalHeight
-        const rotated = (img.rotation ?? 0) !== 0
-        const srcElement = rotated ? rotatedImageCanvas(img) : img.element
-        const srcW = rotated && (img.rotation === 90 || img.rotation === 270) ? img.naturalHeight : img.naturalWidth
-        const srcH = rotated && (img.rotation === 90 || img.rotation === 270) ? img.naturalWidth : img.naturalHeight
+        const srcElement = displayImage ?? img.element
+        const { width: srcW, height: srcH } = getSourceImagePixelSize(img)
         const pixelX = Math.min(Math.floor(u * srcW), srcW - 1)
         const pixelY = Math.min(Math.floor(v * srcH), srcH - 1)
         const sampleCanvas = document.createElement('canvas')
@@ -818,7 +823,7 @@ export default function EditorCanvas() {
       dispatch({ type: 'SELECT_MONITOR', id: null })
       setImageSelected(false)
     }
-  }, [dispatch, state.eyedropperActive, state.sourceImage, toast])
+  }, [dispatch, state.eyedropperActive, state.sourceImage, displayImage, toast])
 
   const handleMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     if (isDraggingCanvas && lastPointerPos.current) {
@@ -1170,13 +1175,11 @@ export default function EditorCanvas() {
   // Render source image (wrapped in Group with delete button so they move together)
   const imgW = state.sourceImage ? state.sourceImage.physicalWidth * scale : 0
   const imgH = state.sourceImage ? state.sourceImage.physicalHeight * scale : 0
-  const imgRotation = state.sourceImage?.rotation ?? 0
-  const imageNode = state.sourceImage ? (
+  const imageNode = state.sourceImage && displayImage ? (
     <Group
       x={toCanvasX(state.sourceImage.physicalX) + imgW / 2}
       y={toCanvasY(state.sourceImage.physicalY) + imgH / 2}
       offset={{ x: imgW / 2, y: imgH / 2 }}
-      rotation={imgRotation}
       draggable
       onClick={() => {
         setImageSelected(true)
@@ -1207,7 +1210,7 @@ export default function EditorCanvas() {
     >
       <KonvaImage
         ref={imageRef}
-        image={state.sourceImage.element}
+        image={displayImage}
         width={imgW}
         height={imgH}
         opacity={0.7}
@@ -1730,7 +1733,7 @@ export default function EditorCanvas() {
               y: img.physicalY,
               width: img.physicalWidth,
               height: img.physicalHeight,
-              aspectRatio: img.naturalWidth / img.naturalHeight,
+              aspectRatio: getSourceImageAspect(img),
             })
             toast.success(state.activeLayoutName ? `Image position bookmarked for '${state.activeLayoutName}'` : 'Image position bookmarked')
           }}
@@ -1738,7 +1741,7 @@ export default function EditorCanvas() {
             const img = state.sourceImage!
             const layoutPos = state.loadedLayoutImagePosition
             if (!layoutPos) return
-            const ar = img.naturalWidth / img.naturalHeight
+            const ar = getSourceImageAspect(img)
             const { x, y, width, height } = adaptSavedPositionToAspectRatio(layoutPos, ar)
             dispatch({ type: 'SET_IMAGE_TRANSFORM', x, y, physicalWidth: width, physicalHeight: height })
             toast.success('Image position from layout applied')
@@ -1748,7 +1751,7 @@ export default function EditorCanvas() {
             const key = state.activeLayoutName ?? '_default'
             const saved = getImagePositionBookmark(key)
             if (!saved) return
-            const ar = img.naturalWidth / img.naturalHeight
+            const ar = getSourceImageAspect(img)
             const { x, y, width, height } = adaptSavedPositionToAspectRatio(saved, ar)
             dispatch({ type: 'SET_IMAGE_TRANSFORM', x, y, physicalWidth: width, physicalHeight: height })
             toast.success('Bookmarked position applied')

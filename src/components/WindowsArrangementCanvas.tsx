@@ -522,7 +522,7 @@ export default function WindowsArrangementCanvas() {
             className="accent-blue-500"
           />
           <span className="text-xs text-gray-300">
-            My virtual layout is top-aligned (default for most OSes)
+            Auto-arrange from my physical layout (top-aligned)
           </span>
         </label>
 
@@ -591,7 +591,7 @@ export default function WindowsArrangementCanvas() {
             <div className="bg-gray-900/90 backdrop-blur rounded-lg px-6 py-4 text-center max-w-md">
               <div className="text-sm text-gray-300 font-medium mb-1">Auto-aligned mode</div>
               <div className="text-xs text-gray-500">
-                Monitors will be arranged top-aligned in the same left-to-right order as your physical layout.
+                Monitors follow your physical layout: side-by-side monitors are placed left-to-right and top-aligned, stacked monitors one above the other.
                 Uncheck the box above to customize.
               </div>
             </div>

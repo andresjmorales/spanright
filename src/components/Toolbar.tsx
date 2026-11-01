@@ -1,5 +1,5 @@
 import { useStore } from '../store'
-import { getRecommendedImageSize, getMonitorsBoundingBox, formatDimension } from '../utils'
+import { getRecommendedImageSize, getMonitorsBoundingBox, formatDimension, getSourceImagePixelSize } from '../utils'
 import ImageUpload from './ImageUpload'
 import ConfigManager from './ConfigManager'
 import ShareButton from './ShareButton'
@@ -15,10 +15,10 @@ export default function Toolbar() {
   // Check if image is undersized
   let imageSizeStatus: 'ok' | 'warn' | 'error' | null = null
   if (hasImage && hasMonitors) {
-    const img = state.sourceImage!
-    if (img.naturalWidth >= recommended.width && img.naturalHeight >= recommended.height) {
+    const img = getSourceImagePixelSize(state.sourceImage!)
+    if (img.width >= recommended.width && img.height >= recommended.height) {
       imageSizeStatus = 'ok'
-    } else if (img.naturalWidth >= recommended.width * 0.7 && img.naturalHeight >= recommended.height * 0.7) {
+    } else if (img.width >= recommended.width * 0.7 && img.height >= recommended.height * 0.7) {
       imageSizeStatus = 'warn'
     } else {
       imageSizeStatus = 'error'

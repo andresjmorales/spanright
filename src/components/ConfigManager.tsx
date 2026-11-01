@@ -5,14 +5,12 @@ import type { SavedConfig, SavedImagePosition, SavedWindowsPosition } from '../t
 import { PRELOADED_LAYOUTS, decodePreloadedLayout } from '../preloadedLayouts'
 import { deleteImagePositionBookmark } from '../imagePositionStorage'
 import { IconBookmark, IconPlus, IconTrash } from '../icons'
+import { getSourceImageAspect } from '../utils'
+import { validateLayoutMonitor } from '../layoutValidation'
 
 const STORAGE_KEY = 'spanright-saved-configs'
 const MAX_CONFIGS = 24
 
-/** Validation limits for imported layouts (match app rules). */
-const IMPORT_MIN_DIAGONAL = 5
-const IMPORT_MAX_DIAGONAL = 120
-const IMPORT_MAX_ASPECT_RATIO = 10
 const LAYOUT_NAME_MAX_LENGTH = 40
 
 const EXPORT_FILENAME_PREFIX = 'spanright-layouts'
@@ -30,9 +28,18 @@ function loadConfigs(): SavedConfig[] {
   }
 }
 
-function saveConfigs(configs: SavedConfig[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(configs))
+/** Persist layouts; returns false when storage is full or unavailable. */
+function saveConfigs(configs: SavedConfig[]): boolean {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(configs))
+    return true
+  } catch {
+    return false
+  }
 }
+
+const STORAGE_FAILED_MESSAGE = "Couldn't save layouts: browser storage is full or unavailable."
+
 
 function validateImportedLayouts(data: unknown): { valid: true; configs: SavedConfig[] } | { valid: false; error: string } {
   if (!Array.isArray(data)) {
@@ -59,58 +66,9 @@ function validateImportedLayouts(data: unknown): { valid: true; configs: SavedCo
     }
     const monitors: SavedConfig['monitors'] = []
     for (let j = 0; j < rawMonitors.length; j++) {
-      const mon = rawMonitors[j] as Record<string, unknown>
-      const preset = mon.preset as Record<string, unknown> | undefined
-      if (!preset || typeof preset !== 'object') {
-        return { valid: false, error: `Layout "${name}", monitor ${j + 1}: preset is required.` }
-      }
-      const diagonal = Number(preset.diagonal)
-      const ar = preset.aspectRatio
-      const resX = Number(preset.resolutionX)
-      const resY = Number(preset.resolutionY)
-      if (!Number.isFinite(diagonal) || diagonal < IMPORT_MIN_DIAGONAL || diagonal > IMPORT_MAX_DIAGONAL) {
-        return { valid: false, error: `Layout "${name}", monitor ${j + 1}: diagonal must be ${IMPORT_MIN_DIAGONAL}–${IMPORT_MAX_DIAGONAL}".` }
-      }
-      if (!Array.isArray(ar) || ar.length !== 2 || !Number.isFinite(ar[0]) || !Number.isFinite(ar[1]) || (ar[0] as number) <= 0 || (ar[1] as number) <= 0) {
-        return { valid: false, error: `Layout "${name}", monitor ${j + 1}: aspectRatio must be [number, number].` }
-      }
-      const ratio = Math.max((ar[0] as number) / (ar[1] as number), (ar[1] as number) / (ar[0] as number))
-      if (ratio > IMPORT_MAX_ASPECT_RATIO) {
-        return { valid: false, error: `Layout "${name}", monitor ${j + 1}: aspect ratio cannot exceed ${IMPORT_MAX_ASPECT_RATIO}:1.` }
-      }
-      if (!Number.isFinite(resX) || !Number.isFinite(resY) || resX < 1 || resY < 1) {
-        return { valid: false, error: `Layout "${name}", monitor ${j + 1}: resolution must be positive numbers.` }
-      }
-      const presetName = typeof preset.name === 'string' ? preset.name : `Monitor ${j + 1}`
-      const physicalX = Number(mon.physicalX)
-      const physicalY = Number(mon.physicalY)
-      if (!Number.isFinite(physicalX) || !Number.isFinite(physicalY)) {
-        return { valid: false, error: `Layout "${name}", monitor ${j + 1}: physicalX and physicalY are required.` }
-      }
-      const rotation = mon.rotation === 90 ? 90 : 0
-      const displayName = typeof mon.displayName === 'string' ? mon.displayName : undefined
-      let bezels: SavedConfig['monitors'][0]['bezels'] | undefined
-      if (mon.bezels != null && typeof mon.bezels === 'object') {
-        const b = mon.bezels as Record<string, unknown>
-        const t = Number(b.top), bot = Number(b.bottom), l = Number(b.left), r = Number(b.right)
-        if (Number.isFinite(t) && Number.isFinite(bot) && Number.isFinite(l) && Number.isFinite(r) && t >= 0 && bot >= 0 && l >= 0 && r >= 0) {
-          bezels = { top: t, bottom: bot, left: l, right: r }
-        }
-      }
-      monitors.push({
-        preset: {
-          name: presetName,
-          diagonal,
-          aspectRatio: [ar[0] as number, ar[1] as number],
-          resolutionX: resX,
-          resolutionY: resY,
-        },
-        physicalX,
-        physicalY,
-        rotation,
-        displayName,
-        bezels,
-      })
+      const result = validateLayoutMonitor(rawMonitors[j], `Layout "${name}", monitor ${j + 1}`, `Monitor ${j + 1}`)
+      if (!result.valid) return { valid: false, error: result.error }
+      monitors.push(result.monitor)
     }
     let imagePosition: SavedImagePosition | null = null
     if (rawImg != null && typeof rawImg === 'object') {
@@ -204,7 +162,7 @@ export default function ConfigManager() {
           y: img.physicalY,
           width: img.physicalWidth,
           height: img.physicalHeight,
-          aspectRatio: img.naturalWidth / img.naturalHeight,
+          aspectRatio: getSourceImageAspect(img),
         }
       : state.loadedLayoutImagePosition ?? null
     const windowsArrangement: SavedWindowsPosition[] | undefined =
@@ -230,8 +188,11 @@ export default function ConfigManager() {
       windowsArrangement,
     }
     const updated = [newConfig, ...configs].slice(0, MAX_CONFIGS)
+    if (!saveConfigs(updated)) {
+      toast.warning(STORAGE_FAILED_MESSAGE)
+      return
+    }
     setConfigs(updated)
-    saveConfigs(updated)
     dispatch({ type: 'SET_ACTIVE_LAYOUT_NAME', name: newConfig.name })
     dispatch({ type: 'SET_LOADED_LAYOUT_IMAGE_POSITION', position: imagePosition })
     toast.success(`Layout saved: ${newConfig.name}`)
@@ -266,10 +227,14 @@ export default function ConfigManager() {
 
   const handleDelete = (id: string) => {
     const config = configs.find(c => c.id === id)
-    if (config) deleteImagePositionBookmark(config.name)
     const updated = configs.filter(c => c.id !== id)
+    if (!saveConfigs(updated)) {
+      toast.warning(STORAGE_FAILED_MESSAGE)
+      return
+    }
+    // Bookmarks are keyed by layout name; keep it if another layout still uses that name.
+    if (config && !updated.some(c => c.name === config.name)) deleteImagePositionBookmark(config.name)
     setConfigs(updated)
-    saveConfigs(updated)
     toast('Layout deleted')
     setConfirmDeleteId(null)
   }
@@ -319,8 +284,11 @@ export default function ConfigManager() {
           id: crypto.randomUUID(),
         }))
         const updated = [...configs, ...toAdd]
+        if (!saveConfigs(updated)) {
+          toast.warning(STORAGE_FAILED_MESSAGE)
+          return
+        }
         setConfigs(updated)
-        saveConfigs(updated)
         const skipped = result.configs.length - toAdd.length
         toast.success(
           skipped > 0
