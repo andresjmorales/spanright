@@ -591,7 +591,7 @@ export default function WindowsArrangementCanvas() {
             <div className="bg-gray-900/90 backdrop-blur rounded-lg px-6 py-4 text-center max-w-md">
               <div className="text-sm text-gray-300 font-medium mb-1">Auto-aligned mode</div>
               <div className="text-xs text-gray-500">
-                Monitors follow your physical layout: side-by-side monitors are placed left-to-right and top-aligned, stacked monitors one above the other.
+                Monitors follow your physical layout: side-by-side monitors are placed left-to-right and top-aligned; stacked monitors go one above the other, left-, center- or right-aligned (whichever is closest).
                 Uncheck the box above to customize.
               </div>
             </div>

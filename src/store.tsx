@@ -206,14 +206,32 @@ function arePhysicallyStacked(a: Monitor, b: Monitor): boolean {
 }
 
 /**
+ * How a stacked monitor most likely lines up with its neighbor in the OS arrangement:
+ * 0 = left edges aligned, 0.5 = centered, 1 = right edges aligned — whichever is
+ * closest to the physical horizontal offset (ties prefer centered).
+ */
+export function stackedAlignment(m: Monitor, n: Monitor): 0 | 0.5 | 1 {
+  const left = Math.abs(m.physicalX - n.physicalX)
+  const center = Math.abs(m.physicalX + m.physicalWidth / 2 - (n.physicalX + n.physicalWidth / 2))
+  const right = Math.abs(m.physicalX + m.physicalWidth - (n.physicalX + n.physicalWidth))
+  if (center <= left && center <= right) return 0.5
+  return left <= right ? 0 : 1
+}
+
+/**
  * Generate a default (auto) Windows arrangement from the physical layout.
  *
  * Side-by-side layouts: same left-to-right order, all top-aligned, laid out by pixel width.
  * Layouts with physically stacked monitors: each monitor is attached to its nearest
- * already-placed neighbor — stacked neighbors go above/below (horizontally offset to
- * follow the physical offset), side-by-side neighbors go left/right, top-aligned.
+ * already-placed neighbor — stacked neighbors go above/below, side-by-side neighbors go
+ * left/right, top-aligned.
+ *
+ * Stacked monitors are left-aligned, centered or right-aligned with their neighbor,
+ * whichever is closest to the physical offset. Users rarely hand-tune a stacked
+ * arrangement in their OS to match the desk exactly, so the likeliest real arrangement
+ * is one of these snapped alignments rather than the proportional physical offset.
  */
-function generateDefaultWindowsArrangement(monitors: Monitor[]): WindowsMonitorPosition[] {
+export function generateDefaultWindowsArrangement(monitors: Monitor[]): WindowsMonitorPosition[] {
   const sorted = [...monitors].sort((a, b) => a.physicalX - b.physicalX)
   const hasStack = monitors.some((a, i) => monitors.some((b, j) => i < j && arePhysicallyStacked(a, b)))
   if (!hasStack) {
@@ -260,9 +278,7 @@ function generateDefaultWindowsArrangement(monitors: Monitor[]): WindowsMonitorP
     let x: number, y: number
     if (arePhysicallyStacked(m, n.m)) {
       y = cy(m) > cy(n.m) ? n.y + n.h : n.y - h
-      // Follow the physical horizontal offset (in the neighbor's pixels), keeping a shared edge
-      const centered = n.x + n.w / 2 - w / 2 + (cx(m) - cx(n.m)) * n.m.ppi
-      x = Math.round(Math.max(n.x - w + 1, Math.min(n.x + n.w - 1, centered)))
+      x = Math.round(n.x + stackedAlignment(m, n.m) * (n.w - w))
     } else {
       x = cx(m) > cx(n.m) ? n.x + n.w : n.x - w
       y = n.y
