@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useStore } from '../store'
 import { buildShareUrl } from '../urlLayout'
 import { useToast } from './Toast'
+import { getSourceImageAspect } from '../utils'
 import { IconCheckSimple, IconShare } from '../icons'
 
 export default function ShareButton() {
@@ -27,7 +28,7 @@ export default function ShareButton() {
           y: state.sourceImage.physicalY,
           width: state.sourceImage.physicalWidth,
           height: state.sourceImage.physicalHeight,
-          aspectRatio: state.sourceImage.naturalWidth / state.sourceImage.naturalHeight,
+          aspectRatio: getSourceImageAspect(state.sourceImage),
         }
       : state.loadedLayoutImagePosition ?? null
 

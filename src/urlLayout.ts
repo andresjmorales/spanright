@@ -1,5 +1,6 @@
 import LZString from 'lz-string'
 import type { SavedConfig, SavedImagePosition, SavedWindowsPosition } from './types'
+import { validateLayoutMonitor } from './layoutValidation'
 
 /**
  * Prefix for LZ-compressed layout payloads; legacy base64url never starts with this.
@@ -117,31 +118,42 @@ export function decodeLayout(encoded: string): DecodedLayout | null {
     const layout = JSON.parse(json) as UrlLayout
     if (!layout || layout.v !== 1 || !Array.isArray(layout.m)) return null
 
-    const monitors: LayoutEntry[] = layout.m.map(mon => ({
-      preset: {
-        name: mon.n,
-        diagonal: mon.d,
-        aspectRatio: mon.ar,
-        resolutionX: mon.rx,
-        resolutionY: mon.ry,
-      },
-      physicalX: mon.x,
-      physicalY: mon.y,
-      rotation: mon.rot,
-      displayName: mon.dn,
-      bezels: mon.bz
-        ? { top: mon.bz[0], bottom: mon.bz[1], left: mon.bz[2], right: mon.bz[3] }
-        : undefined,
-    }))
+    // Shared links come from outside the app: apply the same rules as JSON import.
+    if (layout.m.length === 0) return null
+    const monitors: LayoutEntry[] = []
+    for (let i = 0; i < layout.m.length; i++) {
+      const mon = layout.m[i]
+      if (!mon || typeof mon !== 'object') return null
+      const result = validateLayoutMonitor(
+        {
+          preset: { name: mon.n, diagonal: mon.d, aspectRatio: mon.ar, resolutionX: mon.rx, resolutionY: mon.ry },
+          physicalX: mon.x,
+          physicalY: mon.y,
+          rotation: mon.rot,
+          displayName: mon.dn,
+          bezels: Array.isArray(mon.bz)
+            ? { top: mon.bz[0], bottom: mon.bz[1], left: mon.bz[2], right: mon.bz[3] }
+            : undefined,
+        },
+        `Monitor ${i + 1}`,
+        `Monitor ${i + 1}`,
+      )
+      if (!result.valid) return null
+      monitors.push(result.monitor)
+    }
 
     let imagePosition: SavedImagePosition | null = null
-    if (layout.img && Number.isFinite(layout.img.x) && Number.isFinite(layout.img.y) && Number.isFinite(layout.img.ar)) {
+    const img = layout.img
+    if (
+      img && [img.x, img.y, img.w, img.h, img.ar].every(Number.isFinite) &&
+      img.w > 0 && img.h > 0 && img.ar > 0
+    ) {
       imagePosition = {
-        x: layout.img.x,
-        y: layout.img.y,
-        width: layout.img.w,
-        height: layout.img.h,
-        aspectRatio: layout.img.ar,
+        x: img.x,
+        y: img.y,
+        width: img.w,
+        height: img.h,
+        aspectRatio: img.ar,
       }
     }
 

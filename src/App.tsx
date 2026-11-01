@@ -100,7 +100,7 @@ const WELCOME_SEEN_KEY = 'spanright-welcome-seen'
 
 function WelcomeDialog({ onClose }: { onClose: () => void }) {
   const handleClose = () => {
-    localStorage.setItem(WELCOME_SEEN_KEY, '1')
+    try { localStorage.setItem(WELCOME_SEEN_KEY, '1') } catch { /* storage unavailable */ }
     onClose()
   }
 
@@ -188,6 +188,14 @@ function WelcomeDialog({ onClose }: { onClose: () => void }) {
   )
 }
 
+function hasSeenWelcome(): boolean {
+  try {
+    return !!localStorage.getItem(WELCOME_SEEN_KEY)
+  } catch {
+    return true // storage blocked: don't show the welcome on every load
+  }
+}
+
 function AppContent() {
   const { state, dispatch } = useStore()
   const [showAbout, setShowAbout] = useState(false)
@@ -209,7 +217,7 @@ function AppContent() {
       })
       dispatch({ type: 'SET_ACTIVE_LAYOUT_NAME', name: null })
       clearLayoutHash()
-    } else if (!layoutFromHash && !localStorage.getItem(WELCOME_SEEN_KEY)) {
+    } else if (!layoutFromHash && !hasSeenWelcome()) {
       setShowWelcome(true)
     }
   }, [viewport.isPhone, dispatch])

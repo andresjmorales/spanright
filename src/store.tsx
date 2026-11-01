@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useReducer, type ReactNode } from 'react'
 import type { Monitor, SourceImage, MonitorPreset, WindowsMonitorPosition, ActiveTab, Bezels, FillMode, SavedImagePosition, SavedWindowsPosition, OutputFormat } from './types'
-import { createMonitor, getMonitorDisplayName } from './utils'
+import { createMonitor, getMonitorDisplayName, getSourceImageAspect } from './utils'
 
 const MAX_HISTORY = 50
 
@@ -212,6 +212,40 @@ function generateDefaultWindowsArrangement(monitors: Monitor[]): WindowsMonitorP
   })
 }
 
+function getMonitorStripHeight(m: Monitor): number {
+  return (m.rotation ?? 0) === 90 ? m.preset.resolutionX : m.preset.resolutionY
+}
+
+/**
+ * Arrangement after the monitor list changed (add/remove/duplicate/rotate).
+ * Auto mode regenerates from the physical layout. A custom arrangement is kept:
+ * existing positions stay put, and any monitor that is new or now overlaps
+ * another is appended to the right edge, top-aligned.
+ */
+function updateArrangementForMonitors(state: State, monitors: Monitor[]): WindowsMonitorPosition[] {
+  if (!state.useWindowsArrangement) return generateDefaultWindowsArrangement(monitors)
+  const prev = new Map(state.windowsArrangement.map(wp => [wp.monitorId, wp]))
+  const placed: { wp: WindowsMonitorPosition; w: number; h: number }[] = []
+  const pending: Monitor[] = []
+  const overlaps = (x: number, y: number, w: number, h: number) =>
+    placed.some(p => x < p.wp.pixelX + p.w && x + w > p.wp.pixelX && y < p.wp.pixelY + p.h && y + h > p.wp.pixelY)
+  for (const m of monitors) {
+    const wp = prev.get(m.id)
+    const w = getMonitorStripWidth(m)
+    const h = getMonitorStripHeight(m)
+    if (wp && !overlaps(wp.pixelX, wp.pixelY, w, h)) placed.push({ wp: { ...wp }, w, h })
+    else pending.push(m)
+  }
+  let nextX = placed.length ? Math.max(...placed.map(p => p.wp.pixelX + p.w)) : 0
+  const topY = placed.length ? Math.min(...placed.map(p => p.wp.pixelY)) : 0
+  for (const m of pending) {
+    placed.push({ wp: { monitorId: m.id, pixelX: nextX, pixelY: topY }, w: 0, h: 0 })
+    nextX += getMonitorStripWidth(m)
+  }
+  const byMonitor = new Map(placed.map(p => [p.wp.monitorId, p.wp]))
+  return monitors.map(m => byMonitor.get(m.id)!)
+}
+
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'ADD_MONITOR': {
@@ -222,7 +256,7 @@ function reducer(state: State, action: Action): State {
         ...state,
         monitors: newMonitors,
         selectedMonitorId: monitor.id,
-        windowsArrangement: generateDefaultWindowsArrangement(newMonitors),
+        windowsArrangement: updateArrangementForMonitors(state, newMonitors),
       }
     }
     case 'SET_MONITOR_DISPLAY_NAME': {
@@ -248,7 +282,7 @@ function reducer(state: State, action: Action): State {
         ...state,
         monitors: newMonitors,
         selectedMonitorId: state.selectedMonitorId === action.id ? null : state.selectedMonitorId,
-        windowsArrangement: generateDefaultWindowsArrangement(newMonitors),
+        windowsArrangement: updateArrangementForMonitors(state, newMonitors),
       }
     }
     case 'DUPLICATE_MONITOR': {
@@ -281,7 +315,7 @@ function reducer(state: State, action: Action): State {
         ...state,
         monitors: newMonitors,
         selectedMonitorId: newMonitor.id,
-        windowsArrangement: generateDefaultWindowsArrangement(newMonitors),
+        windowsArrangement: updateArrangementForMonitors(state, newMonitors),
       }
     }
     case 'ROTATE_MONITOR': {
@@ -308,7 +342,7 @@ function reducer(state: State, action: Action): State {
       return {
         ...state,
         monitors: newMonitors,
-        windowsArrangement: generateDefaultWindowsArrangement(newMonitors),
+        windowsArrangement: updateArrangementForMonitors(state, newMonitors),
       }
     }
     case 'CLEAR_ALL_MONITORS':
@@ -339,7 +373,7 @@ function reducer(state: State, action: Action): State {
               y: state.sourceImage.physicalY,
               width: state.sourceImage.physicalWidth,
               height: state.sourceImage.physicalHeight,
-              aspectRatio: state.sourceImage.naturalWidth / state.sourceImage.naturalHeight,
+              aspectRatio: getSourceImageAspect(state.sourceImage),
             }
           : null
       return {
@@ -352,7 +386,21 @@ function reducer(state: State, action: Action): State {
       if (!state.sourceImage) return state
       const r = state.sourceImage.rotation ?? 0
       const next: 0 | 90 | 180 | 270 = r === 270 ? 0 : (r + 90) as 0 | 90 | 180 | 270
-      return { ...state, sourceImage: { ...state.sourceImage, rotation: next } }
+      // A quarter turn swaps the image's physical footprint; keep it centered in place.
+      const img = state.sourceImage
+      const cx = img.physicalX + img.physicalWidth / 2
+      const cy = img.physicalY + img.physicalHeight / 2
+      return {
+        ...state,
+        sourceImage: {
+          ...img,
+          rotation: next,
+          physicalX: cx - img.physicalHeight / 2,
+          physicalY: cy - img.physicalWidth / 2,
+          physicalWidth: img.physicalHeight,
+          physicalHeight: img.physicalWidth,
+        },
+      }
     }
     case 'MOVE_IMAGE':
       return state.sourceImage
@@ -522,6 +570,7 @@ const DISCRETE_UNDOABLE: Record<string, string> = {
   'SET_MONITOR_DISPLAY_NAME': 'Rename monitor',
   'LOAD_LAYOUT': 'Load layout',
   'SET_IMAGE_TRANSFORM': 'Resize image',
+  'ROTATE_SOURCE_IMAGE': 'Rotate image',
 }
 
 const CONTINUOUS_UNDOABLE: Record<string, string> = {

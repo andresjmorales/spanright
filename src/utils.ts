@@ -1,4 +1,4 @@
-import type { MonitorPreset, Monitor, Bezels, SavedImagePosition } from './types'
+import type { MonitorPreset, Monitor, Bezels, SavedImagePosition, SourceImage } from './types'
 import { v4 as uuidv4 } from 'uuid'
 
 const ASPECT_RATIO_TOLERANCE = 0.05
@@ -34,6 +34,20 @@ export function adaptSavedPositionToAspectRatio(
     width: newWidth,
     height: newHeight,
   }
+}
+
+/** Pixel dimensions of the source image as displayed, i.e. after its rotation is applied. */
+export function getSourceImagePixelSize(img: SourceImage): { width: number; height: number } {
+  const quarterTurn = img.rotation === 90 || img.rotation === 270
+  return quarterTurn
+    ? { width: img.naturalHeight, height: img.naturalWidth }
+    : { width: img.naturalWidth, height: img.naturalHeight }
+}
+
+/** Width/height aspect ratio of the source image as displayed (after rotation). */
+export function getSourceImageAspect(img: SourceImage): number {
+  const { width, height } = getSourceImagePixelSize(img)
+  return width / height
 }
 
 /**
