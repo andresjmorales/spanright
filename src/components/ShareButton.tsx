@@ -49,7 +49,7 @@ export default function ShareButton() {
     } catch {
       // Clipboard API not available — update the hash so the user can copy manually
       window.location.hash = url.split('#')[1] ?? ''
-      toast('Share link set in URL — copy it from the address bar')
+      toast('Share link set in URL. Copy it from the address bar.')
     }
   }
 

@@ -78,7 +78,7 @@ function WindowsContent() {
           Your wallpaper is designed for Windows <strong className="text-blue-300">Span</strong> mode, and that should work perfectly in most setups. But if you're seeing stretching, bleed, or misalignment, try switching to <strong className="text-blue-300">Tile</strong> instead: right-click your desktop &gt; Personalize &gt; Background, and change the fit mode.
         </p>
         <p className="text-xs text-gray-400 leading-relaxed">
-          <strong className="text-gray-300">Why does this help?</strong> Span mode scales your image to fit the Windows virtual desktop bounding box — the exterior rectangle that contains your entire display setup (side-by-side, stacked vertical, or mixed). If any monitor is even a few pixels offset, Windows will stretch the image to compensate, causing visible bleed. Tile mode places the image at exact 1:1 pixel scale with no resizing, bypassing the issue entirely.
+          <strong className="text-gray-300">Why does this help?</strong> Span mode scales your image to fit the Windows virtual desktop bounding box, the exterior rectangle that contains your entire display setup (side-by-side, stacked vertical, or mixed). If any monitor is even a few pixels offset, Windows will stretch the image to compensate, causing visible bleed. Tile mode places the image at exact 1:1 pixel scale with no resizing, bypassing the issue entirely.
         </p>
       </div>
 
@@ -98,7 +98,7 @@ function WindowsContent() {
           >
             Spanright Calibrate
           </a>
-          {' '}is a Windows desktop app that reads your monitors via EDID, guides you through an interactive on-screen alignment (using colored overlay lines), and measures the exact physical gaps between your displays. It then exports directly into Spanright — no manual measuring needed.
+          {' '}is a Windows desktop app that reads your monitors via EDID, guides you through an interactive on-screen alignment (using colored overlay lines), and measures the exact physical gaps between your displays. It then exports directly into Spanright, so there's no manual measuring.
         </p>
       </div>
 
@@ -152,7 +152,7 @@ function WindowsContent() {
           </p>
           <ol className="text-sm text-gray-300 leading-relaxed list-decimal list-inside space-y-1.5 ml-1">
             <li>In Spanright, set up your monitor layout as usual.</li>
-            <li>Use a test image with a grid pattern or clearly marked regions — or just use a solid color with distinct colored blocks where each monitor boundary should be.</li>
+            <li>Use a test image with a grid pattern or clearly marked regions, or just use a solid color with distinct colored blocks where each monitor boundary should be.</li>
             <li>Apply the wallpaper using <strong className="text-gray-100">Tile</strong> mode.</li>
             <li>Check each monitor: do the boundaries line up exactly at the screen edges? If you see part of the next monitor's section bleeding over, your Windows display arrangement may have a small offset (see the "Virtual Desktop Misalignment" section above).</li>
           </ol>
@@ -160,7 +160,7 @@ function WindowsContent() {
 
         <AccordionSection title="The wallpaper sections appear on the wrong monitors">
           <p className="text-sm text-gray-300 leading-relaxed">
-            Spanright's output matches the bounding box of your Windows arrangement (positions and order). Windows applies that same image based on your display arrangement in Settings &gt; Display — so the layout there (left-to-right, top-to-bottom, or mixed) must match what you set in the Virtual Layout tab.
+            Spanright's output matches the bounding box of your Windows arrangement (positions and order). Windows applies that same image based on your display arrangement in Settings &gt; Display, so the layout there (left-to-right, top-to-bottom, or mixed) must match what you set in the Virtual Layout tab.
           </p>
           <p className="text-sm text-gray-300 leading-relaxed">
             If these orders don't match, the wallpaper sections will appear on the wrong screens.
@@ -231,10 +231,10 @@ function MacOSContent() {
 
         <AccordionSection title="The wallpaper looks blurry on one or more displays">
           <p className="text-sm text-gray-300 leading-relaxed">
-            This is usually a Retina resolution mismatch. Make sure your Spanright monitor definitions use the <strong className="text-gray-100">actual hardware pixel resolution</strong>, not the scaled resolution macOS reports. A Retina display at "looks like 1440×900" is actually 2880×1800 — use the latter.
+            This is usually a Retina resolution mismatch. Make sure your Spanright monitor definitions use the <strong className="text-gray-100">actual hardware pixel resolution</strong>, not the scaled resolution macOS reports. A Retina display at "looks like 1440×900" is actually 2880×1800, so use the latter.
           </p>
           <p className="text-sm text-gray-300 leading-relaxed">
-            Also check that your source image is large enough — Spanright shows a recommended resolution banner in the toolbar.
+            Also check that your source image is large enough. Spanright shows a recommended resolution banner in the toolbar.
           </p>
         </AccordionSection>
       </div>
@@ -280,7 +280,7 @@ function LinuxContent() {
             Common methods for applying a spanned wallpaper:
           </p>
           <ul className="text-sm text-gray-300 leading-relaxed list-disc list-inside space-y-1.5 ml-1">
-            <li><strong className="text-gray-100">GNOME:</strong> Use <code className="text-gray-300 bg-gray-800 px-1 rounded">gsettings set org.gnome.desktop.background picture-options 'spanned'</code> then set the image URI. Or use <strong className="text-gray-100">Settings &gt; Background</strong> and choose the image — GNOME 42+ supports "Span" in the background settings.</li>
+            <li><strong className="text-gray-100">GNOME:</strong> Use <code className="text-gray-300 bg-gray-800 px-1 rounded">gsettings set org.gnome.desktop.background picture-options 'spanned'</code> then set the image URI. Or use <strong className="text-gray-100">Settings &gt; Background</strong> and choose the image. GNOME 42+ supports "Span" in the background settings.</li>
             <li><strong className="text-gray-100">KDE Plasma:</strong> Right-click the desktop &gt; Configure Desktop &gt; Wallpaper. Some versions support spanning; you may need to set each monitor's portion individually.</li>
             <li><strong className="text-gray-100">feh (X11):</strong> <code className="text-gray-300 bg-gray-800 px-1 rounded">feh --bg-scale /path/to/wallpaper.png</code> will scale across your combined display area.</li>
             <li><strong className="text-gray-100">nitrogen (X11):</strong> Select the image and choose "Scaled" or "Zoomed" fitting.</li>

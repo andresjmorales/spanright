@@ -67,7 +67,7 @@ export default function InfoDialog({ onClose }: InfoDialogProps) {
                   Your operating system paints this image based on how your monitors are arranged in your display settings, starting from the top-left corner. The left-to-right order and vertical offsets determine which slice each monitor gets.
                 </p>
                 <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">
-                  Spanright's output is the <strong className="text-gray-300">bounding box</strong> of that arrangement — the smallest rectangle that contains all your monitors. Side-by-side, stacked vertically, or any mix all work: the image size matches the virtual desktop your OS uses.
+                  Spanright's output is the <strong className="text-gray-300">bounding box</strong> of that arrangement, the smallest rectangle that contains all your monitors. Side-by-side, stacked vertically, or any mix all work: the image size matches the virtual desktop your OS uses.
                 </p>
               </div>
             </div>
@@ -80,7 +80,7 @@ export default function InfoDialog({ onClose }: InfoDialogProps) {
               Your OS display arrangement defines the <strong className="text-gray-300">virtual desktop</strong>: where the cursor and windows move between monitors. If one display is above the other, the cursor crosses at the shared top edge; side-by-side, at the vertical edge between them. Offsets change where that &quot;seam&quot; is. Matching the Virtual Layout tab to your OS ensures the output image lines up with how the OS will paint it.
             </p>
             <p className="text-xs text-gray-400 leading-relaxed mt-2">
-              <strong className="text-gray-300">Why empty area doesn&apos;t show:</strong> The OS (Windows, macOS, Linux) paints the wallpaper from the top-left over that bounding box. Each monitor only displays the rectangle of the image at its position — so only pixels that fall inside a monitor&apos;s rectangle are ever shown on a screen. Gaps in the image (from different resolutions or vertical offsets) lie outside every monitor&apos;s rectangle, so no physical display ever shows them. You only see the parts that map to your actual monitors.
+              <strong className="text-gray-300">Why empty area doesn&apos;t show:</strong> The OS (Windows, macOS, Linux) paints the wallpaper from the top-left over that bounding box. Each monitor only displays the rectangle of the image at its position, so only pixels that fall inside a monitor&apos;s rectangle are ever shown on a screen. Gaps in the image (from different resolutions or vertical offsets) lie outside every monitor&apos;s rectangle, so no physical display ever shows them. You only see the parts that map to your actual monitors.
             </p>
           </section>
 
@@ -146,7 +146,7 @@ export default function InfoDialog({ onClose }: InfoDialogProps) {
               <div>
                 <h3 className="text-sm font-medium text-gray-200">Two layouts, one wallpaper</h3>
                 <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                  The <strong className="text-gray-300">Physical Layout</strong> tab controls what part of your image each monitor shows — based on real-world size and position on your desk. The <strong className="text-gray-300">Virtual Layout</strong> tab controls how the output image is stitched together — matching how your OS will paint it. On the Physical Layout canvas, <strong className="text-gray-300">right-click</strong> any monitor to rename, rotate, duplicate, delete, or set optional bezel borders (for alignment and real-world bezel compensation).
+                  The <strong className="text-gray-300">Physical Layout</strong> tab controls what part of your image each monitor shows, based on real-world size and position on your desk. The <strong className="text-gray-300">Virtual Layout</strong> tab controls how the output image is stitched together to match how your OS will paint it. On the Physical Layout canvas, <strong className="text-gray-300">right-click</strong> any monitor to rename, rotate, duplicate, delete, or set optional bezel borders (for alignment and real-world bezel compensation).
                 </p>
               </div>
             </div>
@@ -159,7 +159,7 @@ export default function InfoDialog({ onClose }: InfoDialogProps) {
               <div>
                 <h3 className="text-sm font-medium text-gray-200">You don't need to change your OS settings</h3>
                 <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                  Just tell Spanright how your monitors are currently arranged in your OS display settings. If your arrangement roughly matches your physical layout with monitors top-aligned, you can skip this step entirely — the default "auto-aligned" option handles it.
+                  Just tell Spanright how your monitors are currently arranged in your OS display settings. If your arrangement roughly matches your physical layout with monitors top-aligned, you can skip this step entirely: the default auto-arrange option handles it.
                 </p>
               </div>
             </div>
