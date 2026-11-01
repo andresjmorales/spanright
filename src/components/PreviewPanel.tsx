@@ -239,7 +239,7 @@ export default function PreviewPanel() {
                     {/* Banner first — always on top of color/fill controls */}
                     <div className="px-3 py-2 bg-gray-800/80 border-b border-gray-700/50 space-y-1">
                       <p className="text-xs text-gray-400">
-                        Empty area is normal — it fills the space around your displays and won&apos;t be visible on the monitors.
+                        Empty area is normal. It fills the space around your displays and won&apos;t be visible on the monitors.
                       </p>
                       <p className="text-xs text-gray-500">
                         {state.fillMode === 'solid'

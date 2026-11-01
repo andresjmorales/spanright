@@ -37,7 +37,7 @@ export default function Toolbar() {
           <div className="text-xs text-gray-400 min-w-0 overflow-hidden text-ellipsis">
             <span className="hidden md:inline">
               {state.monitors.length} monitor{state.monitors.length > 1 ? 's' : ''}{' '}
-              {formatDimension(bbox.width, state.unit)}×{formatDimension(bbox.height, state.unit)} layout —{' '}
+              {formatDimension(bbox.width, state.unit)}×{formatDimension(bbox.height, state.unit)} layout ·{' '}
             </span>
             <span className="text-gray-500">Rec:</span>{' '}
             <span className="font-mono text-gray-300">
