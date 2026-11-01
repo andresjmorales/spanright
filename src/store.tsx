@@ -194,26 +194,90 @@ function getMonitorStripWidth(m: Monitor): number {
   return (m.rotation ?? 0) === 90 ? m.preset.resolutionY : m.preset.resolutionX
 }
 
+function getMonitorStripHeight(m: Monitor): number {
+  return (m.rotation ?? 0) === 90 ? m.preset.resolutionX : m.preset.resolutionY
+}
+
+/** True when two monitors are physically one above the other (they share more width than height). */
+function arePhysicallyStacked(a: Monitor, b: Monitor): boolean {
+  const xOverlap = Math.min(a.physicalX + a.physicalWidth, b.physicalX + b.physicalWidth) - Math.max(a.physicalX, b.physicalX)
+  const yOverlap = Math.min(a.physicalY + a.physicalHeight, b.physicalY + b.physicalHeight) - Math.max(a.physicalY, b.physicalY)
+  return xOverlap > 0 && xOverlap > Math.max(0, yOverlap)
+}
+
 /**
- * Generate a default Windows arrangement from the physical layout:
- * same left-to-right order, all top-aligned, laid out side-by-side by pixel width.
+ * Generate a default (auto) Windows arrangement from the physical layout.
+ *
+ * Side-by-side layouts: same left-to-right order, all top-aligned, laid out by pixel width.
+ * Layouts with physically stacked monitors: each monitor is attached to its nearest
+ * already-placed neighbor — stacked neighbors go above/below (horizontally offset to
+ * follow the physical offset), side-by-side neighbors go left/right, top-aligned.
  */
 function generateDefaultWindowsArrangement(monitors: Monitor[]): WindowsMonitorPosition[] {
   const sorted = [...monitors].sort((a, b) => a.physicalX - b.physicalX)
-  let xOffset = 0
-  return sorted.map(m => {
-    const pos: WindowsMonitorPosition = {
-      monitorId: m.id,
-      pixelX: xOffset,
-      pixelY: 0,
-    }
-    xOffset += getMonitorStripWidth(m)
-    return pos
-  })
-}
+  const hasStack = monitors.some((a, i) => monitors.some((b, j) => i < j && arePhysicallyStacked(a, b)))
+  if (!hasStack) {
+    let xOffset = 0
+    return sorted.map(m => {
+      const pos: WindowsMonitorPosition = {
+        monitorId: m.id,
+        pixelX: xOffset,
+        pixelY: 0,
+      }
+      xOffset += getMonitorStripWidth(m)
+      return pos
+    })
+  }
 
-function getMonitorStripHeight(m: Monitor): number {
-  return (m.rotation ?? 0) === 90 ? m.preset.resolutionX : m.preset.resolutionY
+  type Placed = { m: Monitor; x: number; y: number; w: number; h: number }
+  const cx = (m: Monitor) => m.physicalX + m.physicalWidth / 2
+  const cy = (m: Monitor) => m.physicalY + m.physicalHeight / 2
+  const first = sorted[0]
+  const placed: Placed[] = [{ m: first, x: 0, y: 0, w: getMonitorStripWidth(first), h: getMonitorStripHeight(first) }]
+  const remaining = sorted.slice(1)
+  const overlapsPlaced = (x: number, y: number, w: number, h: number) =>
+    placed.some(p => x < p.x + p.w && x + w > p.x && y < p.y + p.h && y + h > p.y)
+
+  while (remaining.length > 0) {
+    // Nearest (by physical center) unplaced monitor to any placed one
+    let best = { i: 0, n: placed[0], d: Infinity }
+    remaining.forEach((m, i) => {
+      for (const n of placed) {
+        const d = Math.hypot(cx(m) - cx(n.m), cy(m) - cy(n.m))
+        if (d < best.d) best = { i, n, d }
+      }
+    })
+    const m = remaining.splice(best.i, 1)[0]
+    // Prefer attaching beside a placed monitor in the same row (shares height), so rows stay
+    // contiguous; otherwise attach to the nearest monitor.
+    const sameRow = placed
+      .filter(p => !arePhysicallyStacked(m, p.m) &&
+        Math.min(m.physicalY + m.physicalHeight, p.m.physicalY + p.m.physicalHeight) > Math.max(m.physicalY, p.m.physicalY))
+      .sort((a, b) => Math.abs(cx(a.m) - cx(m)) - Math.abs(cx(b.m) - cx(m)))[0]
+    const n = sameRow ?? best.n
+    const w = getMonitorStripWidth(m)
+    const h = getMonitorStripHeight(m)
+    let x: number, y: number
+    if (arePhysicallyStacked(m, n.m)) {
+      y = cy(m) > cy(n.m) ? n.y + n.h : n.y - h
+      // Follow the physical horizontal offset (in the neighbor's pixels), keeping a shared edge
+      const centered = n.x + n.w / 2 - w / 2 + (cx(m) - cx(n.m)) * n.m.ppi
+      x = Math.round(Math.max(n.x - w + 1, Math.min(n.x + n.w - 1, centered)))
+    } else {
+      x = cx(m) > cx(n.m) ? n.x + n.w : n.x - w
+      y = n.y
+    }
+    if (overlapsPlaced(x, y, w, h)) {
+      // No free spot next to its neighbor: append on the right, top-aligned
+      x = Math.max(...placed.map(p => p.x + p.w))
+      y = Math.min(...placed.map(p => p.y))
+    }
+    placed.push({ m, x, y, w, h })
+  }
+
+  const minX = Math.min(...placed.map(p => p.x))
+  const minY = Math.min(...placed.map(p => p.y))
+  return placed.map(p => ({ monitorId: p.m.id, pixelX: p.x - minX, pixelY: p.y - minY }))
 }
 
 /**
