@@ -51,6 +51,46 @@ export function getSourceImageAspect(img: SourceImage): number {
 }
 
 /**
+ * "Cover" fit: the rect with the given aspect ratio that fully covers `target`, overflow centered.
+ */
+export function getCoverRect(
+  aspect: number,
+  target: { x: number; y: number; width: number; height: number },
+): { x: number; y: number; width: number; height: number } {
+  const targetAspect = target.width / target.height
+  let width: number
+  let height: number
+  if (aspect > targetAspect) {
+    height = target.height
+    width = height * aspect
+  } else {
+    width = target.width
+    height = width / aspect
+  }
+  return { x: target.x + (target.width - width) / 2, y: target.y + (target.height - height) / 2, width, height }
+}
+
+/**
+ * How well an image layer's pixel density matches the monitors it covers.
+ * Returns the ratio of the image's pixels-per-inch (as placed) to the highest PPI among the
+ * monitors it overlaps (>= 1 means no upscaling anywhere), or null when it overlaps no monitor.
+ */
+export function getImageDensityRatio(img: SourceImage, monitors: Monitor[]): number | null {
+  let maxPpi = 0
+  for (const m of monitors) {
+    const overlaps =
+      img.physicalX < m.physicalX + m.physicalWidth &&
+      img.physicalX + img.physicalWidth > m.physicalX &&
+      img.physicalY < m.physicalY + m.physicalHeight &&
+      img.physicalY + img.physicalHeight > m.physicalY
+    if (overlaps) maxPpi = Math.max(maxPpi, m.ppi)
+  }
+  if (maxPpi === 0) return null
+  const { width } = getSourceImagePixelSize(img)
+  return width / img.physicalWidth / maxPpi
+}
+
+/**
  * Calculate PPI from resolution and diagonal size.
  * PPI = sqrt(resX² + resY²) / diagonal
  */

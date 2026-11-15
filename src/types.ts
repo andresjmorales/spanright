@@ -34,6 +34,8 @@ export interface Monitor {
 }
 
 export interface SourceImage {
+  /** Stable id for selection / layer ordering. */
+  id: string
   element: HTMLImageElement
   fileName: string
   naturalWidth: number
@@ -96,7 +98,8 @@ export interface SavedConfig {
 
 export interface AppState {
   monitors: Monitor[]
-  sourceImage: SourceImage | null
+  /** Image layers, bottom to top (index 0 is drawn first). */
+  images: SourceImage[]
   canvasScale: number     // pixels per inch on the canvas display
   canvasOffsetX: number   // pan offset
   canvasOffsetY: number

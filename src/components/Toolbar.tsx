@@ -1,5 +1,5 @@
-import { useStore } from '../store'
-import { getRecommendedImageSize, getMonitorsBoundingBox, formatDimension, getSourceImagePixelSize } from '../utils'
+import { useStore, getFocusImage } from '../store'
+import { getRecommendedImageSize, getMonitorsBoundingBox, formatDimension, getSourceImagePixelSize, getImageDensityRatio } from '../utils'
 import ImageUpload from './ImageUpload'
 import ConfigManager from './ConfigManager'
 import ShareButton from './ShareButton'
@@ -10,19 +10,22 @@ export default function Toolbar() {
   const recommended = getRecommendedImageSize(state.monitors)
   const bbox = getMonitorsBoundingBox(state.monitors)
   const hasMonitors = state.monitors.length > 0
-  const hasImage = !!state.sourceImage
+  const hasImage = state.images.length > 0
+  const focusImage = getFocusImage(state)
 
-  // Check if image is undersized
+  // Check if image is undersized.
+  // One image: compare against the recommended size for the whole layout (it is meant to span it all).
+  // Several layers: a layer may cover only some monitors, so compare the selected layer's pixel
+  // density (as placed) against the sharpest monitor it overlaps.
   let imageSizeStatus: 'ok' | 'warn' | 'error' | null = null
-  if (hasImage && hasMonitors) {
-    const img = getSourceImagePixelSize(state.sourceImage!)
-    if (img.width >= recommended.width && img.height >= recommended.height) {
-      imageSizeStatus = 'ok'
-    } else if (img.width >= recommended.width * 0.7 && img.height >= recommended.height * 0.7) {
-      imageSizeStatus = 'warn'
-    } else {
-      imageSizeStatus = 'error'
-    }
+  const rate = (ratio: number) => (ratio >= 1 ? 'ok' : ratio >= 0.7 ? 'warn' : 'error')
+  if (hasImage && hasMonitors && state.images.length === 1) {
+    const img = getSourceImagePixelSize(state.images[0])
+    imageSizeStatus = rate(Math.min(img.width / recommended.width, img.height / recommended.height))
+  } else if (focusImage && hasMonitors) {
+    const ratio = getImageDensityRatio(focusImage, state.monitors)
+    // Small tolerance so a layer sized exactly to a monitor's native resolution reads as correct
+    imageSizeStatus = ratio === null ? null : rate(ratio + 0.005)
   }
 
   return (
@@ -49,6 +52,7 @@ export default function Toolbar() {
                 imageSizeStatus === 'warn' ? 'text-yellow-400' :
                 'text-red-400'
               }`}>
+                {state.images.length > 1 && <span className="text-gray-500">Selected: </span>}
                 {imageSizeStatus === 'ok' && '✓ Correct size'}
                 {imageSizeStatus === 'warn' && '⚠ Slightly undersized'}
                 {imageSizeStatus === 'error' && '✗ Undersized'}

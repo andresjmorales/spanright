@@ -61,7 +61,7 @@ export default function EditorShortcutsDialog({ onClose }: EditorShortcutsDialog
               <ShortcutRow keys="Ctrl+Shift+Z or Ctrl+Y" description="Redo" />
               <ShortcutRow keys="F" description="Fit view to monitors" />
               <ShortcutRow keys="A" description="Align Assist (toggle)" />
-              <ShortcutRow keys="S" description="Size image to fit" />
+              <ShortcutRow keys="S" description="Size image to fit layout" />
               <ShortcutRow keys="Escape" description="Deselect monitor/image or cancel eyedropper" />
             </div>
           </section>
@@ -70,7 +70,7 @@ export default function EditorShortcutsDialog({ onClose }: EditorShortcutsDialog
             <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Canvas actions</h3>
             <div className="space-y-0 divide-y divide-gray-800">
               <ShortcutRow keys="Ctrl+Alt+M" description="Clear all monitors" />
-              <ShortcutRow keys="Ctrl+Alt+I" description="Remove image" />
+              <ShortcutRow keys="Ctrl+Alt+I" description="Remove selected image (all images if none selected)" />
               <ShortcutRow keys="Ctrl+Alt+R" description="Reset canvas" />
             </div>
             <p className="text-[11px] text-gray-500 mt-2">
@@ -81,7 +81,7 @@ export default function EditorShortcutsDialog({ onClose }: EditorShortcutsDialog
           <section>
             <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Nudge (monitor or image)</h3>
             <p className="text-xs text-gray-400 mb-2">
-              With a monitor or the image selected, move it in physical space.
+              With a monitor or an image selected, move it in physical space.
             </p>
             <div className="space-y-0 divide-y divide-gray-800">
               <ShortcutRow keys="Arrow keys" description="Nudge 0.1″" />
@@ -93,7 +93,17 @@ export default function EditorShortcutsDialog({ onClose }: EditorShortcutsDialog
           <section>
             <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Delete</h3>
             <div className="space-y-0 divide-y divide-gray-800">
-              <ShortcutRow keys="Delete or Backspace" description="Remove selected monitor, or remove image when image is selected" />
+              <ShortcutRow keys="Delete or Backspace" description="Remove selected monitor or image" />
+            </div>
+          </section>
+
+          <section>
+            <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Image layers</h3>
+            <div className="space-y-0 divide-y divide-gray-800">
+              <ShortcutRow keys="Ctrl+]" description="Bring selected image forward" />
+              <ShortcutRow keys="Ctrl+[" description="Send selected image backward" />
+              <ShortcutRow keys="Ctrl+Shift+]" description="Bring selected image to front" />
+              <ShortcutRow keys="Ctrl+Shift+[" description="Send selected image to back" />
             </div>
           </section>
 

@@ -1,6 +1,6 @@
 # Spanright — Architecture & Design
 
-**Last updated:** 2025-02-20 (responsive/mobile shell added)
+**Last updated:** 2026-11-15 (multiple image layers)
 
 This document describes the structure and design of Spanright so that maintainers, collaborators, and tooling (including AI) can reason about the codebase. If the app has changed since the date above, this file may be outdated and should be refreshed.
 
@@ -59,18 +59,18 @@ Single source of truth: one `useReducer` (with undo/redo wrapper) exposed via `S
 | Slice | Purpose |
 |-------|--------|
 | `monitors` | Physical layout: each has `id`, `preset`, `physicalX/Y`, `physicalWidth/Height`, `ppi`, `rotation`, `displayName`, `bezels`. |
-| `sourceImage` | Uploaded image + transform in physical space (position, size, rotation). |
+| `images`, `selectedImageId` | Image layers, bottom to top (index 0 drawn first), each with `id` + transform in physical space (position, size, rotation). `images[0]` is the *primary* image: its position is what saved layouts / share links store, and it drives blur fill. `getFocusImage` = selected layer, or the only layer. Selecting an image clears `selectedMonitorId` and vice versa. |
 | `canvasScale`, `canvasOffsetX/Y` | Pan/zoom of the physical canvas (pixels per inch; limits in store constants). |
 | `windowsArrangement` | Virtual layout: `{ monitorId, pixelX, pixelY }[]`. When `useWindowsArrangement` is false, this is regenerated from physical order (left-to-right, top-aligned). |
 | `activeTab` | `'physical' \| 'windows' \| 'preview'`. |
 | `fillMode`, `fillSolidColor` | How to fill empty output area (solid, blur, transparent). |
 | `activeLayoutName`, `loadedLayoutImagePosition` | Set when loading/saving a layout; used for image position restore and bookmark key. |
-| Undo/redo | `_undoStack`, `_redoStack`, `_continuousKey` (internal). Snapshots include monitors, sourceImage, windowsArrangement, useWindowsArrangement, selectedMonitorId. |
+| Undo/redo | `_undoStack`, `_redoStack`, `_continuousKey` (internal). Snapshots include monitors, images, selectedImageId, windowsArrangement, useWindowsArrangement, selectedMonitorId. |
 
 ### 4.2 Key actions (examples)
 
 - **Layout:** `ADD_MONITOR`, `REMOVE_MONITOR`, `MOVE_MONITOR`, `ROTATE_MONITOR`, `DUPLICATE_MONITOR`, `SET_MONITOR_BEZELS`, `SET_MONITOR_DISPLAY_NAME`, `LOAD_LAYOUT`, `CLEAR_ALL_MONITORS`.
-- **Image:** `SET_SOURCE_IMAGE`, `CLEAR_SOURCE_IMAGE`, `MOVE_IMAGE`, `SCALE_IMAGE`, `SET_IMAGE_TRANSFORM`, `ROTATE_SOURCE_IMAGE`.
+- **Image:** `ADD_IMAGE`, `REPLACE_IMAGE`, `REMOVE_IMAGE`, `CLEAR_ALL_IMAGES`, `SELECT_IMAGE`, `REORDER_IMAGE` (front/back/forward/backward), `MOVE_IMAGE`, `SET_IMAGE_TRANSFORM`, `ROTATE_IMAGE` (all keyed by image `id`).
 - **Canvas:** `SET_CANVAS_SCALE`, `PAN_CANVAS`, `SET_CANVAS_OFFSET`; `TOGGLE_SNAP`, `TOGGLE_SMART_ALIGN`, `SET_GRID_SIZE`.
 - **Virtual:** `SET_USE_WINDOWS_ARRANGEMENT`, `MOVE_WINDOWS_MONITOR`, `SYNC_WINDOWS_ARRANGEMENT`.
 - **UI/Modals:** `SET_ACTIVE_TAB`, `SET_SHOW_HOW_IT_WORKS`, `SET_SHOW_TROUBLESHOOTING_GUIDE`, `SET_EYEDROPPER_ACTIVE`, `SET_PRESETS_SIDEBAR_COLLAPSED`.
@@ -120,7 +120,7 @@ Single source of truth for “where the layout wants the image” is **`loadedLa
 - **Load saved layout** (from list) → `LOAD_LAYOUT` with `config.imagePosition` → store sets `loadedLayoutImagePosition`.
 - **Open shared link** → decode URL → `LOAD_LAYOUT` with `imagePosition` from URL → store sets `loadedLayoutImagePosition`.
 - **Save layout** (with no image) → we save `state.loadedLayoutImagePosition` into the config.
-- **Remove image** → `CLEAR_SOURCE_IMAGE` reducer sets `loadedLayoutImagePosition` to the position the image had (so “move → remove → save” keeps the moved position).
+- **Remove image** → `REMOVE_IMAGE` of the primary (bottom) image, or `CLEAR_ALL_IMAGES`, sets `loadedLayoutImagePosition` to the position that image had (so “move → remove → save” keeps the moved position).
 
 **When it is cleared / not set**
 
@@ -129,9 +129,9 @@ Single source of truth for “where the layout wants the image” is **`loadedLa
 
 **Rules that must stay consistent**
 
-1. **Share URL:** `imagePosition` = `state.sourceImage` position if present, else `state.loadedLayoutImagePosition`. (So “load layout → share with no image” still puts position in the link.)
+1. **Share URL:** `imagePosition` = primary image (`images[0]`) position if present, else `state.loadedLayoutImagePosition`. (So “load layout → share with no image” still puts position in the link.)
 2. **Save layout:** `imagePosition` = current image position if there is an image, else `loadedLayoutImagePosition`. (So “load link → save with no image” or “move → remove → save” both retain the right position.)
-3. **Upload image:** Prefer `loadedLayoutImagePosition`, then bookmark for `activeLayoutName`, then center.
+3. **Upload image:** For the first image, prefer `loadedLayoutImagePosition`, then bookmark for `activeLayoutName`, then center. Additional images fill the monitor they were dropped on (or the selected monitor), else center. Only the primary image position is persisted.
 
 ---
 
@@ -159,7 +159,9 @@ PPI and physical size: `utils.ts` (and store when creating monitors) use `ppi = 
 | `src/utils.ts` | PPI/physical size helpers; `createMonitor`; display name resolution. |
 | `src/presets.ts` | Built-in monitor presets (laptops, standard, ultrawide, etc.). |
 | `src/canvasConstants.ts` | Physical canvas bounds (inches) and center (for preloaded layout centering). |
-| `src/generateOutput.ts` | Stitching: rotated image canvas, per-monitor crop at native PPI, placement by `windowsArrangement`, fill for empty area. |
+| `src/generateOutput.ts` | Stitching: for each monitor strip, draws every image layer bottom→top (clipped to the strip) at native PPI, placement by `windowsArrangement`, fill for empty area. |
+| `src/imageLoading.ts` | Decode image files; `computeImagePlacement` (replace keeps footprint; first image uses layout position → bookmark → view center; extra images fill a target monitor or center on a point). |
+| `src/useAddImageFiles.ts` | Hook used by toolbar upload and canvas drop: loads files and dispatches `ADD_IMAGE` / `REPLACE_IMAGE`. |
 | **Layout encoding & persistence** | |
 | `src/urlLayout.ts` | Encode/decode layout and optional image position for share URL (compact JSON → LZ or base64url); `getLayoutFromHash` returns `{ monitors, imagePosition }`; `buildShareUrl`, `setLayoutHash`, `clearLayoutHash`. |
 | `src/viewportConstants.ts` | Breakpoints for responsive layout (phone &lt;768px, tablet 768–1024, desktop ≥1024). |
@@ -172,7 +174,7 @@ PPI and physical size: `utils.ts` (and store when creating monitors) use `ppi = 
 | `src/components/MonitorPresetsSidebar.tsx` | Preset list + custom monitor form; add by click or drag onto canvas. |
 | `src/components/Toolbar.tsx` | Top bar: layout dimensions (in/cm when set), recommended image size, undersized status, saved layouts (ConfigManager), Share Layout, ImageUpload. |
 | `src/components/PreviewPanel.tsx` | Live preview canvas from `generateOutput`; fill mode/color; eyedropper; download PNG/JPEG; troubleshooting link. |
-| `src/components/ImageUpload.tsx` | File input; creates `SourceImage` and dispatches `SET_SOURCE_IMAGE`; applies `loadedLayoutImagePosition` when relevant. |
+| `src/components/ImageUpload.tsx` | Toolbar image controls: upload / + Add Image (multi-file), focused image's Rotate / Replace / Remove, and the Layers dropdown (select, reorder, remove) when there are 2+ images. |
 | `src/components/ConfigManager.tsx` | Saved layouts: load, save, delete, export JSON, import JSON; quick layouts from preloaded; integrates with store and localStorage. |
 | `src/components/ShareButton.tsx` | Builds share URL from current monitors and image position (when present) via `buildShareUrl`, copies to clipboard. |
 | `src/components/MobileShell.tsx` | Phone (&lt;768px) informational view: hero, read-only layout summary from URL hash, “open on desktop” message, “Open full editor” button. |
@@ -209,7 +211,7 @@ Modals (About, Welcome, InfoDialog, TroubleshootingGuide) are rendered in `App` 
 |------|------------|----------|
 | `Monitor` | `types.ts` | In-store physical monitors; includes preset, physical position/size, ppi, rotation, bezels. |
 | `MonitorPreset` | `types.ts` | Name, diagonal, aspect ratio, resolution; from presets or custom. |
-| `SourceImage` | `types.ts` | Element, dimensions, physical transform, rotation. |
+| `SourceImage` | `types.ts` | One image layer: id, element, dimensions, physical transform, rotation. |
 | `WindowsMonitorPosition` | `types.ts` | Virtual layout: monitorId, pixelX, pixelY. |
 | `SavedConfig` | `types.ts` | Persisted layout: name, monitors (preset + physicalX/Y, rotation, displayName, bezels), optional imagePosition. |
 | `SavedImagePosition` | `types.ts` | x, y, width, height, aspectRatio (for restore/bookmark). |

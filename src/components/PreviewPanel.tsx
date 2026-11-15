@@ -42,7 +42,7 @@ export default function PreviewPanel() {
     }
 
     debounceRef.current = requestAnimationFrame(() => {
-      const result = generateOutput(state.monitors, state.sourceImage, state.windowsArrangement, {
+      const result = generateOutput(state.monitors, state.images, state.windowsArrangement, {
         mode: state.fillMode,
         solidColor: state.fillSolidColor,
       })
@@ -55,7 +55,7 @@ export default function PreviewPanel() {
         cancelAnimationFrame(debounceRef.current)
       }
     }
-  }, [state.monitors, state.sourceImage, state.windowsArrangement, state.fillMode, state.fillSolidColor])
+  }, [state.monitors, state.images, state.windowsArrangement, state.fillMode, state.fillSolidColor])
 
   // Draw preview
   useEffect(() => {
@@ -86,18 +86,18 @@ export default function PreviewPanel() {
     }
     ctx.drawImage(output.canvas, 0, 0, canvas.width, canvas.height)
 
-    // Draw monitor strip boundaries and labels (each at its actual position)
-    for (const strip of output.monitors) {
+    // Strip rects in preview pixels. Round each edge (not the width) so neighbouring strips share
+    // exactly the same boundary pixel instead of leaving a gap or overlap.
+    const stripRects = output.monitors.map(strip => {
       const x = Math.round(strip.stripX * displayScale)
       const y = Math.round(strip.stripY * displayScale)
-      const w = Math.round(strip.stripWidth * displayScale)
-      const h = Math.round(strip.stripHeight * displayScale)
+      const right = Math.round((strip.stripX + strip.stripWidth) * displayScale)
+      const bottom = Math.round((strip.stripY + strip.stripHeight) * displayScale)
+      return { strip, x, y, w: right - x, h: bottom - y }
+    })
 
-      ctx.strokeStyle = 'rgba(255,255,255,0.25)'
-      ctx.lineWidth = 1
-      ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1)
-
-      // Label at top of this monitor
+    // Labels at the top of each monitor
+    for (const { strip, x, y, w } of stripRects) {
       ctx.fillStyle = 'rgba(0,0,0,0.65)'
       ctx.fillRect(x, y, w, 18)
       ctx.fillStyle = 'rgba(255,255,255,0.8)'
@@ -106,14 +106,29 @@ export default function PreviewPanel() {
       const label = `${getMonitorDisplayName(strip.monitor)} (${strip.stripWidth}x${strip.stripHeight})`
       ctx.fillText(label, x + w / 2, y + 12, w - 4)
     }
+
+    // Strip boundaries as one path, after the labels so the lines run unbroken. Each edge sits on
+    // the strip's first pixel column/row (right/bottom edges on the pixel just past the strip, i.e.
+    // the neighbour's first pixel), so a shared edge between adjacent monitors is a single line.
+    ctx.beginPath()
+    for (const { x, y, w, h } of stripRects) {
+      const l = x + 0.5
+      const t = y + 0.5
+      const r = Math.min(x + w, canvas.width - 1) + 0.5
+      const b = Math.min(y + h, canvas.height - 1) + 0.5
+      ctx.rect(l, t, r - l, b - t)
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)'
+    ctx.lineWidth = 1
+    ctx.stroke()
   }, [output, state.fillMode])
 
   const getDefaultFilename = useCallback(() => {
     if (!output) return 'spanright'
-    const srcName = state.sourceImage?.fileName
+    const srcName = state.images[0]?.fileName
     const baseName = srcName ? srcName.replace(/\.[^.]+$/, '') : 'wallpaper'
     return `spanright-${baseName}-${output.width}x${output.height}`
-  }, [output, state.sourceImage])
+  }, [output, state.images])
 
   const openDownloadDialog = useCallback(() => {
     setDownloadFilename(getDefaultFilename())
@@ -154,8 +169,8 @@ export default function PreviewPanel() {
 
   // Close empty area popover when layout no longer has empty area
   useEffect(() => {
-    if (output && !output.hasBlackBars) setShowEmptyAreaOptions(false)
-  }, [output?.hasBlackBars])
+    if (output && !output.hasEmptyArea) setShowEmptyAreaOptions(false)
+  }, [output?.hasEmptyArea])
 
   const effectiveFormat = state.fillMode === 'transparent' ? 'png' : state.outputFormat
 
@@ -206,7 +221,7 @@ export default function PreviewPanel() {
           {isGenerating && (
             <span className="text-xs text-blue-400 animate-pulse">Generating...</span>
           )}
-          {!state.sourceImage && state.monitors.length > 0 && (
+          {state.images.length === 0 && state.monitors.length > 0 && (
             <span className="text-xs text-yellow-500">Upload an image to preview output</span>
           )}
         </div>
@@ -224,10 +239,10 @@ export default function PreviewPanel() {
               <button
                 ref={emptyAreaTriggerRef}
                 type="button"
-                onClick={() => output?.hasBlackBars && setShowEmptyAreaOptions((v) => !v)}
-                disabled={!output?.hasBlackBars}
+                onClick={() => output?.hasEmptyArea && setShowEmptyAreaOptions((v) => !v)}
+                disabled={!output?.hasEmptyArea}
                 className="text-xs bg-gray-800 border border-gray-700 rounded px-2 py-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700"
-                title={output?.hasBlackBars ? 'Options for empty area (regions not covered by the image)' : 'No empty area in this setup'}
+                title={output?.hasEmptyArea ? 'Options for empty area (regions not covered by any image)' : 'No empty area in this setup'}
               >
                 Empty area options
               </button>
@@ -238,9 +253,15 @@ export default function PreviewPanel() {
                   >
                     {/* Banner first — always on top of color/fill controls */}
                     <div className="px-3 py-2 bg-gray-800/80 border-b border-gray-700/50 space-y-1">
-                      <p className="text-xs text-gray-400">
-                        Empty area is normal. It fills the space around your displays and won&apos;t be visible on the monitors.
-                      </p>
+                      {output?.hasUncoveredMonitorArea ? (
+                        <p className="text-xs text-yellow-500/90">
+                          Part of a monitor isn&apos;t covered by any image, so that area will show this fill on screen.
+                        </p>
+                      ) : (
+                        <p className="text-xs text-gray-400">
+                          Empty area is normal. It fills the space around your displays and won&apos;t be visible on the monitors.
+                        </p>
+                      )}
                       <p className="text-xs text-gray-500">
                         {state.fillMode === 'solid'
                           ? 'Fill: Solid color'
@@ -256,7 +277,7 @@ export default function PreviewPanel() {
                           value={state.fillMode}
                           onChange={(e) => dispatch({ type: 'SET_FILL_MODE', mode: e.target.value as FillMode })}
                           className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
-                          title="Fill mode for empty area (regions not covered by the image)"
+                          title="Fill mode for empty area (regions not covered by any image)"
                         >
                           <option value="solid">Solid color</option>
                           <option value="blur">Blurred edge extension</option>
@@ -341,7 +362,7 @@ export default function PreviewPanel() {
             <div className="relative" ref={downloadPopoverRef}>
               <button
                 onClick={openDownloadDialog}
-                disabled={!state.sourceImage}
+                disabled={state.images.length === 0}
                 className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white text-xs py-1 px-2.5 rounded border border-gray-600 disabled:border-gray-700 transition-colors flex items-center gap-1.5"
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

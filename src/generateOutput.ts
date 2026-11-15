@@ -62,8 +62,12 @@ export interface OutputResult {
   width: number
   height: number
   monitors: { monitor: Monitor; stripWidth: number; stripHeight: number; stripX: number; stripY: number }[]
-  /** True when the output contains black fill (vertical offsets or different strip heights) */
+  /** True when the bounding box has area outside every monitor (vertical offsets or different strip heights) */
   hasBlackBars: boolean
+  /** True when some on-screen monitor area is not covered by any image, so it shows the fill */
+  hasUncoveredMonitorArea: boolean
+  /** Either kind of empty area: the fill options matter */
+  hasEmptyArea: boolean
 }
 
 /**
@@ -81,12 +85,30 @@ export interface OutputResult {
  * 2. Output dimensions = (maxX - minX) × (maxY - minY).
  * 3. For each monitor, draw its strip at (pixelX - minX, pixelY - minY).
  */
+/**
+ * Whether integer rects (strip pixel coords) fully cover a w×h strip.
+ * Coordinate compression: split the strip at every rect edge, then check each cell.
+ */
+function isStripCovered(w: number, h: number, rects: { l: number; t: number; r: number; b: number }[]): boolean {
+  if (rects.length === 0) return false
+  const xs = [...new Set([0, w, ...rects.flatMap(rc => [rc.l, rc.r])])].sort((a, b) => a - b)
+  const ys = [...new Set([0, h, ...rects.flatMap(rc => [rc.t, rc.b])])].sort((a, b) => a - b)
+  for (let i = 0; i < xs.length - 1; i++) {
+    const cx = (xs[i] + xs[i + 1]) / 2
+    for (let j = 0; j < ys.length - 1; j++) {
+      const cy = (ys[j] + ys[j + 1]) / 2
+      if (!rects.some(rc => cx > rc.l && cx < rc.r && cy > rc.t && cy < rc.b)) return false
+    }
+  }
+  return true
+}
+
 /** Blur radius (px) for blurred-edge fill. */
 const FILL_BLUR_RADIUS_PX = 80
 
 export function generateOutput(
   monitors: Monitor[],
-  sourceImage: SourceImage | null,
+  images: SourceImage[],
   windowsArrangement: WindowsMonitorPosition[],
   fill?: FillSettings,
 ): OutputResult | null {
@@ -132,12 +154,13 @@ export function generateOutput(
   // 'transparent' and 'blur': canvas stays default (transparent); we composite on top
 
   const monitorStrips: OutputResult['monitors'] = []
+  let hasUncoveredMonitorArea = false
 
-  // One-time: get source element (original or rotated canvas)
-  const sourceElement =
-    sourceImage && (sourceImage.rotation ?? 0) !== 0
-      ? rotatedImageCanvas(sourceImage)
-      : sourceImage?.element ?? null
+  // One-time per layer: source element (original or rotated canvas). Bottom layer first.
+  const layers = images.map(img => ({
+    image: img,
+    element: ((img.rotation ?? 0) !== 0 ? rotatedImageCanvas(img) : img.element) as HTMLImageElement | HTMLCanvasElement,
+  }))
 
   for (const wp of winPosList) {
     const monitor = monitorMap.get(wp.monitorId)!
@@ -146,11 +169,22 @@ export function generateOutput(
     const drawX = Math.round(wp.pixelX - minX)
     const drawY = Math.round(wp.pixelY - minY)
 
-    if (sourceImage && sourceElement) {
-      const monLeft = monitor.physicalX
-      const monTop = monitor.physicalY
-      const monRight = monLeft + monitor.physicalWidth
-      const monBottom = monTop + monitor.physicalHeight
+    const monLeft = monitor.physicalX
+    const monTop = monitor.physicalY
+    const monRight = monLeft + monitor.physicalWidth
+    const monBottom = monTop + monitor.physicalHeight
+    const monScaleX = sw / monitor.physicalWidth
+    const monScaleY = sh / monitor.physicalHeight
+
+    // Clip to this monitor's strip so a layer can never bleed into a neighbouring strip
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(drawX, drawY, sw, sh)
+    ctx.clip()
+    // Image footprints on this strip, rounded to whole pixels (sub-pixel slivers don't count as empty)
+    const covered: { l: number; t: number; r: number; b: number }[] = []
+
+    for (const { image: sourceImage, element: sourceElement } of layers) {
       const imgLeft = sourceImage.physicalX
       const imgTop = sourceImage.physicalY
       const imgW = sourceImage.physicalWidth
@@ -166,8 +200,6 @@ export function generateOutput(
           sourceImage, imgLeft, imgTop, imgW, imgH,
           intLeft, intTop, intRight, intBottom
         )
-        const monScaleX = sw / monitor.physicalWidth
-        const monScaleY = sh / monitor.physicalHeight
         const dstX = (intLeft - monLeft) * monScaleX
         const dstY = (intTop - monTop) * monScaleY
         const dstW = (intRight - intLeft) * monScaleX
@@ -178,14 +210,25 @@ export function generateOutput(
           srcX, srcY, srcW, srcH,
           drawX + dstX, drawY + dstY, dstW, dstH
         )
+        const rc = {
+          l: Math.max(0, Math.round(dstX)),
+          t: Math.max(0, Math.round(dstY)),
+          r: Math.min(sw, Math.round(dstX + dstW)),
+          b: Math.min(sh, Math.round(dstY + dstH)),
+        }
+        if (rc.l < rc.r && rc.t < rc.b) covered.push(rc)
       }
     }
+    if (!hasUncoveredMonitorArea && !isStripCovered(sw, sh, covered)) hasUncoveredMonitorArea = true
 
+    ctx.restore()
     monitorStrips.push({ monitor, stripWidth: sw, stripHeight: sh, stripX: drawX, stripY: drawY })
   }
 
-  // Blur fill: draw source scaled-to-cover with heavy blur, then composite sharp strips on top
-  if (fillMode === 'blur' && sourceImage && sourceElement) {
+  // Blur fill: draw the primary (bottom) image scaled-to-cover with heavy blur, then composite sharp strips on top
+  const primary = layers[0]
+  if (fillMode === 'blur' && primary) {
+    const sourceElement = primary.element
     const blurCanvas = document.createElement('canvas')
     blurCanvas.width = totalWidth
     blurCanvas.height = totalHeight
@@ -230,5 +273,7 @@ export function generateOutput(
     height: totalHeight,
     monitors: monitorStrips,
     hasBlackBars,
+    hasUncoveredMonitorArea,
+    hasEmptyArea: hasBlackBars || hasUncoveredMonitorArea,
   }
 }
