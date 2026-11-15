@@ -154,8 +154,8 @@ export default function PreviewPanel() {
 
   // Close empty area popover when layout no longer has empty area
   useEffect(() => {
-    if (output && !output.hasBlackBars) setShowEmptyAreaOptions(false)
-  }, [output?.hasBlackBars])
+    if (output && !output.hasEmptyArea) setShowEmptyAreaOptions(false)
+  }, [output?.hasEmptyArea])
 
   const effectiveFormat = state.fillMode === 'transparent' ? 'png' : state.outputFormat
 
@@ -224,10 +224,10 @@ export default function PreviewPanel() {
               <button
                 ref={emptyAreaTriggerRef}
                 type="button"
-                onClick={() => output?.hasBlackBars && setShowEmptyAreaOptions((v) => !v)}
-                disabled={!output?.hasBlackBars}
+                onClick={() => output?.hasEmptyArea && setShowEmptyAreaOptions((v) => !v)}
+                disabled={!output?.hasEmptyArea}
                 className="text-xs bg-gray-800 border border-gray-700 rounded px-2 py-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700"
-                title={output?.hasBlackBars ? 'Options for empty area (regions not covered by the image)' : 'No empty area in this setup'}
+                title={output?.hasEmptyArea ? 'Options for empty area (regions not covered by any image)' : 'No empty area in this setup'}
               >
                 Empty area options
               </button>
@@ -238,9 +238,15 @@ export default function PreviewPanel() {
                   >
                     {/* Banner first — always on top of color/fill controls */}
                     <div className="px-3 py-2 bg-gray-800/80 border-b border-gray-700/50 space-y-1">
-                      <p className="text-xs text-gray-400">
-                        Empty area is normal. It fills the space around your displays and won&apos;t be visible on the monitors.
-                      </p>
+                      {output?.hasUncoveredMonitorArea ? (
+                        <p className="text-xs text-yellow-500/90">
+                          Part of a monitor isn&apos;t covered by any image, so that area will show this fill on screen.
+                        </p>
+                      ) : (
+                        <p className="text-xs text-gray-400">
+                          Empty area is normal. It fills the space around your displays and won&apos;t be visible on the monitors.
+                        </p>
+                      )}
                       <p className="text-xs text-gray-500">
                         {state.fillMode === 'solid'
                           ? 'Fill: Solid color'
@@ -256,7 +262,7 @@ export default function PreviewPanel() {
                           value={state.fillMode}
                           onChange={(e) => dispatch({ type: 'SET_FILL_MODE', mode: e.target.value as FillMode })}
                           className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-blue-500"
-                          title="Fill mode for empty area (regions not covered by the image)"
+                          title="Fill mode for empty area (regions not covered by any image)"
                         >
                           <option value="solid">Solid color</option>
                           <option value="blur">Blurred edge extension</option>

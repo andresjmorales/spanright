@@ -40,6 +40,10 @@ function getMonitorColor(index: number): string {
 const RULER_SIZE = 24
 /** Max zoom percentage (derived from scale constants in store). */
 const ZOOM_PCT_MAX = (CANVAS_SCALE_MAX / DEFAULT_CANVAS_SCALE) * 100
+/** Image opacity on the editor canvas: one image keeps the original look; stacked layers are more opaque
+ * so overlapping layers read clearly instead of blending into each other. */
+const SINGLE_IMAGE_OPACITY = 0.7
+const LAYERED_IMAGE_OPACITY = 0.85
 const SMART_ALIGN_THRESHOLD_PX = 8
 const SMART_ALIGN_RESIZE_THRESHOLD_PX = 0.5
 
@@ -1244,7 +1248,7 @@ export default function EditorCanvas() {
           image={getDisplayImage(img)}
           width={w}
           height={h}
-          opacity={0.7}
+          opacity={state.images.length > 1 ? LAYERED_IMAGE_OPACITY : SINGLE_IMAGE_OPACITY}
           onTransform={isSel ? handleImageTransform : undefined}
           onTransformEnd={isSel ? handleImageTransformEnd : undefined}
         />
