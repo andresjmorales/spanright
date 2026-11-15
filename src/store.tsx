@@ -13,7 +13,8 @@ export const DEFAULT_CANVAS_SCALE = 10
 
 interface UndoableSnapshot {
   monitors: Monitor[]
-  sourceImage: SourceImage | null
+  images: SourceImage[]
+  selectedImageId: string | null
   windowsArrangement: WindowsMonitorPosition[]
   useWindowsArrangement: boolean
   selectedMonitorId: string | null
@@ -31,7 +32,10 @@ const DEFAULT_PRESET_GROUP_EXPANDED: Record<PresetGroupId, boolean> = {
 
 interface State {
   monitors: Monitor[]
-  sourceImage: SourceImage | null
+  /** Image layers, bottom to top (index 0 is drawn first). */
+  images: SourceImage[]
+  /** Selected image layer (mutually exclusive with selectedMonitorId). */
+  selectedImageId: string | null
   canvasScale: number
   canvasOffsetX: number
   canvasOffsetY: number
@@ -80,12 +84,15 @@ type Action =
   | { type: 'CLEAR_ALL_MONITORS' }
   | { type: 'MOVE_MONITOR'; id: string; x: number; y: number }
   | { type: 'SELECT_MONITOR'; id: string | null }
-  | { type: 'SET_SOURCE_IMAGE'; image: SourceImage }
-  | { type: 'CLEAR_SOURCE_IMAGE' }
-  | { type: 'ROTATE_SOURCE_IMAGE' }
-  | { type: 'MOVE_IMAGE'; x: number; y: number }
-  | { type: 'SCALE_IMAGE'; physicalWidth: number; physicalHeight: number }
-  | { type: 'SET_IMAGE_TRANSFORM'; x: number; y: number; physicalWidth: number; physicalHeight: number }
+  | { type: 'ADD_IMAGE'; image: SourceImage }
+  | { type: 'REPLACE_IMAGE'; id: string; image: SourceImage }
+  | { type: 'REMOVE_IMAGE'; id: string }
+  | { type: 'CLEAR_ALL_IMAGES' }
+  | { type: 'SELECT_IMAGE'; id: string | null }
+  | { type: 'REORDER_IMAGE'; id: string; to: ImageReorder }
+  | { type: 'ROTATE_IMAGE'; id: string }
+  | { type: 'MOVE_IMAGE'; id: string; x: number; y: number }
+  | { type: 'SET_IMAGE_TRANSFORM'; id: string; x: number; y: number; physicalWidth: number; physicalHeight: number }
   | { type: 'SET_CANVAS_SCALE'; scale: number }
   | { type: 'PAN_CANVAS'; dx: number; dy: number }
   | { type: 'SET_CANVAS_OFFSET'; x: number; y: number }
@@ -117,6 +124,42 @@ type Action =
   | { type: 'LOAD_LAYOUT'; monitors: { preset: MonitorPreset; physicalX: number; physicalY: number; rotation?: 0 | 90; displayName?: string; bezels?: Bezels }[]; layoutName?: string; imagePosition?: SavedImagePosition | null; windowsArrangement?: SavedWindowsPosition[] | null }
   | { type: 'UNDO' }
   | { type: 'REDO' }
+
+export type ImageReorder = 'front' | 'back' | 'forward' | 'backward'
+
+/** Image currently being edited: the selected layer, or the only layer when there is exactly one. */
+export function getFocusImage(state: { images: SourceImage[]; selectedImageId: string | null }): SourceImage | null {
+  if (state.selectedImageId) {
+    const sel = state.images.find(i => i.id === state.selectedImageId)
+    if (sel) return sel
+  }
+  return state.images.length === 1 ? state.images[0] : null
+}
+
+/** Primary image (bottom layer): used for saved/shared image position, blur fill, export filename. */
+export function getPrimaryImage(state: { images: SourceImage[] }): SourceImage | null {
+  return state.images[0] ?? null
+}
+
+function imageToSavedPosition(img: SourceImage): SavedImagePosition {
+  return {
+    x: img.physicalX,
+    y: img.physicalY,
+    width: img.physicalWidth,
+    height: img.physicalHeight,
+    aspectRatio: getSourceImageAspect(img),
+  }
+}
+
+function updateImage(state: State, id: string, fn: (img: SourceImage) => SourceImage): State {
+  let changed = false
+  const images = state.images.map(img => {
+    if (img.id !== id) return img
+    changed = true
+    return fn(img)
+  })
+  return changed ? { ...state, images } : state
+}
 
 const UNIT_STORAGE_KEY = 'spanright-unit'
 
@@ -160,7 +203,8 @@ function saveCustomPresets(presets: MonitorPreset[]) {
 
 const initialState: State = {
   monitors: [],
-  sourceImage: null,
+  images: [],
+  selectedImageId: null,
   canvasScale: DEFAULT_CANVAS_SCALE,
   canvasOffsetX: 50,
   canvasOffsetY: 50,
@@ -442,74 +486,85 @@ function reducer(state: State, action: Action): State {
       }
     }
     case 'SELECT_MONITOR':
-      return { ...state, selectedMonitorId: action.id }
-    case 'SET_SOURCE_IMAGE':
-      return { ...state, sourceImage: action.image }
-    case 'CLEAR_SOURCE_IMAGE': {
-      const retainedPosition: SavedImagePosition | null =
-        state.sourceImage
-          ? {
-              x: state.sourceImage.physicalX,
-              y: state.sourceImage.physicalY,
-              width: state.sourceImage.physicalWidth,
-              height: state.sourceImage.physicalHeight,
-              aspectRatio: getSourceImageAspect(state.sourceImage),
-            }
-          : null
+      return { ...state, selectedMonitorId: action.id, selectedImageId: action.id ? null : state.selectedImageId }
+    case 'ADD_IMAGE':
+      return { ...state, images: [...state.images, action.image], selectedImageId: action.image.id, selectedMonitorId: null }
+    case 'REPLACE_IMAGE': {
+      const idx = state.images.findIndex(i => i.id === action.id)
+      if (idx < 0) return state
+      const images = state.images.slice()
+      images[idx] = action.image
       return {
         ...state,
-        sourceImage: null,
-        loadedLayoutImagePosition: retainedPosition ?? state.loadedLayoutImagePosition,
+        images,
+        selectedImageId: state.selectedImageId === action.id ? action.image.id : state.selectedImageId,
       }
     }
-    case 'ROTATE_SOURCE_IMAGE': {
-      if (!state.sourceImage) return state
-      const r = state.sourceImage.rotation ?? 0
-      const next: 0 | 90 | 180 | 270 = r === 270 ? 0 : (r + 90) as 0 | 90 | 180 | 270
-      // A quarter turn swaps the image's physical footprint; keep it centered in place.
-      const img = state.sourceImage
-      const cx = img.physicalX + img.physicalWidth / 2
-      const cy = img.physicalY + img.physicalHeight / 2
+    case 'REMOVE_IMAGE': {
+      const idx = state.images.findIndex(i => i.id === action.id)
+      if (idx < 0) return state
+      // Removing the primary (bottom) image keeps its position as the layout's image position,
+      // so "move -> remove -> save/share" retains where the image was.
+      const retained = idx === 0 ? imageToSavedPosition(state.images[0]) : null
       return {
         ...state,
-        sourceImage: {
+        images: state.images.filter(i => i.id !== action.id),
+        selectedImageId: state.selectedImageId === action.id ? null : state.selectedImageId,
+        loadedLayoutImagePosition: retained ?? state.loadedLayoutImagePosition,
+      }
+    }
+    case 'CLEAR_ALL_IMAGES': {
+      if (state.images.length === 0) return state
+      return {
+        ...state,
+        images: [],
+        selectedImageId: null,
+        loadedLayoutImagePosition: imageToSavedPosition(state.images[0]),
+      }
+    }
+    case 'SELECT_IMAGE':
+      return { ...state, selectedImageId: action.id, selectedMonitorId: action.id ? null : state.selectedMonitorId }
+    case 'REORDER_IMAGE': {
+      const idx = state.images.findIndex(i => i.id === action.id)
+      if (idx < 0) return state
+      const last = state.images.length - 1
+      const target =
+        action.to === 'front' ? last :
+        action.to === 'back' ? 0 :
+        action.to === 'forward' ? Math.min(last, idx + 1) :
+        Math.max(0, idx - 1)
+      if (target === idx) return state
+      const images = state.images.slice()
+      const [img] = images.splice(idx, 1)
+      images.splice(target, 0, img)
+      return { ...state, images }
+    }
+    case 'ROTATE_IMAGE':
+      return updateImage(state, action.id, img => {
+        const r = img.rotation ?? 0
+        const next: 0 | 90 | 180 | 270 = r === 270 ? 0 : (r + 90) as 0 | 90 | 180 | 270
+        // A quarter turn swaps the image's physical footprint; keep it centered in place.
+        const cx = img.physicalX + img.physicalWidth / 2
+        const cy = img.physicalY + img.physicalHeight / 2
+        return {
           ...img,
           rotation: next,
           physicalX: cx - img.physicalHeight / 2,
           physicalY: cy - img.physicalWidth / 2,
           physicalWidth: img.physicalHeight,
           physicalHeight: img.physicalWidth,
-        },
-      }
-    }
+        }
+      })
     case 'MOVE_IMAGE':
-      return state.sourceImage
-        ? { ...state, sourceImage: { ...state.sourceImage, physicalX: action.x, physicalY: action.y } }
-        : state
-    case 'SCALE_IMAGE':
-      return state.sourceImage
-        ? {
-            ...state,
-            sourceImage: {
-              ...state.sourceImage,
-              physicalWidth: action.physicalWidth,
-              physicalHeight: action.physicalHeight,
-            },
-          }
-        : state
+      return updateImage(state, action.id, img => ({ ...img, physicalX: action.x, physicalY: action.y }))
     case 'SET_IMAGE_TRANSFORM':
-      return state.sourceImage
-        ? {
-            ...state,
-            sourceImage: {
-              ...state.sourceImage,
-              physicalX: action.x,
-              physicalY: action.y,
-              physicalWidth: action.physicalWidth,
-              physicalHeight: action.physicalHeight,
-            },
-          }
-        : state
+      return updateImage(state, action.id, img => ({
+        ...img,
+        physicalX: action.x,
+        physicalY: action.y,
+        physicalWidth: action.physicalWidth,
+        physicalHeight: action.physicalHeight,
+      }))
     case 'LOAD_LAYOUT': {
       const monitors = action.monitors.map(m =>
         createMonitor(m.preset, m.physicalX, m.physicalY, m.rotation ?? 0, m.displayName, m.bezels)
@@ -645,18 +700,20 @@ const DISCRETE_UNDOABLE: Record<string, string> = {
   'DUPLICATE_MONITOR': 'Duplicate monitor',
   'ROTATE_MONITOR': 'Rotate monitor',
   'CLEAR_ALL_MONITORS': 'Clear all monitors',
-  'SET_SOURCE_IMAGE': 'Load image',
-  'CLEAR_SOURCE_IMAGE': 'Remove image',
+  'ADD_IMAGE': 'Add image',
+  'REPLACE_IMAGE': 'Replace image',
+  'REMOVE_IMAGE': 'Remove image',
+  'CLEAR_ALL_IMAGES': 'Remove all images',
+  'REORDER_IMAGE': 'Reorder image',
   'SET_MONITOR_DISPLAY_NAME': 'Rename monitor',
   'LOAD_LAYOUT': 'Load layout',
   'SET_IMAGE_TRANSFORM': 'Resize image',
-  'ROTATE_SOURCE_IMAGE': 'Rotate image',
+  'ROTATE_IMAGE': 'Rotate image',
 }
 
 const CONTINUOUS_UNDOABLE: Record<string, string> = {
   'MOVE_MONITOR': 'Move monitor',
   'MOVE_IMAGE': 'Move image',
-  'SCALE_IMAGE': 'Resize image',
   // Bezel popover dispatches on every live-preview change; coalesce into one undo step
   'SET_MONITOR_BEZELS': 'Set bezels',
 }
@@ -664,13 +721,15 @@ const CONTINUOUS_UNDOABLE: Record<string, string> = {
 function getContinuousKey(action: Action): string {
   if (action.type === 'MOVE_MONITOR') return `MOVE_MONITOR:${action.id}`
   if (action.type === 'SET_MONITOR_BEZELS') return `SET_MONITOR_BEZELS:${action.id}`
+  if (action.type === 'MOVE_IMAGE') return `MOVE_IMAGE:${action.id}`
   return action.type
 }
 
 function takeSnapshot(state: State, label: string): UndoableSnapshot {
   return {
     monitors: state.monitors,
-    sourceImage: state.sourceImage,
+    images: state.images,
+    selectedImageId: state.selectedImageId,
     windowsArrangement: state.windowsArrangement,
     useWindowsArrangement: state.useWindowsArrangement,
     selectedMonitorId: state.selectedMonitorId,
@@ -682,7 +741,10 @@ function restoreSnapshot(state: State, snapshot: UndoableSnapshot): State {
   return {
     ...state,
     monitors: snapshot.monitors,
-    sourceImage: snapshot.sourceImage,
+    images: snapshot.images,
+    selectedImageId: snapshot.selectedImageId && snapshot.images.some(i => i.id === snapshot.selectedImageId)
+      ? snapshot.selectedImageId
+      : null,
     windowsArrangement: snapshot.windowsArrangement,
     useWindowsArrangement: snapshot.useWindowsArrangement,
     selectedMonitorId: snapshot.selectedMonitorId,

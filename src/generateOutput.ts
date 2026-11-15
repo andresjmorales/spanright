@@ -86,7 +86,7 @@ const FILL_BLUR_RADIUS_PX = 80
 
 export function generateOutput(
   monitors: Monitor[],
-  sourceImage: SourceImage | null,
+  images: SourceImage[],
   windowsArrangement: WindowsMonitorPosition[],
   fill?: FillSettings,
 ): OutputResult | null {
@@ -133,11 +133,11 @@ export function generateOutput(
 
   const monitorStrips: OutputResult['monitors'] = []
 
-  // One-time: get source element (original or rotated canvas)
-  const sourceElement =
-    sourceImage && (sourceImage.rotation ?? 0) !== 0
-      ? rotatedImageCanvas(sourceImage)
-      : sourceImage?.element ?? null
+  // One-time per layer: source element (original or rotated canvas). Bottom layer first.
+  const layers = images.map(img => ({
+    image: img,
+    element: ((img.rotation ?? 0) !== 0 ? rotatedImageCanvas(img) : img.element) as HTMLImageElement | HTMLCanvasElement,
+  }))
 
   for (const wp of winPosList) {
     const monitor = monitorMap.get(wp.monitorId)!
@@ -146,11 +146,20 @@ export function generateOutput(
     const drawX = Math.round(wp.pixelX - minX)
     const drawY = Math.round(wp.pixelY - minY)
 
-    if (sourceImage && sourceElement) {
-      const monLeft = monitor.physicalX
-      const monTop = monitor.physicalY
-      const monRight = monLeft + monitor.physicalWidth
-      const monBottom = monTop + monitor.physicalHeight
+    const monLeft = monitor.physicalX
+    const monTop = monitor.physicalY
+    const monRight = monLeft + monitor.physicalWidth
+    const monBottom = monTop + monitor.physicalHeight
+    const monScaleX = sw / monitor.physicalWidth
+    const monScaleY = sh / monitor.physicalHeight
+
+    // Clip to this monitor's strip so a layer can never bleed into a neighbouring strip
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(drawX, drawY, sw, sh)
+    ctx.clip()
+
+    for (const { image: sourceImage, element: sourceElement } of layers) {
       const imgLeft = sourceImage.physicalX
       const imgTop = sourceImage.physicalY
       const imgW = sourceImage.physicalWidth
@@ -166,8 +175,6 @@ export function generateOutput(
           sourceImage, imgLeft, imgTop, imgW, imgH,
           intLeft, intTop, intRight, intBottom
         )
-        const monScaleX = sw / monitor.physicalWidth
-        const monScaleY = sh / monitor.physicalHeight
         const dstX = (intLeft - monLeft) * monScaleX
         const dstY = (intTop - monTop) * monScaleY
         const dstW = (intRight - intLeft) * monScaleX
@@ -181,11 +188,14 @@ export function generateOutput(
       }
     }
 
+    ctx.restore()
     monitorStrips.push({ monitor, stripWidth: sw, stripHeight: sh, stripX: drawX, stripY: drawY })
   }
 
-  // Blur fill: draw source scaled-to-cover with heavy blur, then composite sharp strips on top
-  if (fillMode === 'blur' && sourceImage && sourceElement) {
+  // Blur fill: draw the primary (bottom) image scaled-to-cover with heavy blur, then composite sharp strips on top
+  const primary = layers[0]
+  if (fillMode === 'blur' && primary) {
+    const sourceElement = primary.element
     const blurCanvas = document.createElement('canvas')
     blurCanvas.width = totalWidth
     blurCanvas.height = totalHeight

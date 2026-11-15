@@ -1,8 +1,8 @@
-import React, { useRef, useEffect, useCallback, useState, useMemo, type Dispatch } from 'react'
+import React, { useRef, useEffect, useLayoutEffect, useCallback, useState, useMemo, type Dispatch } from 'react'
 import { Stage, Layer, Rect, Text, Group, Image as KonvaImage, Line, Transformer } from 'react-konva'
 import type Konva from 'konva'
-import { useStore, CANVAS_SCALE_MIN, CANVAS_SCALE_MAX, DEFAULT_CANVAS_SCALE } from '../store'
-import { formatDimension, getMonitorsBoundingBox, getMonitorDisplayName, getBezelInches, adaptSavedPositionToAspectRatio, INCHES_PER_CM, getSourceImageAspect, getSourceImagePixelSize } from '../utils'
+import { useStore, getFocusImage, CANVAS_SCALE_MIN, CANVAS_SCALE_MAX, DEFAULT_CANVAS_SCALE, type ImageReorder } from '../store'
+import { formatDimension, getMonitorsBoundingBox, getMonitorDisplayName, getBezelInches, adaptSavedPositionToAspectRatio, INCHES_PER_CM, getSourceImageAspect, getSourceImagePixelSize, getCoverRect } from '../utils'
 import { useToast } from './Toast'
 import { IconUndo, IconRedo, IconCheck, IconKebabVertical } from '../icons'
 import type { Monitor, SourceImage, Bezels } from '../types'
@@ -19,6 +19,8 @@ import {
   deleteImagePositionBookmark,
 } from '../imagePositionStorage'
 import EditorShortcutsDialog from './EditorShortcutsDialog'
+import { useAddImageFiles } from '../useAddImageFiles'
+import { monitorAtPoint } from '../imageLoading'
 
 const MONITOR_COLORS = [
   '#3b82f6', // blue
@@ -347,27 +349,44 @@ function RulerOverlay({
 export default function EditorCanvas() {
   const { state, dispatch, canUndo, canRedo, undoLabel, redoLabel } = useStore()
   const toast = useToast()
-  // The image as displayed: the original element, or a pre-rotated canvas so the Konva node
-  // (and its transformer / buttons) never needs a rotation of its own.
-  const sourceElement = state.sourceImage?.element
-  const sourceRotation = state.sourceImage?.rotation ?? 0
-  const displayImage = useMemo(() => {
-    if (!state.sourceImage) return null
-    return sourceRotation === 0 ? state.sourceImage.element : rotatedImageCanvas(state.sourceImage)
-    // Only the element and rotation affect the pixels; position/size changes must not re-rotate.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceElement, sourceRotation])
+  const addImageFiles = useAddImageFiles()
+  // Each layer as displayed: the original element, or a pre-rotated canvas so the Konva node
+  // (and its transformer / buttons) never needs a rotation of its own. Cached per element+rotation
+  // so position/size changes never re-rotate.
+  const rotatedCacheRef = useRef(new WeakMap<HTMLImageElement, Map<number, HTMLCanvasElement>>())
+  const getDisplayImage = useCallback((img: SourceImage): HTMLImageElement | HTMLCanvasElement => {
+    const rot = img.rotation ?? 0
+    if (rot === 0) return img.element
+    let byRot = rotatedCacheRef.current.get(img.element)
+    if (!byRot) {
+      byRot = new Map()
+      rotatedCacheRef.current.set(img.element, byRot)
+    }
+    let canvas = byRot.get(rot)
+    if (!canvas) {
+      canvas = rotatedImageCanvas(img)
+      byRot.set(rot, canvas)
+    }
+    return canvas
+  }, [])
+  /** Selected image layer (gets the transformer and on-canvas controls). */
+  const selectedImage = state.images.find(i => i.id === state.selectedImageId) ?? null
+  const imageSelected = !!selectedImage
+  /** Image that image-wide actions (size to fit, S key) apply to: selected, or the only one. */
+  const focusImage = getFocusImage(state)
+  const hasImages = state.images.length > 0
+  const selectImage = useCallback((id: string | null) => dispatch({ type: 'SELECT_IMAGE', id }), [dispatch])
   const containerRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<Konva.Stage>(null)
+  /** Konva node of the selected image layer (transformer target). */
   const imageRef = useRef<Konva.Image>(null)
+  /** On-canvas controls (kebab + delete) of the selected image; moved imperatively during drag/resize. */
+  const imageControlsRef = useRef<Konva.Group>(null)
   const transformerRef = useRef<Konva.Transformer>(null)
   const [dimensions, setDimensions] = useState({ width: 800, height: 500 })
   const [isDraggingCanvas, setIsDraggingCanvas] = useState(false)
   const [isDragOverCanvas, setIsDragOverCanvas] = useState(false)
   const lastPointerPos = useRef<{ x: number; y: number } | null>(null)
-  const [imageSelected, setImageSelected] = useState(false)
-  /** Delete (X) button position in Group coords during image resize so it tracks top-right; null when not transforming */
-  const [imageDeleteButtonPos, setImageDeleteButtonPos] = useState<{ x: number; y: number } | null>(null)
   const [showEditorShortcuts, setShowEditorShortcuts] = useState(false)
   const [renameMonitorId, setRenameMonitorId] = useState<string | null>(null)
   const [renameInputValue, setRenameInputValue] = useState('')
@@ -478,10 +497,9 @@ export default function EditorCanvas() {
 
       // Delete/Backspace: remove image when image selected, else remove selected monitor
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (imageSelected && state.sourceImage) {
+        if (selectedImage) {
           e.preventDefault()
-          dispatch({ type: 'CLEAR_SOURCE_IMAGE' })
-          setImageSelected(false)
+          dispatch({ type: 'REMOVE_IMAGE', id: selectedImage.id })
           toast('Image removed')
         } else if (state.selectedMonitorId) {
           dispatch({ type: 'REMOVE_MONITOR', id: state.selectedMonitorId })
@@ -494,8 +512,17 @@ export default function EditorCanvas() {
           dispatch({ type: 'SET_EYEDROPPER_ACTIVE', active: false })
         } else {
           dispatch({ type: 'SELECT_MONITOR', id: null })
-          setImageSelected(false)
+          selectImage(null)
         }
+      }
+      // Ctrl+] / Ctrl+[: bring forward / send backward; with Shift: to front / to back
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.code === 'BracketRight' || e.code === 'BracketLeft')) {
+        if (selectedImage && state.images.length > 1) {
+          e.preventDefault()
+          const up = e.code === 'BracketRight'
+          reorderImageRef.current(selectedImage.id, e.shiftKey ? (up ? 'front' : 'back') : (up ? 'forward' : 'backward'))
+        }
+        return
       }
       // F key to fit view
       if (e.key === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey) {
@@ -525,21 +552,25 @@ export default function EditorCanvas() {
         }
         return
       }
-      // Ctrl+Alt+I: Remove image (Ctrl+I is standard for Italic)
+      // Ctrl+Alt+I: Remove selected image, or all images when none is selected (Ctrl+I is standard for Italic)
       if ((e.ctrlKey || e.metaKey) && e.altKey && e.key.toLowerCase() === 'i') {
-        if (state.sourceImage) {
+        if (selectedImage) {
           e.preventDefault()
-          dispatch({ type: 'CLEAR_SOURCE_IMAGE' })
+          dispatch({ type: 'REMOVE_IMAGE', id: selectedImage.id })
           toast('Image removed')
+        } else if (state.images.length > 0) {
+          e.preventDefault()
+          dispatch({ type: 'CLEAR_ALL_IMAGES' })
+          toast(state.images.length > 1 ? 'All images removed' : 'Image removed')
         }
         return
       }
       // Ctrl+Alt+R: Reset canvas (Ctrl+Shift+R is browser hard reload)
       if ((e.ctrlKey || e.metaKey) && e.altKey && e.key.toLowerCase() === 'r') {
-        if (state.monitors.length > 0 || state.sourceImage) {
+        if (state.monitors.length > 0 || state.images.length > 0) {
           e.preventDefault()
           dispatch({ type: 'CLEAR_ALL_MONITORS' })
-          dispatch({ type: 'CLEAR_SOURCE_IMAGE' })
+          dispatch({ type: 'CLEAR_ALL_IMAGES' })
           toast.warning('Canvas reset')
         }
         return
@@ -547,16 +578,16 @@ export default function EditorCanvas() {
       // Arrow keys: nudge image when selected, else nudge selected monitor
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         const step = e.shiftKey ? MONITOR_NUDGE_STEP_COARSE_IN : e.ctrlKey ? MONITOR_NUDGE_STEP_LARGE_IN : MONITOR_NUDGE_STEP_IN
-        if (imageSelected && state.sourceImage) {
+        if (selectedImage) {
           e.preventDefault()
           let dx = 0, dy = 0
           if (e.key === 'ArrowLeft') dx = -step
           if (e.key === 'ArrowRight') dx = step
           if (e.key === 'ArrowUp') dy = -step
           if (e.key === 'ArrowDown') dy = step
-          const newX = state.snapToGrid ? Math.round((state.sourceImage.physicalX + dx) / state.gridSize) * state.gridSize : state.sourceImage.physicalX + dx
-          const newY = state.snapToGrid ? Math.round((state.sourceImage.physicalY + dy) / state.gridSize) * state.gridSize : state.sourceImage.physicalY + dy
-          dispatch({ type: 'MOVE_IMAGE', x: newX, y: newY })
+          const newX = state.snapToGrid ? Math.round((selectedImage.physicalX + dx) / state.gridSize) * state.gridSize : selectedImage.physicalX + dx
+          const newY = state.snapToGrid ? Math.round((selectedImage.physicalY + dy) / state.gridSize) * state.gridSize : selectedImage.physicalY + dy
+          dispatch({ type: 'MOVE_IMAGE', id: selectedImage.id, x: newX, y: newY })
         } else if (state.selectedMonitorId) {
           e.preventDefault()
           const mon = state.monitors.find(m => m.id === state.selectedMonitorId)
@@ -576,15 +607,15 @@ export default function EditorCanvas() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [
-    imageSelected,
+    selectedImage,
+    selectImage,
     state.selectedMonitorId,
     state.monitors,
-    state.sourceImage,
+    state.images,
     state.snapToGrid,
     state.gridSize,
     state.eyedropperActive,
     state.smartAlign,
-    state.sourceImage,
     canUndo,
     canRedo,
     undoLabel,
@@ -594,35 +625,43 @@ export default function EditorCanvas() {
     toast,
   ])
 
-  const handleSizeImageToFit = useCallback(() => {
-    if (!state.sourceImage || state.monitors.length === 0) return
-
-    const bbox = getMonitorsBoundingBox(state.monitors)
-    if (bbox.width <= 0 || bbox.height <= 0) return
-
-    const imageAspect = getSourceImageAspect(state.sourceImage)
+  /** Cover-fit an image layer to a physical rect (the whole layout, or one monitor). */
+  const sizeImageToRect = useCallback((img: SourceImage, rect: { x: number; y: number; width: number; height: number }, message: string) => {
+    if (rect.width <= 0 || rect.height <= 0) return
+    const imageAspect = getSourceImageAspect(img)
     if (!Number.isFinite(imageAspect) || imageAspect <= 0) return
-
-    const bboxAspect = bbox.width / bbox.height
-    let nextWidth: number
-    let nextHeight: number
-
-    // "Cover" fit: fully cover the monitor bounds, with overflow centered.
-    if (imageAspect > bboxAspect) {
-      nextHeight = bbox.height
-      nextWidth = nextHeight * imageAspect
-    } else {
-      nextWidth = bbox.width
-      nextHeight = nextWidth / imageAspect
-    }
-
-    const nextX = bbox.minX + (bbox.width - nextWidth) / 2
-    const nextY = bbox.minY + (bbox.height - nextHeight) / 2
-
+    const next = getCoverRect(imageAspect, rect)
     setActiveGuides([])
-    dispatch({ type: 'SET_IMAGE_TRANSFORM', x: nextX, y: nextY, physicalWidth: nextWidth, physicalHeight: nextHeight })
-    toast.success('Image sized to fit layout')
-  }, [state.sourceImage, state.monitors, dispatch, toast])
+    dispatch({ type: 'SET_IMAGE_TRANSFORM', id: img.id, x: next.x, y: next.y, physicalWidth: next.width, physicalHeight: next.height })
+    toast.success(message)
+  }, [dispatch, toast])
+
+  // "Cover" fit the focused image to the monitor bounds, with overflow centered.
+  const handleSizeImageToFit = useCallback(() => {
+    if (!focusImage || state.monitors.length === 0) return
+    const bbox = getMonitorsBoundingBox(state.monitors)
+    sizeImageToRect(focusImage, { x: bbox.minX, y: bbox.minY, width: bbox.width, height: bbox.height }, 'Image sized to fit layout')
+  }, [focusImage, state.monitors, sizeImageToRect])
+
+  const handleSizeImageToMonitor = useCallback((img: SourceImage, monitor: Monitor) => {
+    sizeImageToRect(
+      img,
+      { x: monitor.physicalX, y: monitor.physicalY, width: monitor.physicalWidth, height: monitor.physicalHeight },
+      `Image sized to fill ${getMonitorDisplayName(monitor)}`,
+    )
+  }, [sizeImageToRect])
+
+  const reorderImage = useCallback((id: string, to: ImageReorder) => {
+    const idx = state.images.findIndex(i => i.id === id)
+    const last = state.images.length - 1
+    if (idx < 0) return
+    if ((to === 'front' || to === 'forward') && idx === last) { toast('Already the top layer'); return }
+    if ((to === 'back' || to === 'backward') && idx === 0) { toast('Already the bottom layer'); return }
+    dispatch({ type: 'REORDER_IMAGE', id, to })
+    toast({ front: 'Brought to front', back: 'Sent to back', forward: 'Brought forward', backward: 'Sent backward' }[to])
+  }, [state.images, dispatch, toast])
+  const reorderImageRef = useRef(reorderImage)
+  reorderImageRef.current = reorderImage
 
   useEffect(() => {
     sizeImageToFitRef.current = handleSizeImageToFit
@@ -637,7 +676,7 @@ export default function EditorCanvas() {
       transformerRef.current.nodes([])
       transformerRef.current.getLayer()?.batchDraw()
     }
-  }, [imageSelected, state.sourceImage])
+  }, [imageSelected, selectedImage])
 
   const scale = state.canvasScale
 
@@ -776,7 +815,7 @@ export default function EditorCanvas() {
     if (state.eyedropperActive && e.evt.button === 0) {
       e.evt.preventDefault()
       const stage = stageRef.current
-      if (!stage || !state.sourceImage) {
+      if (!stage || state.images.length === 0) {
         toast.warning('Upload an image first to sample a color')
         dispatch({ type: 'SET_EYEDROPPER_ACTIVE', active: false })
         return
@@ -786,12 +825,14 @@ export default function EditorCanvas() {
       const cs = canvasStateRef.current
       const physX = (pointer.x - cs.offsetX) / cs.scale
       const physY = (pointer.y - cs.offsetY) / cs.scale
-      const img = state.sourceImage
-      if (physX >= img.physicalX && physX <= img.physicalX + img.physicalWidth &&
-          physY >= img.physicalY && physY <= img.physicalY + img.physicalHeight) {
+      // Sample the topmost layer under the cursor
+      const img = [...state.images].reverse().find(i =>
+        physX >= i.physicalX && physX <= i.physicalX + i.physicalWidth &&
+        physY >= i.physicalY && physY <= i.physicalY + i.physicalHeight)
+      if (img) {
         const u = (physX - img.physicalX) / img.physicalWidth
         const v = (physY - img.physicalY) / img.physicalHeight
-        const srcElement = displayImage ?? img.element
+        const srcElement = getDisplayImage(img)
         const { width: srcW, height: srcH } = getSourceImagePixelSize(img)
         const pixelX = Math.min(Math.floor(u * srcW), srcW - 1)
         const pixelY = Math.min(Math.floor(v * srcH), srcH - 1)
@@ -821,9 +862,9 @@ export default function EditorCanvas() {
     const stage = stageRef.current
     if (e.target === stage) {
       dispatch({ type: 'SELECT_MONITOR', id: null })
-      setImageSelected(false)
+      selectImage(null)
     }
-  }, [dispatch, state.eyedropperActive, state.sourceImage, displayImage, toast])
+  }, [dispatch, selectImage, state.eyedropperActive, state.images, getDisplayImage, toast])
 
   const handleMouseMove = useCallback((e: Konva.KonvaEventObject<MouseEvent>) => {
     if (isDraggingCanvas && lastPointerPos.current) {
@@ -901,73 +942,25 @@ export default function EditorCanvas() {
       return
     }
 
-    // Otherwise handle image file drop
-    const file = e.dataTransfer.files[0]
-    if (!file || !file.type.startsWith('image/')) return
-
-    const reader = new FileReader()
-    const loadedLayoutImagePosition = state.loadedLayoutImagePosition
-    const bookmarkPosition = loadedLayoutImagePosition
-      ? null
-      : getImagePositionBookmark(state.activeLayoutName ?? '_default')
-    reader.onload = (ev) => {
-      const img = new Image()
-      img.onload = () => {
-        const imgAspect = img.naturalWidth / img.naturalHeight
-        const sixFeet = 72 // inches
-        let physWidth = img.naturalHeight > img.naturalWidth ? sixFeet * imgAspect : sixFeet
-        let physHeight = img.naturalHeight > img.naturalWidth ? sixFeet : sixFeet / imgAspect
-        let physicalX: number
-        let physicalY: number
-        let usedSavedPosition: 'layout' | 'bookmark' | false = false
-
-        if (loadedLayoutImagePosition) {
-          const adapted = adaptSavedPositionToAspectRatio(loadedLayoutImagePosition, imgAspect)
-          physicalX = adapted.x
-          physicalY = adapted.y
-          physWidth = adapted.width
-          physHeight = adapted.height
-          usedSavedPosition = 'layout'
-        } else if (bookmarkPosition) {
-          const adapted = adaptSavedPositionToAspectRatio(bookmarkPosition, imgAspect)
-          physicalX = adapted.x
-          physicalY = adapted.y
-          physWidth = adapted.width
-          physHeight = adapted.height
-          usedSavedPosition = 'bookmark'
-        } else {
-          const container = containerRef.current
-          const viewW = container?.clientWidth ?? 800
-          const viewH = container?.clientHeight ?? 500
-          const centerPhysX = (viewW / 2 - state.canvasOffsetX) / state.canvasScale
-          const centerPhysY = (viewH / 2 - state.canvasOffsetY) / state.canvasScale
-          physicalX = centerPhysX - physWidth / 2
-          physicalY = centerPhysY - physHeight / 2
-        }
-
-        const sourceImage: SourceImage = {
-          element: img,
-          fileName: file.name,
-          naturalWidth: img.naturalWidth,
-          naturalHeight: img.naturalHeight,
-          physicalX,
-          physicalY,
-          physicalWidth: physWidth,
-          physicalHeight: physHeight,
-        }
-        dispatch({ type: 'SET_SOURCE_IMAGE', image: sourceImage })
-        if (usedSavedPosition === 'layout') {
-          toast.success('Image positioned from saved layout')
-        } else if (usedSavedPosition === 'bookmark') {
-          toast.success('Image positioned from bookmark')
-        } else {
-          toast.success(`Image loaded: ${file.name}`)
-        }
+    // Otherwise handle image file drop. Additional images dropped onto a monitor fill that monitor;
+    // elsewhere they are centered on the drop point.
+    const files = e.dataTransfer.files
+    if (files.length === 0) return
+    const container = containerRef.current
+    let center: { x: number; y: number } | undefined
+    if (container) {
+      const rect = container.getBoundingClientRect()
+      const cs = canvasStateRef.current
+      center = {
+        x: (e.clientX - rect.left - cs.offsetX) / cs.scale,
+        y: (e.clientY - rect.top - cs.offsetY) / cs.scale,
       }
-      img.src = ev.target?.result as string
     }
-    reader.readAsDataURL(file)
-  }, [state.canvasOffsetX, state.canvasOffsetY, state.canvasScale, state.activeLayoutName, state.loadedLayoutImagePosition, state.snapToGrid, state.gridSize, dispatch, toast])
+    addImageFiles(files, {
+      center,
+      targetMonitor: center ? monitorAtPoint(state.monitors, center.x, center.y) : null,
+    })
+  }, [state.canvasOffsetX, state.canvasOffsetY, state.canvasScale, state.monitors, state.snapToGrid, state.gridSize, addImageFiles, dispatch, toast])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -1049,8 +1042,7 @@ export default function EditorCanvas() {
         const b = getBezelInches(m)
         return { x: m.physicalX - b.left, y: m.physicalY - b.top, w: m.physicalWidth + b.left + b.right, h: m.physicalHeight + b.top + b.bottom, source: 'monitor' as const }
       })
-    if (state.sourceImage) {
-      const img = state.sourceImage
+    for (const img of state.images) {
       targets.push({ x: img.physicalX, y: img.physicalY, w: img.physicalWidth, h: img.physicalHeight, source: 'image' })
     }
 
@@ -1074,7 +1066,7 @@ export default function EditorCanvas() {
     }
 
     setActiveGuides(guides)
-  }, [state.smartAlign, state.monitors, state.sourceImage, scale, toPhysicalX, toPhysicalY, toCanvasX, toCanvasY])
+  }, [state.smartAlign, state.monitors, state.images, scale, toPhysicalX, toPhysicalY, toCanvasX, toCanvasY])
 
   const handleMonitorDragEnd = useCallback((monitor: Monitor, e: Konva.KonvaEventObject<DragEvent>) => {
     setActiveGuides([])
@@ -1088,20 +1080,8 @@ export default function EditorCanvas() {
     node.position({ x: toCanvasX(newPhysX), y: toCanvasY(newPhysY) })
   }, [dispatch, snap, toPhysicalX, toPhysicalY, toCanvasX, toCanvasY])
 
-  // Handle image drag (Group position is image center)
-  const handleImageDragMove = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
-    if (!state.smartAlign || !state.sourceImage) {
-      smartAlignSnappedRef.current = { x: false, y: false }
-      setActiveGuides([])
-      return
-    }
-    const node = e.target
-    const centerPhysX = toPhysicalX(node.x())
-    const centerPhysY = toPhysicalY(node.y())
-    const physX = centerPhysX - state.sourceImage.physicalWidth / 2
-    const physY = centerPhysY - state.sourceImage.physicalHeight / 2
-    const threshold = SMART_ALIGN_THRESHOLD_PX / scale
-
+  /** Align-assist targets for an image layer: every monitor plus every other image layer. */
+  const getImageAlignTargets = useCallback((img: SourceImage): AlignRect[] => {
     const targets: AlignRect[] = state.monitors.map(m => {
       const b = getBezelInches(m)
       return {
@@ -1110,10 +1090,41 @@ export default function EditorCanvas() {
         source: 'image' as const,
       }
     })
+    for (const other of state.images) {
+      if (other.id === img.id) continue
+      targets.push({ x: other.physicalX, y: other.physicalY, w: other.physicalWidth, h: other.physicalHeight, source: 'image' })
+    }
+    return targets
+  }, [state.monitors, state.images])
+
+  /** Keep the selected image's on-canvas controls at its top-right corner while Konva moves it. */
+  const syncImageControls = useCallback((topRightX: number, topRightY: number) => {
+    const controls = imageControlsRef.current
+    if (!controls || !Number.isFinite(topRightX) || !Number.isFinite(topRightY)) return
+    controls.position({ x: topRightX, y: topRightY })
+    controls.getLayer()?.batchDraw()
+  }, [])
+
+  // Handle image drag (Group position is image center)
+  const handleImageDragMove = useCallback((img: SourceImage, e: Konva.KonvaEventObject<DragEvent>) => {
+    const node = e.target
+    const halfW = img.physicalWidth * scale / 2
+    const halfH = img.physicalHeight * scale / 2
+    if (!state.smartAlign) {
+      smartAlignSnappedRef.current = { x: false, y: false }
+      setActiveGuides([])
+      syncImageControls(node.x() + halfW, node.y() - halfH)
+      return
+    }
+    const centerPhysX = toPhysicalX(node.x())
+    const centerPhysY = toPhysicalY(node.y())
+    const physX = centerPhysX - img.physicalWidth / 2
+    const physY = centerPhysY - img.physicalHeight / 2
+    const threshold = SMART_ALIGN_THRESHOLD_PX / scale
 
     const { snapDeltaX, snapDeltaY, guides } = computeAlignmentGuides(
-      physX, physY, state.sourceImage.physicalWidth, state.sourceImage.physicalHeight,
-      targets, threshold,
+      physX, physY, img.physicalWidth, img.physicalHeight,
+      getImageAlignTargets(img), threshold,
     )
 
     smartAlignSnappedRef.current = {
@@ -1125,33 +1136,52 @@ export default function EditorCanvas() {
       const snappedX = snapDeltaX !== null ? physX + snapDeltaX : physX
       const snappedY = snapDeltaY !== null ? physY + snapDeltaY : physY
       node.position({
-        x: toCanvasX(snappedX + state.sourceImage.physicalWidth / 2),
-        y: toCanvasY(snappedY + state.sourceImage.physicalHeight / 2),
+        x: toCanvasX(snappedX + img.physicalWidth / 2),
+        y: toCanvasY(snappedY + img.physicalHeight / 2),
       })
     }
+    syncImageControls(node.x() + halfW, node.y() - halfH)
 
     setActiveGuides(guides)
-  }, [state.smartAlign, state.sourceImage, state.monitors, scale, toPhysicalX, toPhysicalY, toCanvasX, toCanvasY])
+  }, [state.smartAlign, getImageAlignTargets, syncImageControls, scale, toPhysicalX, toPhysicalY, toCanvasX, toCanvasY])
 
-  const handleImageDragEnd = useCallback((e: Konva.KonvaEventObject<DragEvent>) => {
+  const handleImageDragEnd = useCallback((img: SourceImage, e: Konva.KonvaEventObject<DragEvent>) => {
     setActiveGuides([])
     smartAlignSnappedRef.current = { x: false, y: false }
     const node = e.target
-    if (!state.sourceImage) return
     const centerPhysX = toPhysicalX(node.x())
     const centerPhysY = toPhysicalY(node.y())
-    const newPhysX = centerPhysX - state.sourceImage.physicalWidth / 2
-    const newPhysY = centerPhysY - state.sourceImage.physicalHeight / 2
-    dispatch({ type: 'MOVE_IMAGE', x: newPhysX, y: newPhysY })
-  }, [dispatch, toPhysicalX, toPhysicalY, state.sourceImage])
+    const newPhysX = centerPhysX - img.physicalWidth / 2
+    const newPhysY = centerPhysY - img.physicalHeight / 2
+    dispatch({ type: 'MOVE_IMAGE', id: img.id, x: newPhysX, y: newPhysY })
+  }, [dispatch, toPhysicalX, toPhysicalY])
+
+  // Live resize of the selected image: keep controls on the corner and show align guides.
+  const handleImageTransform = useCallback(() => {
+    const n = imageRef.current
+    if (!n || !selectedImage) return
+    const absBox = n.getClientRect({ skipTransform: false })
+    syncImageControls(absBox.x + absBox.width, absBox.y)
+
+    if (state.smartAlign) {
+      const physX = toPhysicalX(absBox.x)
+      const physY = toPhysicalY(absBox.y)
+      const physW = absBox.width / scale
+      const physH = absBox.height / scale
+      const threshold = SMART_ALIGN_RESIZE_THRESHOLD_PX / scale
+      const { guides } = computeAlignmentGuides(
+        physX, physY, physW, physH, getImageAlignTargets(selectedImage), threshold,
+      )
+      setActiveGuides(guides)
+    }
+  }, [selectedImage, state.smartAlign, getImageAlignTargets, syncImageControls, scale, toPhysicalX, toPhysicalY])
 
   // Handle image transform (resize via handles). Transformer keeps one corner fixed (e.g. top-left
   // when dragging bottom-right); use that corner (bbox top-left) so the image doesn't jump on release.
   const handleImageTransformEnd = useCallback(() => {
-    setImageDeleteButtonPos(null)
     setActiveGuides([])
     const node = imageRef.current
-    if (!node || !state.sourceImage) return
+    if (!node || !selectedImage) return
 
     const scaleX = node.scaleX()
     const scaleY = node.scaleY()
@@ -1169,133 +1199,99 @@ export default function EditorCanvas() {
     node.scaleY(1)
     node.position({ x: 0, y: 0 })
 
-    dispatch({ type: 'SET_IMAGE_TRANSFORM', x: newPhysX, y: newPhysY, physicalWidth: newPhysW, physicalHeight: newPhysH })
-  }, [dispatch, scale, toPhysicalX, toPhysicalY, state.sourceImage])
+    dispatch({ type: 'SET_IMAGE_TRANSFORM', id: selectedImage.id, x: newPhysX, y: newPhysY, physicalWidth: newPhysW, physicalHeight: newPhysH })
+  }, [dispatch, scale, toPhysicalX, toPhysicalY, selectedImage])
 
-  // Render source image (wrapped in Group with delete button so they move together)
-  const imgW = state.sourceImage ? state.sourceImage.physicalWidth * scale : 0
-  const imgH = state.sourceImage ? state.sourceImage.physicalHeight * scale : 0
-  const imageNode = state.sourceImage && displayImage ? (
-    <Group
-      x={toCanvasX(state.sourceImage.physicalX) + imgW / 2}
-      y={toCanvasY(state.sourceImage.physicalY) + imgH / 2}
-      offset={{ x: imgW / 2, y: imgH / 2 }}
-      draggable
-      onClick={() => {
-        setImageSelected(true)
-        dispatch({ type: 'SELECT_MONITOR', id: null })
-        setImageMenuAt(null)
-      }}
-      onTap={() => {
-        setImageSelected(true)
-        dispatch({ type: 'SELECT_MONITOR', id: null })
-        setImageMenuAt(null)
-      }}
-      onContextMenu={(e) => {
-        e.evt.preventDefault()
-        contextMenuHandledRef.current = true
-        const stage = stageRef.current
-        if (!stage) return
-        const container = stage.container().getBoundingClientRect()
-        setImageSelected(true)
-        dispatch({ type: 'SELECT_MONITOR', id: null })
-        setContextMenu(null)
-        setImageMenuAt({
-          x: e.evt.clientX - container.left,
-          y: e.evt.clientY - container.top,
-        })
-      }}
-      onDragMove={handleImageDragMove}
-      onDragEnd={handleImageDragEnd}
-    >
-      <KonvaImage
-        ref={imageRef}
-        image={displayImage}
-        width={imgW}
-        height={imgH}
-        opacity={0.7}
-        onTransform={() => {
-          const n = imageRef.current
-          const group = n?.getParent()
-          if (!n || !group || !state.sourceImage) return
-          const relBox = n.getClientRect({ skipTransform: false, relativeTo: group })
-          const bx = relBox.x + relBox.width - 22
-          const by = relBox.y + 4
-          if (Number.isFinite(bx) && Number.isFinite(by)) setImageDeleteButtonPos({ x: bx, y: by })
+  const openImageMenuAt = useCallback((x: number, y: number) => {
+    setContextMenu(null)
+    setImageMenuAt({ x, y })
+  }, [])
 
-          if (state.smartAlign) {
-            const absBox = n.getClientRect({ skipTransform: false })
-            const physX = toPhysicalX(absBox.x)
-            const physY = toPhysicalY(absBox.y)
-            const physW = absBox.width / scale
-            const physH = absBox.height / scale
-            const threshold = SMART_ALIGN_RESIZE_THRESHOLD_PX / scale
-
-            const targets: AlignRect[] = state.monitors.map(m => {
-              const b = getBezelInches(m)
-              return {
-                x: m.physicalX - b.left, y: m.physicalY - b.top,
-                w: m.physicalWidth + b.left + b.right, h: m.physicalHeight + b.top + b.bottom,
-                source: 'image' as const,
-              }
-            })
-
-            const { guides } = computeAlignmentGuides(
-              physX, physY, physW, physH, targets, threshold,
-            )
-            setActiveGuides(guides)
-          }
+  // Render image layers bottom to top, each in a Group centered on the image
+  const imageNodes = state.images.map(img => {
+    const isSel = img.id === state.selectedImageId
+    const w = img.physicalWidth * scale
+    const h = img.physicalHeight * scale
+    const handleSelect = () => {
+      selectImage(img.id)
+      setImageMenuAt(null)
+      setContextMenu(null)
+    }
+    return (
+      <Group
+        key={img.id}
+        x={toCanvasX(img.physicalX) + w / 2}
+        y={toCanvasY(img.physicalY) + h / 2}
+        offset={{ x: w / 2, y: h / 2 }}
+        draggable
+        onClick={handleSelect}
+        onTap={handleSelect}
+        onDragStart={() => { if (!isSel) handleSelect() }}
+        onContextMenu={(e) => {
+          e.evt.preventDefault()
+          contextMenuHandledRef.current = true
+          const stage = stageRef.current
+          if (!stage) return
+          const container = stage.container().getBoundingClientRect()
+          selectImage(img.id)
+          openImageMenuAt(e.evt.clientX - container.left, e.evt.clientY - container.top)
         }}
-        onTransformEnd={handleImageTransformEnd}
-      />
-      {/* Kebab menu — left of X when selected; opens Size image to fit / Remove image */}
-      {imageSelected && (
+        onDragMove={(e) => handleImageDragMove(img, e)}
+        onDragEnd={(e) => handleImageDragEnd(img, e)}
+      >
+        <KonvaImage
+          ref={isSel ? imageRef : undefined}
+          image={getDisplayImage(img)}
+          width={w}
+          height={h}
+          opacity={0.7}
+          onTransform={isSel ? handleImageTransform : undefined}
+          onTransformEnd={isSel ? handleImageTransformEnd : undefined}
+        />
+      </Group>
+    )
+  })
+
+  // Kebab + delete for the selected image, drawn above monitors so they stay clickable.
+  // Group sits at the image's top-right corner; moved imperatively while dragging/resizing.
+  const imageControlsNode = selectedImage ? (() => {
+    const right = toCanvasX(selectedImage.physicalX + selectedImage.physicalWidth)
+    const top = toCanvasY(selectedImage.physicalY)
+    const removeSelected = () => {
+      setImageMenuAt(null)
+      dispatch({ type: 'REMOVE_IMAGE', id: selectedImage.id })
+      toast('Image removed')
+    }
+    const openMenu = () => {
+      const controls = imageControlsRef.current
+      const pos = controls ? controls.position() : { x: right, y: top }
+      openImageMenuAt(pos.x - 44, pos.y + 4 + 22)
+    }
+    return (
+      <Group ref={imageControlsRef} x={right} y={top}>
+        {/* Kebab menu — left of X; opens size / arrange / position / remove */}
         <Group
-          x={imageDeleteButtonPos ? imageDeleteButtonPos.x - 22 : imgW - 44}
-          y={imageDeleteButtonPos ? imageDeleteButtonPos.y : 4}
-          onClick={(e) => {
-            e.cancelBubble = true
-            const imgX = toCanvasX(state.sourceImage!.physicalX)
-            const imgY = toCanvasY(state.sourceImage!.physicalY)
-            setImageMenuAt({ x: imgX + imgW - 44, y: imgY + 4 + 22 })
-          }}
-          onTap={(e) => {
-            e.cancelBubble = true
-            const imgX = toCanvasX(state.sourceImage!.physicalX)
-            const imgY = toCanvasY(state.sourceImage!.physicalY)
-            setImageMenuAt({ x: imgX + imgW - 44, y: imgY + 4 + 22 })
-          }}
+          x={-44}
+          y={4}
+          onClick={(e) => { e.cancelBubble = true; openMenu() }}
+          onTap={(e) => { e.cancelBubble = true; openMenu() }}
         >
           <Rect width={18} height={18} fill="#475569" cornerRadius={3} />
           <Text x={3} y={2} text="⋮" fontSize={12} fill="#e2e8f0" />
         </Group>
-      )}
-      {/* Delete button — top-right, follows visual corner during resize (any handle) */}
-      {imageSelected && (
+        {/* Delete button — top-right, follows visual corner during resize (any handle) */}
         <Group
-          x={imageDeleteButtonPos ? imageDeleteButtonPos.x : imgW - 22}
-          y={imageDeleteButtonPos ? imageDeleteButtonPos.y : 4}
-          onClick={(e) => {
-            e.cancelBubble = true
-            setImageSelected(false)
-            setImageMenuAt(null)
-            dispatch({ type: 'CLEAR_SOURCE_IMAGE' })
-            toast('Image removed')
-          }}
-          onTap={(e) => {
-            e.cancelBubble = true
-            setImageSelected(false)
-            setImageMenuAt(null)
-            dispatch({ type: 'CLEAR_SOURCE_IMAGE' })
-            toast('Image removed')
-          }}
+          x={-22}
+          y={4}
+          onClick={(e) => { e.cancelBubble = true; removeSelected() }}
+          onTap={(e) => { e.cancelBubble = true; removeSelected() }}
         >
           <Rect width={18} height={18} fill="#ef4444" cornerRadius={3} />
           <Text x={4} y={1} text="✕" fontSize={12} fill="#ffffff" />
         </Group>
-      )}
-    </Group>
-  ) : null
+      </Group>
+    )
+  })() : null
 
   // Render monitors
   const monitorNodes = state.monitors.map((monitor, index) => {
@@ -1323,13 +1319,11 @@ export default function EditorCanvas() {
         onDragEnd={(e) => handleMonitorDragEnd(monitor, e)}
         onClick={() => {
           dispatch({ type: 'SELECT_MONITOR', id: monitor.id })
-          setImageSelected(false)
           setContextMenu(null)
           setImageMenuAt(null)
         }}
         onTap={() => {
           dispatch({ type: 'SELECT_MONITOR', id: monitor.id })
-          setImageSelected(false)
           setContextMenu(null)
           setImageMenuAt(null)
         }}
@@ -1345,7 +1339,6 @@ export default function EditorCanvas() {
             monitorId: monitor.id,
           })
           dispatch({ type: 'SELECT_MONITOR', id: monitor.id })
-          setImageSelected(false)
         }}
       >
         {/* Bezel overlay — extends outward from display edges */}
@@ -1563,7 +1556,7 @@ export default function EditorCanvas() {
           {originLines}
         </Layer>
         <Layer listening={!state.eyedropperActive}>
-          {imageNode}
+          {imageNodes}
           {/* Transformer for image resizing */}
           <Transformer
             ref={transformerRef}
@@ -1593,6 +1586,7 @@ export default function EditorCanvas() {
               listening={false}
             />
           ))}
+          {imageControlsNode}
         </Layer>
       </Stage>
 
@@ -1714,19 +1708,28 @@ export default function EditorCanvas() {
       })()}
 
       {/* Image kebab dropdown — Size image to fit, layout position, bookmark (apply/clear), Remove image */}
-      {imageMenuAt && state.sourceImage && (
+      {imageMenuAt && selectedImage && (
         <ImageKebabMenu
           x={imageMenuAt.x}
           y={imageMenuAt.y}
           canSizeToFit={state.monitors.length > 0}
+          monitors={state.monitors}
+          layerIndex={state.images.findIndex(i => i.id === selectedImage.id)}
+          layerCount={state.images.length}
+          onSizeImageToMonitor={(m) => handleSizeImageToMonitor(selectedImage, m)}
+          onReorder={(to) => reorderImage(selectedImage.id, to)}
           hasLayoutPosition={!!state.loadedLayoutImagePosition}
           savedPosition={(() => {
             const key = state.activeLayoutName ?? '_default'
             return getImagePositionBookmark(key)
           })()}
-          onSizeImageToFit={() => handleSizeImageToFit()}
+          onSizeImageToFit={() => sizeImageToRect(
+            selectedImage,
+            (() => { const b = getMonitorsBoundingBox(state.monitors); return { x: b.minX, y: b.minY, width: b.width, height: b.height } })(),
+            'Image sized to fit layout',
+          )}
           onSaveImagePosition={() => {
-            const img = state.sourceImage!
+            const img = selectedImage
             const key = state.activeLayoutName ?? '_default'
             setImagePositionBookmark(key, {
               x: img.physicalX,
@@ -1738,22 +1741,22 @@ export default function EditorCanvas() {
             toast.success(state.activeLayoutName ? `Image position bookmarked for '${state.activeLayoutName}'` : 'Image position bookmarked')
           }}
           onApplyLayoutPosition={() => {
-            const img = state.sourceImage!
+            const img = selectedImage
             const layoutPos = state.loadedLayoutImagePosition
             if (!layoutPos) return
             const ar = getSourceImageAspect(img)
             const { x, y, width, height } = adaptSavedPositionToAspectRatio(layoutPos, ar)
-            dispatch({ type: 'SET_IMAGE_TRANSFORM', x, y, physicalWidth: width, physicalHeight: height })
+            dispatch({ type: 'SET_IMAGE_TRANSFORM', id: img.id, x, y, physicalWidth: width, physicalHeight: height })
             toast.success('Image position from layout applied')
           }}
           onApplySavedPosition={() => {
-            const img = state.sourceImage!
+            const img = selectedImage
             const key = state.activeLayoutName ?? '_default'
             const saved = getImagePositionBookmark(key)
             if (!saved) return
             const ar = getSourceImageAspect(img)
             const { x, y, width, height } = adaptSavedPositionToAspectRatio(saved, ar)
-            dispatch({ type: 'SET_IMAGE_TRANSFORM', x, y, physicalWidth: width, physicalHeight: height })
+            dispatch({ type: 'SET_IMAGE_TRANSFORM', id: img.id, x, y, physicalWidth: width, physicalHeight: height })
             toast.success('Bookmarked position applied')
           }}
           onClearSavedPosition={() => {
@@ -1762,8 +1765,7 @@ export default function EditorCanvas() {
             toast('Bookmarked position cleared')
           }}
           onRemoveImage={() => {
-            setImageSelected(false)
-            dispatch({ type: 'CLEAR_SOURCE_IMAGE' })
+            dispatch({ type: 'REMOVE_IMAGE', id: selectedImage.id })
             toast('Image removed')
           }}
           onClose={() => setImageMenuAt(null)}
@@ -1810,9 +1812,10 @@ export default function EditorCanvas() {
         </button>
         <CanvasMenuInner
           hasMonitors={state.monitors.length > 0}
-          hasImage={!!state.sourceImage}
+          imageCount={state.images.length}
+          selectedImageId={selectedImage?.id ?? null}
           smartAlign={state.smartAlign}
-          canSizeImageToFit={state.monitors.length > 0 && !!state.sourceImage}
+          canSizeImageToFit={state.monitors.length > 0 && !!focusImage}
           onSizeImageToFit={handleSizeImageToFit}
           onOpenEditorShortcuts={() => setShowEditorShortcuts(true)}
           dispatch={dispatch}
@@ -1828,7 +1831,7 @@ export default function EditorCanvas() {
       <CanvasScrollbars
         dimensions={dimensions}
         monitors={state.monitors}
-        sourceImage={state.sourceImage}
+        images={state.images}
         canvasScale={state.canvasScale}
         canvasOffsetX={state.canvasOffsetX}
         canvasOffsetY={state.canvasOffsetY}
@@ -1917,7 +1920,7 @@ export default function EditorCanvas() {
       )}
 
       {/* Instructions overlay */}
-      {state.monitors.length === 0 && !state.sourceImage && (
+      {state.monitors.length === 0 && !hasImages && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="text-center text-gray-600">
             <div className="text-lg font-medium mb-1">Editor Canvas</div>
@@ -1939,14 +1942,21 @@ const imageMenuItemClass = 'w-full text-left px-3 py-2 text-xs text-gray-300 hov
  * Dropdown for image kebab: Size image to fit, layout position (if any), bookmark (bookmark/apply/clear), Remove image.
  */
 function ImageKebabMenu({
-  x, y, canSizeToFit,
+  x, y, canSizeToFit, monitors, layerIndex, layerCount,
   hasLayoutPosition, savedPosition,
-  onSizeImageToFit, onSaveImagePosition, onApplyLayoutPosition, onApplySavedPosition, onClearSavedPosition,
+  onSizeImageToFit, onSizeImageToMonitor, onReorder,
+  onSaveImagePosition, onApplyLayoutPosition, onApplySavedPosition, onClearSavedPosition,
   onRemoveImage, onClose,
 }: {
   x: number
   y: number
   canSizeToFit: boolean
+  monitors: Monitor[]
+  /** Index of this image in the layer stack (0 = bottom). */
+  layerIndex: number
+  layerCount: number
+  onSizeImageToMonitor: (monitor: Monitor) => void
+  onReorder: (to: ImageReorder) => void
   hasLayoutPosition: boolean
   savedPosition: { aspectRatio: number } | null
   onSizeImageToFit: () => void
@@ -1958,6 +1968,17 @@ function ImageKebabMenu({
   onClose: () => void
 }) {
   const menuRef = useRef<HTMLDivElement>(null)
+  // Keep the menu inside the canvas (it opens at the image's top-right corner, often near an edge)
+  const [pos, setPos] = useState({ left: x, top: y })
+  useLayoutEffect(() => {
+    const el = menuRef.current
+    const parent = el?.offsetParent as HTMLElement | null
+    if (!el || !parent) return
+    const margin = 8
+    const left = Math.max(margin, Math.min(x, parent.clientWidth - el.offsetWidth - margin))
+    const top = Math.max(margin, Math.min(y, parent.clientHeight - el.offsetHeight - margin))
+    setPos({ left, top })
+  }, [x, y])
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose()
@@ -1973,16 +1994,48 @@ function ImageKebabMenu({
   return (
     <div
       ref={menuRef}
-      className="absolute z-50 w-56 bg-gray-900 border border-gray-700 rounded-lg shadow-xl overflow-hidden"
-      style={{ left: x, top: y }}
+      className="absolute z-50 w-56 bg-gray-900 border border-gray-700 rounded-lg shadow-xl overflow-y-auto max-h-[70vh]"
+      style={pos}
     >
       <button
         onClick={() => { onSizeImageToFit(); onClose() }}
         disabled={!canSizeToFit}
         className={imageMenuItemClass}
       >
-        Size image to fit
+        Size image to fit layout
       </button>
+      {monitors.length > 1 && (
+        <>
+          <div className="px-3 pt-1.5 pb-0.5 text-[10px] uppercase tracking-wide text-gray-500">Fill one monitor</div>
+          {monitors.map(m => (
+            <button
+              key={m.id}
+              onClick={() => { onSizeImageToMonitor(m); onClose() }}
+              className={`${imageMenuItemClass} pl-5 truncate`}
+              title={`Cover ${getMonitorDisplayName(m)} with this image`}
+            >
+              {getMonitorDisplayName(m)}
+            </button>
+          ))}
+        </>
+      )}
+      {layerCount > 1 && (
+        <>
+          <div className="border-t border-gray-700" />
+          <button onClick={() => { onReorder('front'); onClose() }} disabled={layerIndex === layerCount - 1} className={imageMenuItemClass}>
+            Bring to front
+          </button>
+          <button onClick={() => { onReorder('forward'); onClose() }} disabled={layerIndex === layerCount - 1} className={imageMenuItemClass}>
+            Bring forward
+          </button>
+          <button onClick={() => { onReorder('backward'); onClose() }} disabled={layerIndex === 0} className={imageMenuItemClass}>
+            Send backward
+          </button>
+          <button onClick={() => { onReorder('back'); onClose() }} disabled={layerIndex === 0} className={imageMenuItemClass}>
+            Send to back
+          </button>
+        </>
+      )}
       <div className="border-t border-gray-700" />
       {hasLayoutPosition && (
         <button onClick={() => { onApplyLayoutPosition(); onClose() }} className={imageMenuItemClass}>
@@ -2305,7 +2358,8 @@ function BezelEditorPopover({
  */
 function CanvasMenuInner({
   hasMonitors,
-  hasImage,
+  imageCount,
+  selectedImageId,
   smartAlign,
   canSizeImageToFit,
   onSizeImageToFit,
@@ -2314,7 +2368,8 @@ function CanvasMenuInner({
   eyedropperActive,
 }: {
   hasMonitors: boolean
-  hasImage: boolean
+  imageCount: number
+  selectedImageId: string | null
   smartAlign: boolean
   canSizeImageToFit: boolean
   onSizeImageToFit: () => void
@@ -2421,23 +2476,35 @@ function CanvasMenuInner({
           >
             Clear all monitors
           </button>
+          {imageCount > 1 && selectedImageId && (
+            <button
+              onClick={() => {
+                dispatch({ type: 'REMOVE_IMAGE', id: selectedImageId })
+                toast('Image removed')
+                setOpen(false)
+              }}
+              className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+            >
+              Remove selected image
+            </button>
+          )}
           <button
-            disabled={!hasImage}
+            disabled={imageCount === 0}
             onClick={() => {
-              dispatch({ type: 'CLEAR_SOURCE_IMAGE' })
-              toast('Image removed')
+              dispatch({ type: 'CLEAR_ALL_IMAGES' })
+              toast(imageCount > 1 ? 'All images removed' : 'Image removed')
               setOpen(false)
             }}
             className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-300 disabled:cursor-default transition-colors"
           >
-            Remove image
+            {imageCount > 1 ? 'Remove all images' : 'Remove image'}
           </button>
           <div className="border-t border-gray-700" />
           <button
-            disabled={!hasMonitors && !hasImage}
+            disabled={!hasMonitors && imageCount === 0}
             onClick={() => {
               dispatch({ type: 'CLEAR_ALL_MONITORS' })
-              dispatch({ type: 'CLEAR_SOURCE_IMAGE' })
+              dispatch({ type: 'CLEAR_ALL_IMAGES' })
               toast.warning('Canvas reset')
               setOpen(false)
             }}
@@ -2457,7 +2524,7 @@ function CanvasMenuInner({
 function CanvasScrollbars({
   dimensions,
   monitors,
-  sourceImage,
+  images,
   canvasScale,
   canvasOffsetX,
   canvasOffsetY,
@@ -2465,7 +2532,7 @@ function CanvasScrollbars({
 }: {
   dimensions: { width: number; height: number }
   monitors: Monitor[]
-  sourceImage: SourceImage | null
+  images: SourceImage[]
   canvasScale: number
   canvasOffsetX: number
   canvasOffsetY: number
@@ -2484,11 +2551,11 @@ function CanvasScrollbars({
       maxX = Math.max(maxX, m.physicalX + m.physicalWidth)
       maxY = Math.max(maxY, m.physicalY + m.physicalHeight)
     }
-    if (sourceImage) {
-      minX = Math.min(minX, sourceImage.physicalX)
-      minY = Math.min(minY, sourceImage.physicalY)
-      maxX = Math.max(maxX, sourceImage.physicalX + sourceImage.physicalWidth)
-      maxY = Math.max(maxY, sourceImage.physicalY + sourceImage.physicalHeight)
+    for (const img of images) {
+      minX = Math.min(minX, img.physicalX)
+      minY = Math.min(minY, img.physicalY)
+      maxX = Math.max(maxX, img.physicalX + img.physicalWidth)
+      maxY = Math.max(maxY, img.physicalY + img.physicalHeight)
     }
     // Add padding in physical space
     const padX = (maxX - minX) * 0.3
@@ -2499,7 +2566,7 @@ function CanvasScrollbars({
       maxX: maxX + padX,
       maxY: maxY + padY,
     }
-  }, [monitors, sourceImage])
+  }, [monitors, images])
 
   // Convert content bounds to canvas pixels
   const contentMinCX = contentBounds.minX * canvasScale + canvasOffsetX

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useStore } from '../store'
+import { useStore, getPrimaryImage } from '../store'
 import { buildShareUrl } from '../urlLayout'
 import { useToast } from './Toast'
 import { getSourceImageAspect } from '../utils'
@@ -22,13 +22,15 @@ export default function ShareButton() {
       bezels: m.bezels,
     }))
 
-    const imagePosition = state.sourceImage
+    // Share links carry one image position: the primary (bottom) layer
+    const primary = getPrimaryImage(state)
+    const imagePosition = primary
       ? {
-          x: state.sourceImage.physicalX,
-          y: state.sourceImage.physicalY,
-          width: state.sourceImage.physicalWidth,
-          height: state.sourceImage.physicalHeight,
-          aspectRatio: getSourceImageAspect(state.sourceImage),
+          x: primary.physicalX,
+          y: primary.physicalY,
+          width: primary.physicalWidth,
+          height: primary.physicalHeight,
+          aspectRatio: getSourceImageAspect(primary),
         }
       : state.loadedLayoutImagePosition ?? null
 

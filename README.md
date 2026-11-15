@@ -53,6 +53,7 @@ Spanright operates in **physical space** (inches/cm), so you arrange monitors as
 - **Monitor rotation** — Rotate any monitor 90° (portrait/landscape) via the ↻ button or **right-click** context menu. Resolution is swapped (e.g. 1080×1920 when rotated); rotation is saved in saved layouts and reflected in output and the Virtual Layout view.
 - **Right-click or kebab menu** — Right-click any monitor, or when a monitor is selected click the **⋮** (kebab) button next to the **✕** delete button, for **Set Bezels**, **Rename**, **Rotate 90°**, **Duplicate**, and **Delete**. Bezels are optional per-edge borders (in mm) that extend outward from the display area; they help with alignment and matching real bezels, and Align Assist snaps to outer bezel edges when set. **Duplicate** copies the monitor (preset/size, bezels, rotation, name with " - Copy 1" appended) and places the copy offset so you can drag it easily.
 - **Image placement** — Upload a source image and drag/scale it behind the monitor layout. Semi-transparent monitor overlays let you see exactly what portion of the image each screen will display. Vertical images (height > width) default to 6 ft tall; horizontal ones default to 6 ft wide.
+- **Multiple images (layers)** — Add more than one image, e.g. one image spanning two monitors and a separate image on each of the others. Images stack as layers: higher layers cover lower ones where they overlap, and each monitor shows whatever is on top. Reorder with **Bring to front / forward / Send backward / to back** (image ⋮ menu, right-click, the toolbar **Layers** list, or Ctrl+] / Ctrl+[). Use **Fill one monitor** in the image menu to cover a single screen, or drop an additional image directly onto a monitor to fill it.
 - **Smart image recommendations** — Calculates the minimum source image resolution needed based on your layout's physical size and the highest-PPI monitor.
 - **Accurate output generation** — Crops and scales the source image per-monitor at each screen's native PPI, then stitches at each monitor's virtual layout position (side-by-side, stacked, or mixed). Gaps in the layout use a configurable fill: solid color (default black), blurred edge extension, or transparent (PNG only).
 - **Preview & download** — Live preview of the final stitched wallpaper with one-click PNG/JPEG export.
@@ -116,7 +117,7 @@ Drag monitors on the canvas to match your physical desk arrangement:
 - Position your laptop screen lower-left, your main monitor centered, etc.
 - The canvas uses physical dimensions — a 27" monitor will appear larger than a 13" laptop
 - **Right-click** a monitor, or select it and click the **⋮** kebab next to the **✕**, for the context menu: **Set Bezels**, **Rename**, **Rotate 90°**, **Duplicate**, or **Delete**. Bezels extend outward from the display area; Align Assist snaps to outer bezel edges when bezels are set.
-- When the **source image** is selected, use the **⋮** kebab or **right-click** the image for **Size image to fit**, **Bookmark image position**, **Apply bookmarked position** (when a bookmark exists), **Clear bookmarked position**, and **Remove image**.
+- When an **image** is selected, use the **⋮** kebab or **right-click** the image for **Size image to fit layout**, **Fill one monitor**, **Bring to front / forward**, **Send backward / to back** (with 2+ images), **Bookmark image position**, **Apply bookmarked position** (when a bookmark exists), **Clear bookmarked position**, and **Remove image**.
 - Use **Align Assist** (canvas menu) for dynamic edge/center alignment guides while dragging monitors
 - Use the **↻** (rotate) button on a monitor, or **Rotate 90°** from the right-click menu, to switch between landscape and portrait
 - Click a monitor and press **Delete** (or use the context menu) to remove it
@@ -133,7 +134,8 @@ Drag monitors on the canvas to match your physical desk arrangement:
 - Use **Size image to fit** from the canvas menu (top-right ⋮) or from the **⋮** kebab / right-click menu on the source image. The canvas menu also has **Editor shortcuts** — opens a dialog listing all keyboard shortcuts (nudge, undo/redo, fit, pan/zoom, etc.).
 - **Right-click** the image for **Bookmark image position**, **Apply bookmarked position**, or **Clear bookmarked position**
 - With **Align Assist** enabled, image drag/resize shows green alignment guides against monitor edges/centers
-- Check the **recommended image size** banner in the toolbar — green means your image is large enough, yellow/red means it may appear pixelated
+- Check the **recommended image size** banner in the toolbar — green means your image is large enough, yellow/red means it may appear pixelated. With several images, the check applies to the selected image, against the sharpest monitor it covers
+- **Multiple images:** use **+ Add Image** in the toolbar (or drop more files onto the canvas). An additional image dropped onto a monitor, or added while a monitor is selected, is sized to fill that monitor; otherwise it is centered in view. The **Layers** dropdown lists every image top-first for selecting, reordering, and removing. The bottom image is the *primary* one: it is used for the blurred-edge fill and its position is what saved layouts and share links store
 
 ### 4. Virtual Layout (optional)
 

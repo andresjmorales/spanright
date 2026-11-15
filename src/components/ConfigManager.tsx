@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { useStore } from '../store'
+import { useStore, getPrimaryImage } from '../store'
 import { useToast } from './Toast'
 import type { SavedConfig, SavedImagePosition, SavedWindowsPosition } from '../types'
 import { PRELOADED_LAYOUTS, decodePreloadedLayout } from '../preloadedLayouts'
@@ -154,8 +154,8 @@ export default function ConfigManager() {
 
   const handleSave = () => {
     if (!saveName.trim() || state.monitors.length === 0) return
-    // Use current canvas image position when present; otherwise keep layout image position (e.g. from shared link)
-    const img = state.sourceImage
+    // Use the primary (bottom) image position when present; otherwise keep layout image position (e.g. from shared link)
+    const img = getPrimaryImage(state)
     const imagePosition: SavedImagePosition | null = img
       ? {
           x: img.physicalX,

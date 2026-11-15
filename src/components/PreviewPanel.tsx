@@ -42,7 +42,7 @@ export default function PreviewPanel() {
     }
 
     debounceRef.current = requestAnimationFrame(() => {
-      const result = generateOutput(state.monitors, state.sourceImage, state.windowsArrangement, {
+      const result = generateOutput(state.monitors, state.images, state.windowsArrangement, {
         mode: state.fillMode,
         solidColor: state.fillSolidColor,
       })
@@ -55,7 +55,7 @@ export default function PreviewPanel() {
         cancelAnimationFrame(debounceRef.current)
       }
     }
-  }, [state.monitors, state.sourceImage, state.windowsArrangement, state.fillMode, state.fillSolidColor])
+  }, [state.monitors, state.images, state.windowsArrangement, state.fillMode, state.fillSolidColor])
 
   // Draw preview
   useEffect(() => {
@@ -110,10 +110,10 @@ export default function PreviewPanel() {
 
   const getDefaultFilename = useCallback(() => {
     if (!output) return 'spanright'
-    const srcName = state.sourceImage?.fileName
+    const srcName = state.images[0]?.fileName
     const baseName = srcName ? srcName.replace(/\.[^.]+$/, '') : 'wallpaper'
     return `spanright-${baseName}-${output.width}x${output.height}`
-  }, [output, state.sourceImage])
+  }, [output, state.images])
 
   const openDownloadDialog = useCallback(() => {
     setDownloadFilename(getDefaultFilename())
@@ -206,7 +206,7 @@ export default function PreviewPanel() {
           {isGenerating && (
             <span className="text-xs text-blue-400 animate-pulse">Generating...</span>
           )}
-          {!state.sourceImage && state.monitors.length > 0 && (
+          {state.images.length === 0 && state.monitors.length > 0 && (
             <span className="text-xs text-yellow-500">Upload an image to preview output</span>
           )}
         </div>
@@ -341,7 +341,7 @@ export default function PreviewPanel() {
             <div className="relative" ref={downloadPopoverRef}>
               <button
                 onClick={openDownloadDialog}
-                disabled={!state.sourceImage}
+                disabled={state.images.length === 0}
                 className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white text-xs py-1 px-2.5 rounded border border-gray-600 disabled:border-gray-700 transition-colors flex items-center gap-1.5"
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
