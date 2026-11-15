@@ -128,7 +128,7 @@ Drag monitors on the canvas to match your physical desk arrangement:
 ### 3. Upload & Position Your Image
 
 - Drag and drop an image file onto the canvas, or use the upload button in the toolbar
-- The image appears behind the monitors with 70% opacity. If you loaded a layout that had a saved image position, the next image you upload is automatically positioned from that layout (with aspect-ratio adaptation); a toast confirms "Image positioned from saved layout"
+- The image appears behind the semi-transparent monitor overlays, fully opaque so the canvas matches the exported output (higher layers hide lower ones exactly as in the export). If you loaded a layout that had a saved image position, the next image you upload is automatically positioned from that layout (with aspect-ratio adaptation); a toast confirms "Image positioned from saved layout"
 - **Drag** the image to reposition it
 - **Click** the image and use the corner handles to resize it
 - Use **Size image to fit** from the canvas menu (top-right ⋮) or from the **⋮** kebab / right-click menu on the source image. The canvas menu also has **Editor shortcuts** — opens a dialog listing all keyboard shortcuts (nudge, undo/redo, fit, pan/zoom, etc.).
