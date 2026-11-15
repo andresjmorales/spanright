@@ -106,18 +106,22 @@ function isStripCovered(w: number, h: number, rects: { l: number; t: number; r: 
 /** Blur radius (px) for blurred-edge fill. */
 const FILL_BLUR_RADIUS_PX = 80
 
-export function generateOutput(
-  monitors: Monitor[],
-  images: SourceImage[],
-  windowsArrangement: WindowsMonitorPosition[],
-  fill?: FillSettings,
-): OutputResult | null {
-  if (monitors.length === 0) return null
+export interface OutputLayout {
+  width: number
+  height: number
+  strips: OutputResult['monitors']
+}
 
-  // Build lookup maps
+/**
+ * Output dimensions and where each monitor's strip sits, without drawing anything.
+ * Cheap; used by generateOutput and for the preview's loading placeholder.
+ */
+export function computeOutputLayout(
+  monitors: Monitor[],
+  windowsArrangement: WindowsMonitorPosition[],
+): OutputLayout | null {
   const monitorMap = new Map<string, Monitor>()
   for (const m of monitors) monitorMap.set(m.id, m)
-
   const winPosList = windowsArrangement.filter(wp => monitorMap.has(wp.monitorId))
   if (winPosList.length === 0) return null
 
@@ -128,15 +132,38 @@ export function generateOutput(
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (const wp of winPosList) {
     const mon = monitorMap.get(wp.monitorId)!
-    const sw = stripWidth(mon)
-    const sh = stripHeight(mon)
     minX = Math.min(minX, wp.pixelX)
     minY = Math.min(minY, wp.pixelY)
-    maxX = Math.max(maxX, wp.pixelX + sw)
-    maxY = Math.max(maxY, wp.pixelY + sh)
+    maxX = Math.max(maxX, wp.pixelX + stripWidth(mon))
+    maxY = Math.max(maxY, wp.pixelY + stripHeight(mon))
   }
-  const totalWidth = maxX - minX
-  const totalHeight = maxY - minY
+  return {
+    width: maxX - minX,
+    height: maxY - minY,
+    strips: winPosList.map(wp => {
+      const monitor = monitorMap.get(wp.monitorId)!
+      return {
+        monitor,
+        stripWidth: stripWidth(monitor),
+        stripHeight: stripHeight(monitor),
+        stripX: Math.round(wp.pixelX - minX),
+        stripY: Math.round(wp.pixelY - minY),
+      }
+    }),
+  }
+}
+
+export function generateOutput(
+  monitors: Monitor[],
+  images: SourceImage[],
+  windowsArrangement: WindowsMonitorPosition[],
+  fill?: FillSettings,
+): OutputResult | null {
+  if (monitors.length === 0) return null
+  const layout = computeOutputLayout(monitors, windowsArrangement)
+  if (!layout) return null
+  const totalWidth = layout.width
+  const totalHeight = layout.height
 
   // Create output canvas
   const outputCanvas = document.createElement('canvas')
@@ -162,12 +189,7 @@ export function generateOutput(
     element: ((img.rotation ?? 0) !== 0 ? rotatedImageCanvas(img) : img.element) as HTMLImageElement | HTMLCanvasElement,
   }))
 
-  for (const wp of winPosList) {
-    const monitor = monitorMap.get(wp.monitorId)!
-    const sw = stripWidth(monitor)
-    const sh = stripHeight(monitor)
-    const drawX = Math.round(wp.pixelX - minX)
-    const drawY = Math.round(wp.pixelY - minY)
+  for (const { monitor, stripWidth: sw, stripHeight: sh, stripX: drawX, stripY: drawY } of layout.strips) {
 
     const monLeft = monitor.physicalX
     const monTop = monitor.physicalY

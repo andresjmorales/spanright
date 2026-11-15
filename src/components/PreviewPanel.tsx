@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState, useCallback, type FormEvent } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback, type FormEvent } from 'react'
 import { useStore } from '../store'
 import { useToast } from './Toast'
-import { generateOutput, type OutputResult } from '../generateOutput'
+import { generateOutput, computeOutputLayout, type OutputResult, type OutputLayout } from '../generateOutput'
 import { getMonitorDisplayName } from '../utils'
 import { IconEyedropper } from '../icons'
-import type { FillMode } from '../types'
+import type { FillMode, Monitor, SourceImage, WindowsMonitorPosition } from '../types'
 
 /** Solid fill preset colors for quick select. */
 const FILL_PRESET_BLACK = '#000000'
@@ -13,55 +13,106 @@ const FILL_PRESET_DARK_GRAY = '#1a1a1a'
 
 const CHECKERBOARD_CELL_PX = 8
 
+/** Everything the generated output depends on. Store updates are immutable, so reference equality is exact. */
+interface PreviewInputs {
+  monitors: Monitor[]
+  images: SourceImage[]
+  windowsArrangement: WindowsMonitorPosition[]
+  fillMode: FillMode
+  fillSolidColor: string
+}
+
+function sameInputs(a: PreviewInputs, b: PreviewInputs): boolean {
+  return a.monitors === b.monitors && a.images === b.images && a.windowsArrangement === b.windowsArrangement &&
+    a.fillMode === b.fillMode && a.fillSolidColor === b.fillSolidColor
+}
+
+/**
+ * Last generated preview, kept at module level because this panel unmounts whenever another tab is
+ * shown. Coming back with nothing changed reuses it instantly instead of regenerating; coming back
+ * after edits shows it dimmed as a placeholder while the new output renders.
+ */
+let lastPreview: { inputs: PreviewInputs; output: OutputResult } | null = null
+
 export default function PreviewPanel() {
   const { state, dispatch } = useStore()
   const toast = useToast()
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const [output, setOutput] = useState<OutputResult | null>(null)
-  const [isGenerating, setIsGenerating] = useState(false)
+  const inputs = useMemo<PreviewInputs>(() => ({
+    monitors: state.monitors,
+    images: state.images,
+    windowsArrangement: state.windowsArrangement,
+    fillMode: state.fillMode,
+    fillSolidColor: state.fillSolidColor,
+  }), [state.monitors, state.images, state.windowsArrangement, state.fillMode, state.fillSolidColor])
+  /** Strip layout of the output; cheap, so the placeholder can match the real shape. */
+  const layout = useMemo(() => computeOutputLayout(state.monitors, state.windowsArrangement), [state.monitors, state.windowsArrangement])
+  const [output, setOutput] = useState<OutputResult | null>(() =>
+    lastPreview && sameInputs(lastPreview.inputs, inputs) ? lastPreview.output : null)
+  /**
+   * Shown until the first output of this mount is ready: the previous preview (dimmed) when it has the
+   * same dimensions as the new layout, otherwise null and a skeleton of the layout is drawn instead.
+   */
+  const [stalePreview] = useState<OutputResult | null>(() => {
+    if (!lastPreview || sameInputs(lastPreview.inputs, inputs) || !layout) return null
+    const prev = lastPreview.output
+    return prev.width === layout.width && prev.height === layout.height ? prev : null
+  })
+  const [isGenerating, setIsGenerating] = useState(() => !output && state.monitors.length > 0)
   const [showDownloadDialog, setShowDownloadDialog] = useState(false)
   const [downloadFilename, setDownloadFilename] = useState('')
   const [showEmptyAreaOptions, setShowEmptyAreaOptions] = useState(false)
   const downloadPopoverRef = useRef<HTMLDivElement>(null)
   const emptyAreaPopoverRef = useRef<HTMLDivElement>(null)
   const emptyAreaTriggerRef = useRef<HTMLButtonElement>(null)
-  const debounceRef = useRef<number | null>(null)
 
-  // Debounced output generation
+  // Output generation. Deferred until after the next paint (rAF + timeout) so the placeholder shows
+  // before the heavy work blocks the main thread; skipped entirely when the cached output still matches.
   useEffect(() => {
-    if (state.monitors.length === 0) {
+    if (inputs.monitors.length === 0) {
       setOutput(null)
+      setIsGenerating(false)
+      return
+    }
+    if (lastPreview && sameInputs(lastPreview.inputs, inputs)) {
+      setOutput(lastPreview.output)
+      setIsGenerating(false)
       return
     }
 
     setIsGenerating(true)
-
-    if (debounceRef.current) {
-      cancelAnimationFrame(debounceRef.current)
-    }
-
-    debounceRef.current = requestAnimationFrame(() => {
-      const result = generateOutput(state.monitors, state.images, state.windowsArrangement, {
-        mode: state.fillMode,
-        solidColor: state.fillSolidColor,
-      })
-      setOutput(result)
-      setIsGenerating(false)
+    let timer: number | undefined
+    const raf = requestAnimationFrame(() => {
+      timer = window.setTimeout(() => {
+        const result = generateOutput(inputs.monitors, inputs.images, inputs.windowsArrangement, {
+          mode: inputs.fillMode,
+          solidColor: inputs.fillSolidColor,
+        })
+        lastPreview = result ? { inputs, output: result } : null
+        setOutput(result)
+        setIsGenerating(false)
+      }, 0)
     })
 
     return () => {
-      if (debounceRef.current) {
-        cancelAnimationFrame(debounceRef.current)
-      }
+      cancelAnimationFrame(raf)
+      if (timer !== undefined) clearTimeout(timer)
     }
-  }, [state.monitors, state.images, state.windowsArrangement, state.fillMode, state.fillSolidColor])
+  }, [inputs])
 
-  // Draw preview
-  useEffect(() => {
+  /** What the canvas shows: fresh output, else the dimmed previous preview, else a layout skeleton. */
+  const displayed: OutputResult | null = output ?? stalePreview
+  const showingPlaceholder = !output
+  /** Header info, available as soon as the layout is known. */
+  const info = output ?? stalePreview ?? (layout ? { ...layout, hasEmptyArea: false, hasUncoveredMonitorArea: false } : null)
+
+  // Draw preview. Layout effect so the first paint after switching tabs already has content.
+  useLayoutEffect(() => {
     const canvas = canvasRef.current
     const container = containerRef.current
-    if (!canvas || !container || !output) return
+    const frame: OutputLayout | null = displayed ? { width: displayed.width, height: displayed.height, strips: displayed.monitors } : layout
+    if (!canvas || !container || !frame) return
 
     const ctx = canvas.getContext('2d')!
     // p-8 = 32px each side (64 total); canvas has border-2 = 4px extra per axis
@@ -69,9 +120,9 @@ export default function PreviewPanel() {
     const containerHeight = container.clientHeight - 64 - 4
 
     // Scale to fit container
-    const displayScale = Math.min(1, containerWidth / output.width, containerHeight / output.height)
-    canvas.width = Math.round(output.width * displayScale)
-    canvas.height = Math.round(output.height * displayScale)
+    const displayScale = Math.min(1, containerWidth / frame.width, containerHeight / frame.height)
+    canvas.width = Math.round(frame.width * displayScale)
+    canvas.height = Math.round(frame.height * displayScale)
 
     if (state.fillMode === 'transparent') {
       for (let cy = 0; cy < canvas.height; cy += CHECKERBOARD_CELL_PX) {
@@ -84,17 +135,25 @@ export default function PreviewPanel() {
       ctx.fillStyle = '#000000'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
     }
-    ctx.drawImage(output.canvas, 0, 0, canvas.width, canvas.height)
+    if (displayed) {
+      ctx.drawImage(displayed.canvas, 0, 0, canvas.width, canvas.height)
+    }
 
     // Strip rects in preview pixels. Round each edge (not the width) so neighbouring strips share
     // exactly the same boundary pixel instead of leaving a gap or overlap.
-    const stripRects = output.monitors.map(strip => {
+    const stripRects = frame.strips.map(strip => {
       const x = Math.round(strip.stripX * displayScale)
       const y = Math.round(strip.stripY * displayScale)
       const right = Math.round((strip.stripX + strip.stripWidth) * displayScale)
       const bottom = Math.round((strip.stripY + strip.stripHeight) * displayScale)
       return { strip, x, y, w: right - x, h: bottom - y }
     })
+
+    // Skeleton (nothing generated yet): fill each monitor's strip so the placeholder has the real shape
+    if (!displayed) {
+      ctx.fillStyle = '#1f2937'
+      for (const { x, y, w, h } of stripRects) ctx.fillRect(x, y, w, h)
+    }
 
     // Labels at the top of each monitor
     for (const { strip, x, y, w } of stripRects) {
@@ -121,7 +180,7 @@ export default function PreviewPanel() {
     ctx.strokeStyle = 'rgba(255,255,255,0.25)'
     ctx.lineWidth = 1
     ctx.stroke()
-  }, [output, state.fillMode])
+  }, [displayed, layout, state.fillMode])
 
   const getDefaultFilename = useCallback(() => {
     if (!output) return 'spanright'
@@ -213,9 +272,9 @@ export default function PreviewPanel() {
           <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">
             Output Preview
           </h2>
-          {output && (
+          {info && (
             <span className="text-xs font-mono text-gray-400 bg-gray-800 px-2 py-0.5 rounded">
-              {output.width} x {output.height} px
+              {info.width} x {info.height} px
             </span>
           )}
           {isGenerating && (
@@ -226,7 +285,7 @@ export default function PreviewPanel() {
           )}
         </div>
 
-        {output && (
+        {info && (
           <div className="flex items-center gap-3">
             <button
               onClick={() => dispatch({ type: 'SET_SHOW_TROUBLESHOOTING_GUIDE', value: true })}
@@ -239,10 +298,10 @@ export default function PreviewPanel() {
               <button
                 ref={emptyAreaTriggerRef}
                 type="button"
-                onClick={() => output?.hasEmptyArea && setShowEmptyAreaOptions((v) => !v)}
-                disabled={!output?.hasEmptyArea}
+                onClick={() => info?.hasEmptyArea && setShowEmptyAreaOptions((v) => !v)}
+                disabled={!info?.hasEmptyArea}
                 className="text-xs bg-gray-800 border border-gray-700 rounded px-2 py-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-800 text-gray-400 hover:text-gray-200 hover:bg-gray-700"
-                title={output?.hasEmptyArea ? 'Options for empty area (regions not covered by any image)' : 'No empty area in this setup'}
+                title={info?.hasEmptyArea ? 'Options for empty area (regions not covered by any image)' : 'No empty area in this setup'}
               >
                 Empty area options
               </button>
@@ -253,7 +312,7 @@ export default function PreviewPanel() {
                   >
                     {/* Banner first — always on top of color/fill controls */}
                     <div className="px-3 py-2 bg-gray-800/80 border-b border-gray-700/50 space-y-1">
-                      {output?.hasUncoveredMonitorArea ? (
+                      {info?.hasUncoveredMonitorArea ? (
                         <p className="text-xs text-yellow-500/90">
                           Part of a monitor isn&apos;t covered by any image, so that area will show this fill on screen.
                         </p>
@@ -362,7 +421,7 @@ export default function PreviewPanel() {
             <div className="relative" ref={downloadPopoverRef}>
               <button
                 onClick={openDownloadDialog}
-                disabled={state.images.length === 0}
+                disabled={state.images.length === 0 || !output}
                 className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white text-xs py-1 px-2.5 rounded border border-gray-600 disabled:border-gray-700 transition-colors flex items-center gap-1.5"
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -415,7 +474,9 @@ export default function PreviewPanel() {
       <div ref={containerRef} className="flex-1 flex items-center justify-center p-8 overflow-auto bg-[#12122a]">
         <canvas
           ref={canvasRef}
-          className="border-2 border-gray-600 rounded bg-black"
+          className={`border-2 border-gray-600 rounded bg-black transition-[filter,opacity] duration-200 ${
+            showingPlaceholder ? (displayed ? 'grayscale-[60%] blur-[2px] opacity-70' : 'animate-pulse') : ''
+          }`}
           style={{ imageRendering: 'auto' }}
         />
       </div>
