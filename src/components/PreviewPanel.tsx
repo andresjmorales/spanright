@@ -86,18 +86,18 @@ export default function PreviewPanel() {
     }
     ctx.drawImage(output.canvas, 0, 0, canvas.width, canvas.height)
 
-    // Draw monitor strip boundaries and labels (each at its actual position)
-    for (const strip of output.monitors) {
+    // Strip rects in preview pixels. Round each edge (not the width) so neighbouring strips share
+    // exactly the same boundary pixel instead of leaving a gap or overlap.
+    const stripRects = output.monitors.map(strip => {
       const x = Math.round(strip.stripX * displayScale)
       const y = Math.round(strip.stripY * displayScale)
-      const w = Math.round(strip.stripWidth * displayScale)
-      const h = Math.round(strip.stripHeight * displayScale)
+      const right = Math.round((strip.stripX + strip.stripWidth) * displayScale)
+      const bottom = Math.round((strip.stripY + strip.stripHeight) * displayScale)
+      return { strip, x, y, w: right - x, h: bottom - y }
+    })
 
-      ctx.strokeStyle = 'rgba(255,255,255,0.25)'
-      ctx.lineWidth = 1
-      ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1)
-
-      // Label at top of this monitor
+    // Labels at the top of each monitor
+    for (const { strip, x, y, w } of stripRects) {
       ctx.fillStyle = 'rgba(0,0,0,0.65)'
       ctx.fillRect(x, y, w, 18)
       ctx.fillStyle = 'rgba(255,255,255,0.8)'
@@ -106,6 +106,21 @@ export default function PreviewPanel() {
       const label = `${getMonitorDisplayName(strip.monitor)} (${strip.stripWidth}x${strip.stripHeight})`
       ctx.fillText(label, x + w / 2, y + 12, w - 4)
     }
+
+    // Strip boundaries as one path, after the labels so the lines run unbroken. Each edge sits on
+    // the strip's first pixel column/row (right/bottom edges on the pixel just past the strip, i.e.
+    // the neighbour's first pixel), so a shared edge between adjacent monitors is a single line.
+    ctx.beginPath()
+    for (const { x, y, w, h } of stripRects) {
+      const l = x + 0.5
+      const t = y + 0.5
+      const r = Math.min(x + w, canvas.width - 1) + 0.5
+      const b = Math.min(y + h, canvas.height - 1) + 0.5
+      ctx.rect(l, t, r - l, b - t)
+    }
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)'
+    ctx.lineWidth = 1
+    ctx.stroke()
   }, [output, state.fillMode])
 
   const getDefaultFilename = useCallback(() => {
